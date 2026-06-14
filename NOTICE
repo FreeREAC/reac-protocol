@@ -1,0 +1,23 @@
+reac-protocol
+Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
+
+Licensed under GPL-3.0-or-later (see LICENSE).
+
+An independent interoperability reference for Roland's REAC (EtherType 0x8819),
+derived from FreeREAC's own packet captures, from GPL-3.0 open-source
+reverse-engineering projects, and from a reverse-engineering pass on console
+firmware — all re-expressed in FreeREAC's own words and tables. REAC is a Roland
+trademark; this is not official Roland documentation, and FreeREAC is not affiliated
+with or endorsed by Roland.
+
+## References
+
+The wire-format reference draws on three GPL-3.0 reverse-engineered codebases:
+
+  - per-gron/reacdriver — GPL-3.0
+  - norihiro/obs-h8819-source — GPL-3.0-or-later
+  - norihiro/reaccapture — GPL-3.0-or-later
+
+Protocol facts (the wire schema, message formats, the remote-control command
+surface) are unprotected interface data, restated here in our own words and tables.
+No Roland binaries, symbols, or decompilation listings are reproduced.
