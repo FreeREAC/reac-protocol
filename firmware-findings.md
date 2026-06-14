@@ -6,6 +6,15 @@ behaviours derived from a reverse-engineering pass on Roland console firmware an
 on-rig observation of live M-5000 hardware. **No Roland binaries, symbols, or
 disassembly listings are reproduced.** Status tags as in the wire-format doc.
 
+**Why the firmware only shows connection logic. [S]** On these devices the wire
+framing and the sample clock live in an **on-board FPGA**, not in the device CPU.
+The `0x8819` Ethernet framing, the per-frame counter,
+the per-frame sample tick, and the link-check counter are all FPGA-generated; the CPU
+is handed already-parsed control messages and runs the high-level connection state
+machine on top. So a firmware RE pass yields the **connection behaviour** below — join,
+hold, drop, channel-map negotiation — but never the frame builder or the clock
+recovery, which is why those facts have to come from on-wire capture instead.
+
 ## On-rig verification of the wire spec (live M-5000 master) [V]
 
 Forward broadcast control frames captured from both REAC ports of an M-5000 master
@@ -60,6 +69,24 @@ master:
 A virtual REAC slave is reproducible from this: flood broadcast FILLER, then unicast
 audio + checksummed CONTROL (return map `01 03 00 01 81`) to the master MAC.
 
+## Holding the link — the per-frame link-check budget [S]
+
+Once established, the link is held against a **single per-frame budget of ~600 frames**.
+Each REAC frame decrements it; reaching zero declares the peer absent. Because a frame is
+one sample slot, 600 frames is **≈150 ms at 48 kHz / ≈75 ms at 96 kHz** — so the
+wall-clock loss tolerance *halves* when the sample rate doubles, and a 96 kHz link is
+about twice as fragile as a 48 kHz one over a lossy hop. This matches the observed 96 kHz
+Wi-Fi fragility on the rig.
+
+The established side re-arms the budget with its **periodic keep-alive heartbeat** (the
+~1/s CONTROL frame `01 03 00 01 81`): a heartbeat carrying the keep-alive selector resets
+the count to full, the same selector cleared latches an explicit disconnect, and a change
+of the peer's source MAC also forces a disconnect. The counter itself is decremented
+**in the FPGA**, not in CPU code — the device firmware only arms and tests it. A frame
+budget that is FPGA-ticked but CPU-armed is the device-side mechanism behind the wire's
+~1000 ms no-audio cutoff and the heartbeat re-arm described in
+[wire-format.md](wire-format.md).
+
 ## Master split/mirror output vs a true split device [V]
 
 A master REAC port configured as a split / mirror output emits a passive copy of the
@@ -94,8 +121,16 @@ version):
 - The console maintains a full AES3 **channel-status array** (24 bytes) and can
   internally lock its clock to an AES input, though the vendor UI documents AES IN as a
   clock slave only (AES-as-master is an undocumented internal capability, not something
-  to rely on). Documented clock masters: INTERNAL, WORD CLOCK, REAC A, REAC B (plus
-  expansion-slot sources).
+  to rely on).
+- The master exposes a **settable clock-source selector** over the control protocol
+  (not over the REAC audio wire): the front-panel-visible sources are **WORD CLOCK**,
+  **REAC A**, **REAC B**, **INTERNAL** (free-run — the normal "master" mode), and
+  **AES** input pairs (plus expansion-slot sources). Choosing REAC A/B slaves the
+  desk's own clock to a clock arriving on a REAC port; choosing INTERNAL makes the desk
+  free-run and clock the fabric. The selection changes *what* the master locks to, not
+  the on-wire REAC frame form. (The selector is a routing/configuration parameter, the
+  same in nature as "which source feeds an output slot" — see the clock-source selector
+  note in [wire-format.md](wire-format.md).)
 - The rear panel exposes 2 stereo AES3 pairs each way (AES/EBU IN 1/2, IN 3/4,
   OUT 1/2, OUT 3/4), all IEC 60958-compliant; each pair is one AES3 stream whose
   A/B subframes carry L/R.
