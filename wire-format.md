@@ -12,6 +12,15 @@ REAC is a proprietary **synchronous Layer-2** audio-over-Ethernet transport. One
 lock to it; a **split** receiver listens passively. Up to **40 channels** per REAC
 connection, 24-bit, at 44.1 / 48 / 96 kHz, over a single Cat5e run.
 
+**The wire framing and the sample clock are owned by an on-board FPGA**, not the
+device CPU. **[S]** The FPGA assembles and parses the
+`0x8819` Ethernet frames, generates the per-frame sample tick, and runs the
+per-frame link-check counter; the CPU is handed already-parsed control messages and
+runs only the high-level connection state machine on top. The practical consequence
+for an outside observer: every byte-level fact in this document is something the FPGA
+produces, and the connection *behaviour* in the lifecycle section is the only layer a
+software node can mimic without re-implementing the framing/clock engine.
+
 ## Physical / link layer
 
 - **100BASE-TX** (Fast Ethernet, full-duplex), Cat5e / RJ-45 — not 10 Mbit, not
@@ -80,12 +89,21 @@ external concern (switch / VLAN topology), not a protocol field.
 |---|---|---|
 | `0x00 0x00` | FILLER | carries audio; receivers skip the checksum on this type |
 | `0xcd 0xea` | CONTROL | sub-typed by the first 5 `data[]` bytes |
-| `0xcf 0xea` | MASTER_ANNOUNCE | |
-| `0xce 0xea` | SPLIT_ANNOUNCE | |
+| `0xcf 0xea` | MASTER_ANNOUNCE | ~1/s; carries master MAC + in/out channel counts |
+| `0xce 0xea` | SPLIT_ANNOUNCE | the passive-split path |
+| `0xc2 0xea` | ENDING | the split/teardown path (distinct from the `0xC2 0xEA` end-marker role at byte 1490) |
 
 There is **no distinct "audio" frame type** — audio rides in every frame, including
 FILLER. The master interleaves FILLER frames with periodic CONTROL / ANNOUNCE
 frames while continuously filling the audio region.
+
+**What our stageboxes actually emit. [V]** A stagebox in slave mode sends only
+**FILLER** (`0x00 0x00`) and **CONTROL** (`0xcd 0xea`) — zero `0xce 0xea` /
+`0xc2 0xea`. The `SPLIT_ANNOUNCE` / `ENDING` types belong to the passive-split path;
+a plain slave, a merge unit in slave mode, and a master's mirror output never source
+them. They remain the last unmapped frame types — capturing them needs a real split
+device in the chain. `MASTER_ANNOUNCE` (`0xcf 0xea`) is master-only and is likewise
+never sourced by a slave.
 
 ### CONTROL sub-types — `data[0..4]` prefix [S]
 
@@ -195,7 +213,9 @@ pps) is the same model, not yet exercised on our rig.
 
 REAC has **one sample-clock master** (the console). The master emits a frame every slot
 period from its own crystal — 272 µs at 44.1 kHz, 250 µs at 48 kHz, 125 µs at 96 kHz —
-and that cadence *is* the fabric word clock.
+and that cadence *is* the fabric word clock. The slot tick is generated **in the FPGA**,
+not in CPU software, which is why the device firmware shows the connection logic but not
+the sample clock itself. **[S]**
 
 The receiver is a **hardware clock slave with no jitter buffer**. It does not buffer and
 resample; it recovers word clock directly from packet **arrival cadence**, advancing its
@@ -209,6 +229,26 @@ after **1000 ms** without a sized audio frame. At the transport layer "connected
 declared purely by **packet length** — the first frame whose length equals a full audio
 frame flips `connected = true`, independent of the announce handshake. This is exactly
 why a passive tap connects without participating.
+
+### Choosing what the master locks to — the clock-source selector [S]
+
+Although the recovered word clock itself is FPGA-internal and never appears on the REAC
+audio wire, **the master exposes a clock-source selector** that decides which reference
+its own crystal/PLL follows. The selectable sources are the front-panel-visible set:
+
+- **WORD CLOCK** (external word-clock input),
+- **REAC A** / **REAC B** (slave the master's clock to either REAC port),
+- **INTERNAL** (free-run from the internal oscillator — the normal "I am the master"
+  mode),
+- **AES** (lock to an incoming AES/EBU pair).
+
+This selection is made over the console's **separate control protocol**, not over the
+REAC audio wire — it is a routing/configuration parameter, in the same family as
+"which source feeds an output slot." Picking INTERNAL makes the desk free-run and clock
+the whole fabric; picking REAC A/B makes the desk *slave* to a clock arriving on a REAC
+port, which is how a master can be chained to follow another fabric. The on-wire REAC
+cadence is unchanged in form by the selection — only *what* the master's slot tick is
+disciplined to changes.
 
 ### How a re-clocking relay adapts across rates
 
@@ -241,6 +281,44 @@ runs on its own fixed-rate packetisation.
 Audio is a continuous broadcast stream (no per-packet request/response). Connection
 setup is a call/answer exchange in `data[32]`, driven by the periodic
 `MASTER_ANNOUNCE` (re-announced ~once/second).
+
+### Connection lifecycle as wire behaviour [V][S]
+
+Seen purely from the wire — independent of the byte-level state-machine detail below
+— a slave joining a master moves through four observable phases:
+
+1. **Link-up flood.** On PHY link-up (and only PHY link-up — not a mere data gap)
+   the box **floods broadcast FILLER** (`0x00 0x00`, dst `ff:ff:ff:ff:ff:ff`) at full
+   packet rate to announce its presence. This lasts on the order of a second, then it
+   switches direction.
+2. **Cold-connect / grant.** The box sends a short **unicast cold-connect burst** of
+   CONTROL frames to the master; the master replies (on its broadcast stream) with a
+   matching short **grant burst** of CONTROL frames whose payload echoes the box's
+   identity. The grant lands as a ~100-frame burst (≈150 ms at 48 kHz / ≈75 ms at
+   96 kHz). The instant it lands, the box **stops broadcasting and switches to
+   unicast-to-master**.
+3. **Config-announce.** The box sends a CONTROL frame advertising its own input count
+   (its return channel map). The master and box exchange channel-map CONTROL frames to
+   agree on the slot layout.
+4. **Established.** Steady state is unicast FILLER/audio to the master MAC plus a
+   periodic CONTROL frame (~1/s); the master holds its broadcast at the same ~1/s
+   CONTROL + ~1/s `MASTER_ANNOUNCE` cadence.
+
+**Loss tolerance is a per-frame budget.** Once established, the link is held against a
+**frame-count budget of ~600 frames**. Because a frame is one sample slot, 600 frames
+is **≈150 ms at 48 kHz / ≈75 ms at 96 kHz** of tolerated silence/loss before the link
+is declared dead — so doubling the sample rate halves the wall-clock tolerance, which
+is why a 96 kHz link is about twice as fragile over a lossy hop as a 48 kHz one. **[S]**
+
+**A keep-alive heartbeat re-arms the budget.** The established side emits a periodic
+CONTROL heartbeat (~1/s) carrying a keep-alive selector byte; each heartbeat with the
+selector set **re-arms the ~600-frame budget**. The same selector cleared latches an
+explicit disconnect, and a change of the peer's source MAC also forces a disconnect.
+So "connected" is maintained by *both* a steady stream of sized audio frames (the
+~1000 ms no-audio cutoff) **and** the periodic heartbeat re-arm; losing either tears
+the link down. **[S]**
+
+The byte-level state machines for the split and slave paths follow.
 
 ### Split handshake (fully specified)
 
@@ -283,11 +361,14 @@ channels travel toward the mixer as raw, pre-patch PCM (the mixer's internal pat
 decides routing after they cross REAC). Stagebox **OUTPUT** channels travel from
 mixer to box carrying whatever the mixer routed to each slot (post-routing).
 
-The upstream return frame is unicast to the master MAC, ~628 B at 96 kHz = ~49–52 B
-header + 576 B audio + trailer (576 = 16 ch × 3 B × 12 samples). **Plain 24-bit LE,
-sample-major** — identical packing to the verified M-5000 downstream; the injected
-tone decodes clean reading 3 consecutive LE bytes, confirming the obs-h8819 braid does
-not apply upstream.
+The upstream return frame is unicast to the master MAC and is **smaller** than the
+downstream broadcast: it carries the box's *own* input count, not the fabric's
+40-channel block. At 96 kHz a **16-channel** box returns ~628 B (= ~49–52 B header +
+576 B audio + trailer; 576 = 16 ch × 3 B × 12 samples) and an **8-channel** box
+returns ~340 B (= header + 288 B audio + trailer; 288 = 8 ch × 3 B × 12 samples).
+**Plain 24-bit LE, sample-major** — identical packing to the verified M-5000
+downstream; the injected tone decodes clean reading 3 consecutive LE bytes, confirming
+the obs-h8819 braid does not apply upstream.
 
 The audio is intact on the wire (every tone decoded clean) but the channel **MAP** is
 scrambled — the wire does **not** carry input N → channel N. The scramble is
