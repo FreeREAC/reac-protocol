@@ -160,38 +160,79 @@ repeated twice, and ASCII tags `SYSP` (`53 59 53 50`) and `XVSCEN`
 channel-info block. (The `0xc0 0xa8` bytes are a protocol fact — what a master stuffs
 into CONTROL frames — not anyone's network address.)
 
-## Sample rates and packet rate (SETTLED) [V]
+## Sample rates and the audio clock
 
-The frame is rate-invariant (always 40 ch × 12 samp × 3 B = 1440 B). Sample rate is
-set by the **packet rate**: `pps = rate / 12`, `samples_per_pkt = 12`.
+The downstream frame is **rate-invariant** — always 40 ch × 12 samples × 3 B = 1440 B
+of audio. The sample rate is carried entirely in the **packet rate**, never in the
+frame: `pps = rate / 12`, 12 samples per frame.
 
-| rate | pps | slot | status |
-|---|---|---|---|
-| 44.1 kHz | 3675 | 272 µs | [?] not yet exercised on our rig |
-| 48 kHz | 4000 | 250 µs | [V] measured ~4000 pps |
-| 96 kHz | 8000 | 125 µs | [V] settled — double-pps, same 1492 B / 40-ch frame |
+| rate | pps (downstream) | slot period | audio bandwidth | status |
+|---|---|---|---|---|
+| 44.1 kHz | 3675 | 272.1 µs | ~46 Mbit/s | [?] not yet exercised on our rig |
+| 48 kHz | 4000 | 250.0 µs | ~46 Mbit/s | [V] measured ~4000 pps |
+| 96 kHz | 8000 | 125.0 µs | ~92 Mbit/s | [V] settled — double-pps |
 
-**96 kHz model settled.** The on-rig 96 kHz stream measured ~8000 pps carrying the
-same 1492 B / 40-channel frame (double-pps model `{96000, 40, 12}`), matching
-`reacdriver`'s constants (`SAMPLES_PER_PACKET=12`, `PACKETS_PER_SECOND=8000`,
-`MAX_CHANNEL_COUNT=40`). The rejected channel-halving model `{96000, 20, 24}` would
-have been ~4000 pps / 20 ch; both the measured pps and the channel count refuted it.
-Payload growth was already ruled out (the 48 kHz frame fills ~99% of the 1500 MTU and
-REAC is 100BASE-TX, so it adds packets, never enlarges them). A "24 tracks @96k"
-figure in a Roland recorder manual is a storage limit, not a wire constraint.
+What changes with rate is **only the packet rate** — and therefore the inter-frame
+interval (the *slot period*, `1e9 / pps` ns). The frame layout, channel count (40),
+sample width (24-bit), and the 12-samples-per-frame packing are identical at every
+rate, and there is **no rate field on the wire**. 44.1 and 48 kHz carry the same audio
+bandwidth and differ only in slot timing; 96 kHz doubles the packet rate (and the
+bandwidth), about saturating the 100BASE-TX link.
 
-## Clocking [V][S]
+**96 kHz model settled.** The on-rig 96 kHz stream measured ~8000 pps carrying the same
+1492 B / 40-channel frame (double-pps model `{96000, 40, 12}`), matching `reacdriver`'s
+constants (`SAMPLES_PER_PACKET=12`, `PACKETS_PER_SECOND=8000`, `MAX_CHANNEL_COUNT=40`).
+The rejected channel-halving model `{96000, 20, 24}` would have been ~4000 pps / 20 ch;
+both the measured pps and the channel count refuted it. Payload growth was already ruled
+out (the 48 kHz frame fills ~99% of the 1500 MTU and REAC is 100BASE-TX, so it adds
+packets, never enlarges them). A "24 tracks @96k" figure in a Roland recorder manual is
+a storage limit, not a wire constraint. 48 kHz is verified at ~4000 pps; 44.1 kHz (3675
+pps) is the same model, not yet exercised on our rig.
 
-One sample-clock master; the whole fabric locks to it; mismatched rates → no audio.
-The receiver is a **hardware clock slave with no jitter buffer** — it recovers word
-clock from packet arrival cadence (the master timer fires every `1e9 / pps` ns). This
-is why raw REAC tolerates Wi-Fi / jitter poorly, and why an AES67 bridge must add the
-de-jitter layer the REAC slave lacks.
+### How the clock is set and recovered [V][S]
 
-Connection is declared lost after **1000 ms** without a sized audio packet. At the
-transport layer, "connected" is declared purely by **packet length**, independent of
-the announce handshake: the first frame whose length equals a full audio frame flips
-`connected = true`. This is exactly why a passive tap connects without any handshake.
+REAC has **one sample-clock master** (the console). The master emits a frame every slot
+period from its own crystal — 272 µs at 44.1 kHz, 250 µs at 48 kHz, 125 µs at 96 kHz —
+and that cadence *is* the fabric word clock.
+
+The receiver is a **hardware clock slave with no jitter buffer**. It does not buffer and
+resample; it recovers word clock directly from packet **arrival cadence**, advancing its
+clock one slot per frame. So a stagebox tolerates almost no arrival jitter — a late frame
+is a late sample. This is why raw REAC runs badly over Wi-Fi, and why a bridge or relay
+across a jittery hop has to re-impose the exact cadence the slave expects.
+
+Master and slave agree on rate implicitly: the slave locks to whatever cadence the master
+sends, so a rate mismatch simply means no lock and no audio. Connection is declared lost
+after **1000 ms** without a sized audio frame. At the transport layer "connected" is
+declared purely by **packet length** — the first frame whose length equals a full audio
+frame flips `connected = true`, independent of the announce handshake. This is exactly
+why a passive tap connects without participating.
+
+### How a re-clocking relay adapts across rates
+
+A de-jitter relay (see [reac-repacer](https://github.com/FreeREAC/reac-repacer)) sits
+between a jittery link and the clock-slave stagebox and must hand the slave a clean
+cadence. Because there is no rate field, it **measures** the rate: count REAC frames on
+the wired side over a short window, divide by elapsed time → pps → `rate = pps × 12`
+(~3675 → 44.1 kHz, ~4000 → 48 kHz, ~8000 → 96 kHz). It then re-emits frames at exactly
+`1e9 / pps` ns spacing on a recovered, free-running clock. On a **live rate change** (the
+operator switches the console 48 ↔ 96 kHz) the measured pps jumps, so the relay
+re-detects and re-locks to the new period. Since the frame itself is rate-invariant, the
+relay never changes how it parses or forwards a frame — only the emit period changes with
+rate.
+
+### Downstream vs upstream packet rate
+
+The two directions packetise differently:
+
+- **Downstream** (master → box, broadcast 1492 B): **fixed 12 samples/frame**; the packet
+  rate scales with sample rate (3675 / 4000 / 8000 pps).
+- **Upstream** (box → master, unicast ~628 B at 96 kHz): **fixed ~8000 fps**; the samples
+  per frame scale with rate instead (12 at 96 kHz, 6 at 48 kHz → ~288 B audio). Same plain
+  LE sample-major packing; the channel map is FPGA-scrambled (see the upstream section).
+
+The slot period a stagebox slaves to is the **downstream** cadence; the upstream return
+runs on its own fixed-rate packetisation.
 
 ## Handshakes [S]
 
