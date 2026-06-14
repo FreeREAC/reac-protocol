@@ -24,9 +24,11 @@ connection, 24-bit, at 44.1 / 48 / 96 kHz, over a single Cat5e run.
 
 ## Frame geometry (the schema) [V][S]
 
-A fixed **1492-byte** Ethernet frame: 50 B non-audio header + 1440 B audio + 2 B
-end marker. The audio block is constant (rate-invariant); only the packet *rate*
-changes with sample rate.
+The master's **downstream broadcast** is a fixed **1492-byte** Ethernet frame: 50 B
+non-audio header + 1440 B audio + 2 B end marker. The audio block is constant
+(rate-invariant) — always 40 channels; only the packet *rate* changes with sample
+rate. (A stagebox's **upstream** return is a different, smaller frame carrying the
+box's own input count — see *Upstream audio layout* below.)
 
 | offset | size | field | notes |
 |---|---|---|---|
