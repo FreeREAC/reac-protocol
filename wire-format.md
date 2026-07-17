@@ -281,6 +281,19 @@ runs on its own fixed-rate packetisation.
 Measured off a **Roland M-200 commanding an S-0808**, captured passively on a switch mirror port
 with our own master stopped, so every frame is the console's. 740 op-`0403` frames.
 
+**End to end — both directions [V].** Head-amp is a one-way *declarative* channel with a receiver
+that conforms, and it is now exercised and confirmed in **both** directions. A **master SENDS**
+TAG `01 01` records — edge-triggered the instant an operator moves a control, then **periodically
+RE-ASSERTS the full per-channel state** (the two-phase full assert below). The model is **DMX-style
+declarative**: every record carries an **absolute** value (never a delta), nothing is ACKed, and the
+master simply re-broadcasts the whole world, so a lost frame self-heals within one re-assert cycle —
+the failure that bites is a lost **phantom-off** frame, which otherwise leaves 48 V sitting on the
+XLR pins while the console reads "off". A **box RECEIVES** those records and conforms, addressed at
+the **width-assigned CH base** it was granted (see *CH carries a per-model base* below). Both halves
+are on the wire: a real S-0808 / S-1608 receives them, and a software stagebox (reac-pw) established
+at 16 ch receives the identical bytes at base `0x20` while `reac_ctrl_build_headamp` reproduces them
+byte-for-byte — so the record is validated **parsed-in and built-out**, not just observed.
+
 **`0x04 0x03` is a record container, not a single message.** `op_len` gives the record's data
 length; `data[16..17]` is a **TAG** selecting the record type. Earlier work named the whole opcode
 after the one record it had seen (the connect-grant); that is too narrow — see the registry below.
@@ -372,6 +385,22 @@ like a real S-1608, and receives the full head-amp set: phantom, pad, and a comp
   master emits to a real box are emitted to a virtual one, and reproduce byte-for-byte from the
   builder (`reac_ctrl_build_headamp`).
 
+### Open items — honestly not yet closed [?]
+
+Two gaps remain, recorded rather than papered over:
+
+- **reac-pw does not SEND a TAG `05 00` model-identity record.** The virtual box establishes on
+  **width alone** (the cold-connect escalation) and is nonetheless addressed at the correct base, so
+  identity is demonstrably **not required** for base assignment — but the `05 00` record real boxes
+  emit is still unmodelled and unsent from the box side, and its four distinct values (see the
+  op-`0403` registry) are undecoded. "Base came from width alone" is a positive result, not a reason
+  to stop: the `05 00` payload is the next thing to decode.
+- **Master-send of head-amp is not yet validated at the pins.** The build path is byte-exact against
+  captured console frames and the box-side **receive** path is confirmed, but that a reac-pw *master*
+  emitting a phantom-off record actually drops 48 V at a real box's XLR pins is **rig-gated** — it
+  needs a physical box on the bench with a meter across the pins, not just a byte match. Until then,
+  the send direction is proven correct *on the wire* but not *at the converter*.
+
 ### The master's state assert tracks PRESENCE [V]
 
 When a box is unplugged, the master **drops its channels from the re-assert** within one cycle: an
@@ -438,31 +467,54 @@ Every measured property of the control plane follows from this, and only coheres
 
 A master is therefore **not** correct if it only sends on change. It must re-assert.
 
+The lifecycle below covers the whole thing end to end: the **box/slave establishment path** (left
+of ESTABLISHED, the wire behaviour from *Connection lifecycle* above) and, inside ESTABLISHED, the
+**master's head-amp control plane** (edge-emit plus periodic full re-assert).
+
 ```mermaid
 stateDiagram-v2
     direction TB
-    [*] --> Hunting
-    Hunting --> Granting : box answers the probe
-    Granting --> Established : grant record (op 04 03, TAG 01 00)
 
-    state Established {
+    [*] --> PHY_DOWN
+    PHY_DOWN --> FLOOD_ANNOUNCE : PHY link-up (not a mere data gap)
+    FLOOD_ANNOUNCE --> COLDCONNECT : ~1 s bounded broadcast FILLER flood, then switch direction
+    COLDCONNECT --> COLDCONNECT : unicast cold-connect retry grid, width escalates 0014→0013→0016→001a
+    COLDCONNECT --> TX_MUTE : master grant burst (op 04 03, TAG 01 00) lands, box goes unicast-to-master
+    TX_MUTE --> ESTABLISHED : config-announce, channel map agreed, upstream TX un-mutes
+
+    ESTABLISHED --> PHY_DOWN : link-check budget (~600 frames) expires / PHY bounce
+    PHY_DOWN --> FLOOD_ANNOUNCE : re-establish on the next link-up
+
+    state ESTABLISHED {
         direction TB
         [*] --> Steady
-        Steady --> Steady : heartbeat cdea 01 03, ~1/s
-        Steady --> EdgeAssert : operator moves a control
-        EdgeAssert --> Steady : ONE op 04 03 / TAG 01 01 record (absolute value)
+        Steady --> Steady : heartbeat cdea 01 03, ~1/s (re-arms the ~600-frame budget)
 
-        Steady --> FullAssert : trigger UNKNOWN, irregular
+        Steady --> EdgeAssert : operator moves a head-amp control
+        EdgeAssert --> Steady : ONE op 04 03 / TAG 01 01 record (absolute value) — box conforms
+
+        Steady --> FullAssert : trigger UNKNOWN [?], irregular
         state FullAssert {
             direction TB
             [*] --> SceneBroadcast
-            SceneBroadcast --> Settle : op 01 01 start / 01 00 data / 01 02 end
-            Settle --> HeadAmpPush : +4.4 s  (measured 7/7, zero drift)
-            HeadAmpPush --> [*] : grant + every ch x every param, re-stated
+            SceneBroadcast --> Settle : cdea 01 01 start / 01 00 data / 01 02 end (SCENE / SYSPARAM)
+            Settle --> HeadAmpPush : +4.4 s (measured 7/7, zero drift)
+            HeadAmpPush --> [*] : grant + every PRESENT ch × every param, re-stated absolute
+            note right of HeadAmpPush
+                Presence-tracked: a departed box's
+                channels drop from the assert within
+                one cycle (S-0808 leaves → 0x00..0x07
+                gone, S-1608's 0x20..0x2f unchanged)
+            end note
         }
         FullAssert --> Steady
     }
 ```
+
+The establishment path (PHY_DOWN → FLOOD_ANNOUNCE → COLDCONNECT → grant → TX_MUTE → ESTABLISHED, with
+the PHY-bounce re-establish edge) is the box's wire behaviour; everything inside ESTABLISHED is the
+master's declarative control plane. The box is the receiver on both — it locks the clock during
+establishment and conforms to the head-amp records once established.
 
 ### The full assert is ONE operation in two phases [V]
 
