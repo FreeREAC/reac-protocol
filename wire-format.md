@@ -305,7 +305,7 @@ data[]:  0..1 op(04 03)  2..3 op_len  4..13 preamble  14..15 (12 12)
 
 ```
 data[16..17] = 01 01        TAG
-data[18]     = CH           channel, ZERO-BASED (ch1 = 00 … ch8 = 07)
+data[18]     = CH           model_base + (channel - 1)  -- NOT flat zero-based, see below
 data[19]     = PARAM        00 = phantom +48V · 01 = pad (-20 dB) · 02 = SENS
 data[20]     = VALUE        phantom/pad: 00|01 · SENS: 0x00..0x37
 data[21]     = CKSUM_inner
@@ -323,6 +323,44 @@ Inner verified 740/740; outer verified across 11186 control frames of every op. 
 carries the inner sum, which is why it is easy to miss. For the head-amp record the inner rule
 reduces to `CH + PARAM + VALUE + CKSUM == 0x7e`, since the TAG contributes a constant `0x02` —
 but that shortcut is a special case, not the rule.
+
+### CH carries a PER-MODEL BASE [V]
+
+```
+CH = model_base + (channel - 1)
+
+S-0808  (8ch)  base  0  ->  0x00..0x07
+S-1608 (16ch)  base 32  ->  0x20..0x2f     <- not 0x00..0x0f
+S-4000 (32ch)  base  0  ->  0x00..0x1f
+```
+
+**Anchored on hardware, prediction-first:** with an S-1608 alone on the segment, all three params
+were exercised on **ch1**; `CH=0x20` was predicted before the test and **all 26 operator edges landed
+on `0x20` and nothing else**. So `0x20` *is* ch1, not merely the bottom of an occupied range.
+
+The base is **intrinsic to the model**, established three ways:
+
+1. **Two different physical S-1608 units** base at 32 and emit byte-identical TAG `05 00` records.
+2. **Three different consoles** (M-200 / M-300 / M-5000) address the S-1608 at 32.
+3. **Alone on an empty segment**, with `0..7` entirely free, an S-1608 is *still* addressed at 32 —
+   so the base is **not** collision-avoidance.
+
+Two boxes coexist at `0x00..0x07` + `0x20..0x2f`, contiguous and non-overlapping. `(box_index << 5)`
+is **refuted**: the 32-ch S-4000 bases at 0, like the 8-ch S-0808. **Why the S-1608 bases at 32 is
+unknown [?]** — recorded as measured, not explained.
+
+> **A master must LEARN a box's base from its model, not compute it from width.** `CH = channel - 1`
+> is correct for an S-0808 and addresses nothing on an S-1608. The box declares its model in its
+> TAG `05 00` records at enrolment.
+
+Everything else in the head-amp record is **model-independent**: the same three params in the same
+order, the same `0x7e` invariant, the same linear SENS law, verified on both an S-0808 and an S-1608.
+
+### The master's state assert tracks PRESENCE [V]
+
+When a box is unplugged, the master **drops its channels from the re-assert** within one cycle: an
+S-0808 leaving removed `0x00..0x07` while the S-1608's `0x20..0x2f` continued unchanged. The assert
+covers only boxes actually present.
 
 ### SENS ↔ dB — **pad-relative** [V]
 
