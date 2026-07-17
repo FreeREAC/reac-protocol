@@ -276,6 +276,221 @@ The two directions packetise differently:
 The slot period a stagebox slaves to is the **downstream** cadence; the upstream return
 runs on its own fixed-rate packetisation.
 
+## Source control (head-amp) — op `0x04 0x03` [V]
+
+Measured off a **Roland M-200 commanding an S-0808**, captured passively on a switch mirror port
+with our own master stopped, so every frame is the console's. 740 op-`0403` frames.
+
+**`0x04 0x03` is a record container, not a single message.** `op_len` gives the record's data
+length; `data[16..17]` is a **TAG** selecting the record type. Earlier work named the whole opcode
+after the one record it had seen (the connect-grant); that is too narrow — see the registry below.
+
+```
+data[]:  0..1 op(04 03)  2..3 op_len  4..13 preamble  14..15 (12 12)
+        16..17 TAG   18..(18+n-1) DATA   (18+n) CKSUM_inner   (19+n) 0xf7   ...   31 CKSUM_block
+```
+
+| `op_len` | n (data bytes) | TAG | record | status |
+|---|---|---|---|---|
+| `0x0013` | 3 | `01 01` | **head-amp source control** | **[V]** decoded below |
+| `0x0013` | 3 | `05 00` | — | **[?]** 4 distinct values, state-push only |
+| `0x0014` | 4 | `01 00` | **connect-grant** (`06 00 01 00`) | **[S]** known from firmware RE |
+| `0x0014` | 4 | `00 00` | — (`03 00 00 00`) | **[?]** state-push only |
+
+> **Parsers must dispatch on TAG, not on the opcode.** Classifying every `04 03` as a grant means a
+> slave in the join phase reads an engineer's preamp knob-turn as its grant: a live M-200 emits 628
+> head-amp records for every 14 grants.
+
+### The head-amp record — TAG `01 01` [V]
+
+```
+data[16..17] = 01 01        TAG
+data[18]     = CH           model_base + (channel - 1)  -- NOT flat zero-based, see below
+data[19]     = PARAM        00 = phantom +48V · 01 = pad (-20 dB) · 02 = SENS
+data[20]     = VALUE        phantom/pad: 00|01 · SENS: 0x00..0x37
+data[21]     = CKSUM_inner
+data[22]     = 0xf7         terminator
+```
+
+**Two nested checksums — an implementation must set BOTH, inner first.**
+
+| | span | rule |
+|---|---|---|
+| inner | `data[16..21]` (TAG→CKSUM) | **sums to `0x80`** — op-`0403` records only |
+| outer | `data[0..31]` | **sums to `0`** — every control frame (see the `data[32]` section) |
+
+Inner verified 740/740; outer verified across 11186 control frames of every op. Only `04 03`
+carries the inner sum, which is why it is easy to miss. For the head-amp record the inner rule
+reduces to `CH + PARAM + VALUE + CKSUM == 0x7e`, since the TAG contributes a constant `0x02` —
+but that shortcut is a special case, not the rule.
+
+### CH carries a PER-MODEL BASE [V]
+
+```
+CH = model_base + (channel - 1)
+
+S-0808  (8ch)  base  0  ->  0x00..0x07
+S-1608 (16ch)  base 32  ->  0x20..0x2f     <- not 0x00..0x0f
+S-4000 (32ch)  base  0  ->  0x00..0x1f
+```
+
+**Anchored on hardware, prediction-first:** with an S-1608 alone on the segment, all three params
+were exercised on **ch1**; `CH=0x20` was predicted before the test and **all 26 operator edges landed
+on `0x20` and nothing else**. So `0x20` *is* ch1, not merely the bottom of an occupied range.
+
+The base is **intrinsic to the model**, established three ways:
+
+1. **Two different physical S-1608 units** base at 32 and emit byte-identical TAG `05 00` records.
+2. **Three different consoles** (M-200 / M-300 / M-5000) address the S-1608 at 32.
+3. **Alone on an empty segment**, with `0..7` entirely free, an S-1608 is *still* addressed at 32 —
+   so the base is **not** collision-avoidance.
+
+Two boxes coexist at `0x00..0x07` + `0x20..0x2f`, contiguous and non-overlapping. `(box_index << 5)`
+is **refuted**: the 32-ch S-4000 bases at 0, like the 8-ch S-0808. **Why the S-1608 bases at 32 is
+unknown [?]** — recorded as measured, not explained.
+
+> **A master assigns the base from the box's declared WIDTH, not from a model-identity string.**
+> `CH = channel - 1` is correct for an S-0808 and addresses nothing on an S-1608. The width is
+> carried by the escalating cold-connect (`0014 → 0013 → 0016 → 001a`); the master allocates
+> width-many contiguous fabric slots (see the grant-sweep note): 8-in → base 0, 16-in → base 32,
+> 32-in → base 0 (a 32-in box cannot base at 32 — `0x20+31 = 0x3f` runs past the `0x2f` ceiling).
+
+Everything else in the head-amp record is **model-independent**: the same three params in the same
+order, the same `0x7e` invariant, the same linear SENS law, verified on both an S-0808 and an S-1608.
+
+### Confirmed from the BOX side — a virtual stagebox receives head-amp [V]
+
+The base assignment is confirmed from the receiving end, not just by observing real boxes. A
+**software stagebox** (reac-pw) that establishes as a 16-channel box — and that sends **no** TAG
+`05 00` model identity at all — is nonetheless addressed by the M-200 at base **`0x20`**, exactly
+like a real S-1608, and receives the full head-amp set: phantom, pad, and a complete SENS sweep
+`0x00..0x37`, every frame satisfying the `0x7e` head-amp checksum. This settles two things:
+
+- **The base is width-driven, not identity-driven.** The box declares only its width (via the
+  cold-connect escalation) and gets the width's base. No `05 00` model string is required.
+- **The head-amp record is exactly as decoded**, validated bidirectionally: the same bytes a
+  master emits to a real box are emitted to a virtual one, and reproduce byte-for-byte from the
+  builder (`reac_ctrl_build_headamp`).
+
+### The master's state assert tracks PRESENCE [V]
+
+When a box is unplugged, the master **drops its channels from the re-assert** within one cycle: an
+S-0808 leaving removed `0x00..0x07` while the S-1608's `0x20..0x2f` continued unchanged. The assert
+covers only boxes actually present.
+
+### SENS ↔ dB — **pad-relative** [V]
+
+Roland SENS is **input sensitivity in dBu**: more negative = MORE gain.
+
+```
+dB = -10 - VALUE + (pad ? 20 : 0)
+
+pad OFF:  0x00 = -10 dB (min sens) … 0x37 = -65 dB (max sens)
+pad ON :  0x00 = +10 dB (min sens) … 0x37 = -45 dB (max sens)
+```
+
+**56 values over 55 dB = exactly 1 dB/step, linear** — no lookup table. Anchored against the
+console's own display at -17/-40/-60/-65/-10 (pad off); every anchor lands.
+
+**The pad shifts the SENS scale by +20 dB and the BOX applies the offset**, not the console: across
+20 pad toggles the master never re-sent a SENS record, yet the console display moved 20 dB. The same
+VALUE byte therefore means two different dB depending on pad state. Anchored twice: `-15 → +5` and
+`-30 → -10`. Together pad+SENS span **+10 … -65 dBu (75 dB)** with a 35 dB overlap.
+
+### What the box owns — measured, and it is only these three [V]
+
+A **full state push** dumps `ch1..ch8 × {phantom, pad, SENS}` = 24 records and nothing else. This is
+positive evidence: the console enumerates its own complete box state, so the parameter space is
+closed at three, not merely unrefuted.
+
+Polarity, pan, main level, HPF and EQ were each exercised on the console while the tap was live and
+produced **zero** `04 03` records. They are console-side DSP.
+
+> **The boundary: the protocol carries only what cannot be done in software.** The box owns exactly
+> the three things that are physically impossible anywhere else, all **pre-converter** — 48 V (a
+> voltage on the XLR pins), pad (attenuation before the preamp: you cannot un-clip a sample), and
+> SENS (analog gain before quantisation). Everything past the converter is arithmetic, and
+> arithmetic belongs to whoever already performs it.
+
+This rule is **predictive, not descriptive**: pad was looked for because the rule required it, as a
+test that would have falsified the rule had it been absent. EQ is the converse test — a biquad has
+no physical claim on the box, so a single `04 03` record from an EQ move would have broken the rule.
+None appeared.
+
+The S-0808 has **no analog HPF** (toggled and swept: silent). An analog HPF *would* have been a
+legitimate box parameter — it protects headroom from subsonic energy ahead of the preamp — so this
+is a fact about the hardware, not a test of the rule.
+
+## State assertion — the master RE-ASSERTS, it does not issue commands [V]
+
+**This is the load-bearing behaviour of the control plane.** REAC control is raw Layer-2: broadcast,
+**no ACK, no retransmit, no sequence recovery**. A dropped command would desynchronise a box
+**permanently**, and nothing anywhere would notice. So a master does not send commands and hope — it
+**continuously restates the world**, and the box conforms.
+
+Every measured property of the control plane follows from this, and only coheres together:
+
+- **Values are ABSOLUTE, never deltas.** A SENS ramp sends `0x04, 0x05, 0x06 …`, never "+1".
+  Absolute values are **idempotent** — which is precisely what makes blind resending safe.
+- **Nothing is ACKed**, and nothing needs to be: the re-assert *is* the reliability mechanism.
+- **Broadcast with no addressing** — a declarative "this is the world" has no recipient.
+- **Edge-triggered AND re-asserted**: immediate on an operator move, then restated regardless.
+
+A master is therefore **not** correct if it only sends on change. It must re-assert.
+
+```mermaid
+stateDiagram-v2
+    direction TB
+    [*] --> Hunting
+    Hunting --> Granting : box answers the probe
+    Granting --> Established : grant record (op 04 03, TAG 01 00)
+
+    state Established {
+        direction TB
+        [*] --> Steady
+        Steady --> Steady : heartbeat cdea 01 03, ~1/s
+        Steady --> EdgeAssert : operator moves a control
+        EdgeAssert --> Steady : ONE op 04 03 / TAG 01 01 record (absolute value)
+
+        Steady --> FullAssert : trigger UNKNOWN, irregular
+        state FullAssert {
+            direction TB
+            [*] --> SceneBroadcast
+            SceneBroadcast --> Settle : op 01 01 start / 01 00 data / 01 02 end
+            Settle --> HeadAmpPush : +4.4 s  (measured 7/7, zero drift)
+            HeadAmpPush --> [*] : grant + every ch x every param, re-stated
+        }
+        FullAssert --> Steady
+    }
+```
+
+### The full assert is ONE operation in two phases [V]
+
+The head-amp push is **not on its own timer**. It follows a SCENE/SYSPARAM transfer by **exactly
+4.4 s, 7 occurrences out of 7, with no drift across 25 minutes**:
+
+```
+scene @  797.0 → push @  801.4      scene @ 2102.6 → push @ 2107.1
+scene @  842.8 → push @  847.3      scene @ 2192.7 → push @ 2197.1
+scene @ 1854.3 → push @ 1858.7      scene @ 2282.7 → push @ 2287.1
+scene @ 2057.8 → push @ 2062.3
+```
+
+The console announces its **own DSP state** (SCENE/SYSPARAM, `cdea 01 00` bulk data bracketed by
+`01 01` start / `01 02` end markers, ASCII `SCENE` / `SYSPARAM` in the markers), waits 4.4 s, then
+announces its **box state** (`04 03` records: the grant, the `05 00` records, and all 24 head-amp
+records). One operation, two phases, locked.
+
+**[?] What triggers a full assert is unknown.** Observed intervals are irregular — 46, 1011, 204,
+45, 90, 90 s — and did not correlate with operator activity. It is **not** a simple timer, and any
+claim of a fixed cadence would be wrong.
+
+> **Safety consequence for any master implementation.** Fire-and-forget loses a frame and the box is
+> wrong **forever**. The parameter where that bites is **phantom**: an engineer switches 48 V off to
+> patch a ribbon mic, the frame is lost, the box never hears it, and the console shows "off" while
+> 48 V sits on the pins. Re-assertion is what bounds that failure to one cycle instead of the rest
+> of the session.
+
 ## Handshakes [S]
 
 Audio is a continuous broadcast stream (no per-packet request/response). Connection
