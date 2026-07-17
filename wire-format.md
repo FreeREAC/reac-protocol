@@ -349,12 +349,28 @@ Two boxes coexist at `0x00..0x07` + `0x20..0x2f`, contiguous and non-overlapping
 is **refuted**: the 32-ch S-4000 bases at 0, like the 8-ch S-0808. **Why the S-1608 bases at 32 is
 unknown [?]** — recorded as measured, not explained.
 
-> **A master must LEARN a box's base from its model, not compute it from width.** `CH = channel - 1`
-> is correct for an S-0808 and addresses nothing on an S-1608. The box declares its model in its
-> TAG `05 00` records at enrolment.
+> **A master assigns the base from the box's declared WIDTH, not from a model-identity string.**
+> `CH = channel - 1` is correct for an S-0808 and addresses nothing on an S-1608. The width is
+> carried by the escalating cold-connect (`0014 → 0013 → 0016 → 001a`); the master allocates
+> width-many contiguous fabric slots (see the grant-sweep note): 8-in → base 0, 16-in → base 32,
+> 32-in → base 0 (a 32-in box cannot base at 32 — `0x20+31 = 0x3f` runs past the `0x2f` ceiling).
 
 Everything else in the head-amp record is **model-independent**: the same three params in the same
 order, the same `0x7e` invariant, the same linear SENS law, verified on both an S-0808 and an S-1608.
+
+### Confirmed from the BOX side — a virtual stagebox receives head-amp [V]
+
+The base assignment is confirmed from the receiving end, not just by observing real boxes. A
+**software stagebox** (reac-pw) that establishes as a 16-channel box — and that sends **no** TAG
+`05 00` model identity at all — is nonetheless addressed by the M-200 at base **`0x20`**, exactly
+like a real S-1608, and receives the full head-amp set: phantom, pad, and a complete SENS sweep
+`0x00..0x37`, every frame satisfying the `0x7e` head-amp checksum. This settles two things:
+
+- **The base is width-driven, not identity-driven.** The box declares only its width (via the
+  cold-connect escalation) and gets the width's base. No `05 00` model string is required.
+- **The head-amp record is exactly as decoded**, validated bidirectionally: the same bytes a
+  master emits to a real box are emitted to a virtual one, and reproduce byte-for-byte from the
+  builder (`reac_ctrl_build_headamp`).
 
 ### The master's state assert tracks PRESENCE [V]
 
