@@ -278,6 +278,11 @@ runs on its own fixed-rate packetisation.
 
 ## Source control (head-amp) — op `0x04 0x03` [V]
 
+> **Machine-readable spec.** The canonical field layout of this record lives in
+> [`spec/reac_control.ksy`](spec/reac_control.ksy) (Kaitai Struct) — `ksc` compiles it to a
+> C++ / Python / … parser, and CI regenerates it and validates it against known records on
+> every change. The prose below is derived from that spec.
+
 Measured off a **Roland M-200 commanding an S-0808**, captured passively on a switch mirror port
 with our own master stopped, so every frame is the console's. 740 op-`0403` frames.
 
