@@ -21,17 +21,19 @@ Communications*.
 - **[wire-format.md](wire-format.md)** — the wire-format reference: frame geometry,
   the sequence counter, roles and addressing, the frame-type registry, the CONTROL
   checksum, audio de-interleave, sample rates, clocking, the connection handshakes,
-  **head-amp source control** (op `04 03` tagged records — phantom / pad / SENS, the
-  pad-relative dB law, the per-model channel base, and the two nested checksums), and
-  the **state-assertion model** (the master's declarative, DMX-style periodic
-  re-assert of the whole console state) with a full connection-lifecycle state diagram.
+  **head-amp source control** (op `04 03` tagged records wrapping a **Roland DT1
+  SysEx** — phantom / pad / SENS, the pad-relative dB law, the per-model channel base,
+  and the two nested checksums), and the **state-assertion model** (the master's
+  declarative, DMX-style periodic re-assert of the whole console state) with a full
+  connection-lifecycle state diagram.
 - **[capturing.md](capturing.md)** — how to capture and decode REAC yourself: the
   raw socket / tcpdump filter, frame validation, de-interleave, rate sanity-checks,
   and the traps (VLAN tags, level correctness).
 - **[firmware-findings.md](firmware-findings.md)** — device behaviour derived from
   firmware RE and live-hardware observation, re-expressed: on-rig verification,
-  slave establishment, the AES/EBU crossbar, the remote-control (RCP) command
-  surface, and bidirectional-TX feasibility.
+  slave establishment, the **head-amp commit model** (staging vs active tables), the
+  AES/EBU crossbar, the remote-control (RCP) command surface, and bidirectional-TX
+  feasibility.
 
 ## Status tags
 
