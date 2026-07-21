@@ -1,0 +1,33 @@
+name: ksy-conformance
+on:
+  push:
+    paths: ['spec/**', '.github/workflows/ksy-conformance.yml']
+  pull_request:
+    paths: ['spec/**', '.github/workflows/ksy-conformance.yml']
+jobs:
+  ksy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install ksc 0.10
+        run: |
+          curl -fsSLO https://github.com/kaitai-io/kaitai_struct_compiler/releases/download/0.10/kaitai-struct-compiler-0.10.zip
+          unzip -q kaitai-struct-compiler-0.10.zip
+          echo "$PWD/kaitai-struct-compiler-0.10/bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install kaitai python runtime + pytest
+        run: pip install kaitaistruct pytest
+      - name: Regenerate the Python parser from the spec
+        run: kaitai-struct-compiler -t python --outdir spec spec/reac_control.ksy
+      - name: Run the conformance fixtures
+        run: cd spec && python -m pytest test_reac_control.py -q
+      - name: Verify the cpp_stl (C-family) target also generates
+        run: |
+          kaitai-struct-compiler -t cpp_stl --outdir /tmp/cpp spec/reac_control.ksy
+          test -f /tmp/cpp/reac_control.cpp && test -f /tmp/cpp/reac_control.h
