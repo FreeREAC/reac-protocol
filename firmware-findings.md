@@ -87,6 +87,42 @@ budget that is FPGA-ticked but CPU-armed is the device-side mechanism behind the
 ~1000 ms no-audio cutoff and the heartbeat re-arm described in
 [wire-format.md](wire-format.md).
 
+## Head-amp commit — staging vs active tables [S][?]
+
+The wire-format reference documents *what* head-amp records look like
+([wire-format.md](wire-format.md), source control). This is the firmware-side behaviour of *how a box
+applies them* — re-expressed from an RE pass, **not yet confirmed at the pins**, and the practical
+reason a software master can command 48 V correctly on the wire yet only commit it to one input.
+
+A box keeps **two head-amp tables**: an **active** table (what the converters actually run) and a
+**staging** table (pending values). Two record streams feed them, and they are **complementary**, not
+alternatives:
+
+- **op-`0103` channel map** — the per-input **presence / enrol** stream. It writes head-amp into the
+  **active** table directly, and is how an *already-enrolled* input carries its state. (Its per-record
+  marker byte is a constant hardware-bank tag — the `0x28` / `0x38` byte in the channel-info records
+  above — **not** a phantom bit.)
+- **op-`0403` TAG `01 01`** — the per-channel head-amp **values**, written to the **staging** table.
+- a **commit** step copies **staging → active for every slot at once**. It is driven by the console's
+  bulk **`cd ea 01 01` → `cd ea 01 02`** start/end marker pair (the same pair that brackets a
+  SCENE / SYSPARAM transfer), and a working console **sustains** that pair on its steady cadence rather
+  than firing it once.
+
+The consequence for a master implementation, and why it matters: emitting correct op-`0403` values for
+every input is **not sufficient**. Without the commit pair, only the box's default-enrolled **anchor**
+input flushes from staging to active — 48 V lands on one socket and silently ignores the rest. A master
+that fires the start/end pair only during the join/probe phase (before it has staged any values) shows
+exactly this: the anchor commits, the others do not.
+
+**[?] Status — RE-derived, rig-unvalidated.** The falsification test is direct: on a box whose anchor
+already commits, a master that (1) emits the commit pair *after* staging the values and (2) **sustains**
+it on the established cadence should light **every** enrolled input — confirmed by a physical 48 V check
+per socket (a real condenser microphone, or a meter across the XLR pins; never a software level
+readout). Until that bench check passes, treat "stage the values, then sustain the commit pair" as the
+current best model, not a settled fact. Captured console cadences for the pair disagree — a scene-recall
+burst fires it a few times within seconds, a steady session spaces it out — which is itself the argument
+for *sustaining* the pair rather than counting its occurrences.
+
 ## Master split/mirror output vs a true split device [V]
 
 A master REAC port configured as a split / mirror output emits a passive copy of the

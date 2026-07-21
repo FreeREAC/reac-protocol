@@ -278,6 +278,11 @@ runs on its own fixed-rate packetisation.
 
 ## Source control (head-amp) — op `0x04 0x03` [V]
 
+> **Machine-readable spec.** The canonical field layout of this record lives in
+> [`spec/reac_control.ksy`](spec/reac_control.ksy) (Kaitai Struct) — `ksc` compiles it to a
+> C++ / Python / … parser, and CI regenerates it and validates it against known records on
+> every change. The prose below is derived from that spec.
+
 Measured off a **Roland M-200 commanding an S-0808**, captured passively on a switch mirror port
 with our own master stopped, so every frame is the console's. 740 op-`0403` frames.
 
@@ -299,9 +304,47 @@ length; `data[16..17]` is a **TAG** selecting the record type. Earlier work name
 after the one record it had seen (the connect-grant); that is too narrow — see the registry below.
 
 ```
-data[]:  0..1 op(04 03)  2..3 op_len  4..13 preamble  14..15 (12 12)
+data[]:  0..1 op(04 03)   2..3 op_len   4..7 REAC wrapper(00 02 00 fe)   8 len_echo(0e)
+         9 f0   10 41   11 0a   12..14 model-id(00 00 12)   15 DT1 cmd(12)
         16..17 TAG   18..(18+n-1) DATA   (18+n) CKSUM_inner   (19+n) 0xf7   ...   31 CKSUM_block
 ```
+
+### The container wraps a Roland DT1 SysEx [V]
+
+The "preamble" bytes and the pair of `12` bytes are **not** opaque padding: from `data[9]` the record
+carries a genuine **Roland DT1 (Data Set 1) MIDI System-Exclusive** message — `f0 41 .. 12 .. f7` —
+riding inside the REAC container. Decoded:
+
+| data | bytes | field |
+|---|---|---|
+| 4..7 | `00 02 00 fe` | REAC console wrapper, **outside** the SysEx (part of the dispatch signature) |
+| 8 | `0e` | SysEx-payload length echo (`= op_len − 5`) |
+| 9 | `f0` | MIDI SysEx start |
+| 10 | `41` | Roland Corporation manufacturer ID |
+| 11 | `0a` | Roland device (unit) ID |
+| 12..14 | `00 00 12` | Roland 3-byte extended model ID (constant across M-200 / M-300 / M-5000) |
+| 15 | `12` | Roland command — `0x12` **DT1** (Data Set, a write); `0x11` **RQ1** (Data Request) on the master's identity polls |
+| 16..17 | TAG | high 2 bytes of the DT1 address (the record-type selector) |
+| 18.. | DATA | DT1 address low bytes + data (for head-amp: `CH PARAM VALUE`) |
+| 18+n | CKSUM | **Roland DT1 checksum** — `(128 − Σ(address+data)) mod 128` |
+| 19+n | `f7` | MIDI SysEx end (EOX) |
+
+So the two `12` bytes are the **model-ID low byte** (`00 00 12`) and the **DT1 command** (`0x12`) — not a
+repeated marker — and the "TAG" is the **high half of the Roland 4-byte address** (`01 01 CH PARAM` for
+head-amp), not a REAC-native tag. Provenance is settled two ways: the Roland DT1 checksum rule
+reproduces the observed `CKSUM` byte on every op-`0403` record, and the command byte flips `0x12`→`0x11`
+exactly on the master's identity-request polls (DT1 vs RQ1) — a distinction that only means anything if
+the envelope really is Roland's SysEx. The record is therefore a **standard Roland SysEx transport
+carried over REAC**, and the head-amp payload below is its DT1 data.
+
+This also **sharpens frame dispatch**: the box-upstream audio braid frames also carry `cd ea 04 03`, but
+with wrapper `02 00 fe 00` and **no** `f0 41` envelope. A genuine control record is identified by the
+`cd ea` marker **and** the `00 02 00 fe` wrapper **and** the `f0 41` SysEx envelope — never by the
+`04 03` opcode alone.
+
+> **The `12 12` is two different bytes.** Reading it as one repeated marker (as earlier revisions did)
+> mislabels the model-ID low byte and hides the DT1 command that distinguishes a write (`DT1`) from a
+> request (`RQ1`).
 
 | `op_len` | n (data bytes) | TAG | record | status |
 |---|---|---|---|---|
@@ -329,13 +372,21 @@ data[22]     = 0xf7         terminator
 
 | | span | rule |
 |---|---|---|
-| inner | `data[16..21]` (TAG→CKSUM) | **sums to `0x80`** — op-`0403` records only |
+| inner | `data[16..21]` (TAG→CKSUM) | **sums to `0x80`** — the Roland DT1 checksum, op-`0403` records only |
 | outer | `data[0..31]` | **sums to `0`** — every control frame (see the `data[32]` section) |
 
-Inner verified 740/740; outer verified across 11186 control frames of every op. Only `04 03`
-carries the inner sum, which is why it is easy to miss. For the head-amp record the inner rule
-reduces to `CH + PARAM + VALUE + CKSUM == 0x7e`, since the TAG contributes a constant `0x02` —
-but that shortcut is a special case, not the rule.
+The **inner** sum is Roland's own DT1 checksum over the SysEx `address+data` span; the **outer** is
+REAC's block checksum and is unrelated. The two rules coincide numerically here only because the
+head-amp span is small (its maximum sum stays under 128, so `(128 − Σ) mod 128` and "sums to `0x80`"
+land on the same byte). Inner verified 740/740 on the M-200/S-0808 census and **7130/7130 (100 %)**
+across a full master×box corpus (M-200 / M-300 / M-5000 × S-0808 / S-1608 / S-4000); outer verified
+across 11186 control frames of every op. Only `04 03` carries the inner sum, which is why it is easy to
+miss. For the head-amp record the inner rule reduces to `CH + PARAM + VALUE + CKSUM == 0x7e`, since the
+TAG contributes a constant `0x02` — but that shortcut is a special case, not the rule.
+
+> **Build-order trap.** A builder that ends every record with the usual block-checksum helper ships a
+> correct **outer** sum wrapped around a **garbage inner** one, and the box rejects a frame that looks
+> perfect on the wire. Set the Roland DT1 (inner) checksum **first**, then the REAC block (outer) one.
 
 ### CH carries a PER-MODEL BASE [V]
 
