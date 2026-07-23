@@ -32,19 +32,19 @@ GRANT = "cdea 0403 0014 000200fe 0f f041 0a 000012 12 0100 06 00 01 00 78 f7"
 def test_headamp_records():
     for h, ch, param, val in HEADAMP:
         r = parse(h)
-        assert r.op == 0x0403
-        assert r.command == rc.ReacControl.DtCommand.dt1_set
-        assert r.tag == rc.ReacControl.RegPage.head_amp
-        assert r.payload.ch == ch
-        assert r.payload.param.name == param
-        assert r.payload.value == val
-        assert r.sysex_end == b"\xf7"
+        assert r.op == rc.ReacControl.ControlOp.dt1_container
+        assert r.body.command == rc.ReacControl.DtCommand.dt1_set
+        assert r.body.tag == rc.ReacControl.RegPage.head_amp
+        assert r.body.payload.ch == ch
+        assert r.body.payload.param.name == param
+        assert r.body.payload.value == val
+        assert r.body.sysex_end == b"\xf7"
 
 
 def test_join_grant():
     r = parse(GRANT)
-    assert r.tag == rc.ReacControl.RegPage.join_grant
-    assert r.payload.body == bytes.fromhex("06000100")
+    assert r.body.tag == rc.ReacControl.RegPage.join_grant
+    assert r.body.payload.body == bytes.fromhex("06000100")
 
 
 def test_inner_checksum_is_0x80():
