@@ -87,6 +87,46 @@ budget that is FPGA-ticked but CPU-armed is the device-side mechanism behind the
 ~1000 ms no-audio cutoff and the heartbeat re-arm described in
 [wire-format.md](wire-format.md).
 
+## Head-amp commit — what arms a channel [S][?]
+
+The wire-format reference documents *what* head-amp records look like
+([wire-format.md](wire-format.md)). This is the firmware-side behaviour of *how a box applies them*, and
+the practical reason a software master can command 48 V correctly on the wire and still not light every
+input.
+
+**A superseded model, recorded so it is not re-derived.** An earlier revision of this document described
+a **staging vs active** pair of tables flushed by a *sustained* `cd ea 01 01` → `cd ea 01 02` commit
+pair, with only a default-enrolled **anchor** input committing without it. That model is **falsified**.
+A later audit against the same captures found that `cd ea 01 01` / `01 02` are establishment messages
+(op-`0101` carries ASCII `"1234"`), not a scene-commit bracket; op-`0100` is a probe, not a scene; and no
+anchor rule exists in the box's apply path — it gates on the channel number only. A master implementation
+built on the sustained-pair theory was written, tested against real boxes, and **removed** as dead code.
+Do not resurrect it.
+
+**What the evidence supports instead.** Every head-amp edit is carried by one standalone op-`0403`
+record; the box is armed by the **complete** per-input scene delivered during establishment. Two
+constraints follow, both observed on real hardware:
+
+- **A channel armed with an all-zero value is never enrolled.** Arming with a real, non-zero value (for
+  SENS, a sane default rather than `0x00`) is what makes the box take the channel; an all-zero scene
+  leaves it inert. This alone accounted for inputs that never lit.
+- **Addressing must match the box's declared base.** The record's channel number is
+  `MODEL_BASE + (box input − 1)`, and the base is negotiated from the box's own declaration rather than
+  fixed per model — see [`PLACEMENT-EVIDENCE.md`](https://github.com/FreeREAC/reac-pw/blob/main/docs/PLACEMENT-EVIDENCE.md)
+  in reac-pw. Addressing a 16-input box from the wrong base pushes its upper half past the firmware's
+  channel gate, so those inputs silently ignore every command.
+
+**[?] Status — still open at the pins.** With correct addressing and a real-valued scene, all inputs of a
+16-input box accept phantom. Holding it steadily without the enrolment step is **not** solved: 48 V
+flickers, because enrolment also drives the apply latch. The open work is a held real-valued scene with a
+one-shot commit decoupled from enrolment
+([reac-pw#67](https://github.com/FreeREAC/reac-pw/issues/67)). Confirm any claim here with a physical
+48 V check per socket — a real condenser microphone, or a meter across the XLR pins; never a software
+level readout.
+
+The op-`0103` channel map remains the per-input **presence / enrol** stream; its per-record marker byte
+is a constant hardware-bank tag (the `0x28` / `0x38` byte in the channel-info records above) and **not**
+a phantom bit.
 ## Master split/mirror output vs a true split device [V]
 
 A master REAC port configured as a split / mirror output emits a passive copy of the
