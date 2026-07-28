@@ -1,0 +1,6 @@
+# ksc-generated parsers — regenerated from reac.ksy, never committed
+reac.py
+cpp/
+out/
+__pycache__/
+.pytest_cache/
