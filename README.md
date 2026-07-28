@@ -18,6 +18,14 @@ Communications*.
 
 ## Documents
 
+- **[spec/reac.ksy](spec/reac.ksy)** — the wire format as a **machine-checkable
+  [Kaitai Struct](https://kaitai.io) grammar**: the `0x8819` frame family in both
+  directions, the control multiplex, the `op 04 03` DT1 record container, the two
+  nested checksums, and the audio region described structurally. The prose below is
+  the readable rendering of the same facts; this is the one a machine can check.
+  [`spec/README.md`](spec/README.md) explains the three roles — libreac is the
+  executable C oracle, the `.ksy` is the formal spec, and the parser generated from it
+  is the referee that cross-validates the two against checked-in golden captures.
 - **[wire-format.md](wire-format.md)** — the wire-format reference: frame geometry,
   the sequence counter, roles and addressing, the frame-type registry, the CONTROL
   checksum, audio de-interleave, sample rates, clocking, the connection handshakes,
