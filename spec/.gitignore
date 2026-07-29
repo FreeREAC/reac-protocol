@@ -4,3 +4,6 @@ cpp/
 out/
 __pycache__/
 .pytest_cache/
+
+# the dev-only oracle diff links against a libreac checkout
+c_oracle_dump
