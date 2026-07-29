@@ -589,7 +589,31 @@ types:
 
       DISPATCH: a genuine record is op 0x0403 AND wrapper 00 02 00 fe AND
       F0 41 ... — all three are asserted below by `contents`, which is what
-      rejects the look-alikes.
+      rejects the look-alikes. The look-alike to beat is the box-upstream braid,
+      which carries cd ea 04 03 with the bytes 02 00 fe 00 where the wrapper
+      belongs and no SysEx envelope at all.
+
+      WORKED EXAMPLE — an S-1608 input 1 phantom-ON edit, as the leading 25 bytes
+      of the frame[16:50] window (zero padding and the block checksum follow):
+
+        cd ea 04 03 00 13 00 02 00 fe 0e f0 41 0a 00 00 12 12 01 01 20 00 01 5d f7
+
+        cd ea        type word, control
+        04 03        op, this container
+        00 13        op_len -> record_len 6, data_len 3
+        00 02 00 fe  wrapper
+        0e           len_echo, op_len - 5
+        f0 41        SysEx start + Roland manufacturer id
+        0a           device id
+        00 00 12     model id
+        12           command, DT1 (a write)
+        01 01        TAG, the head-amp page
+        20 00 01     data: CH 0x20, PARAM phantom, VALUE on
+        5d           inner checksum
+        f7           SysEx end
+
+      The inner sum spans the record only: 01+01+20+00+01+5d = 0x80. CH 0x20 is
+      input 1 of a box based at 0x20, not channel 32 of anything.
     seq:
       - id: wrapper
         contents: [0x00, 0x02, 0x00, 0xfe]
@@ -648,10 +672,10 @@ types:
         type: u1
         doc: |
           The WIRE channel: model_base + (box_input - 1), in the 48-slot head-amp
-          space 0x00..0x2f. NOT an audio fabric slot (that space is 40 wide), and
-          a table bounded by 40 silently rejects the top half of a 16-input box
-          based at 0x20. The base itself is session state — see
-          config_announce_page.
+          space 0x00..0x2f. It addresses a BOX INPUT — not a console channel
+          strip, and not an audio fabric slot (that space is 40 wide). A table
+          bounded by 40 silently rejects the top half of a 16-input box based at
+          0x20. The base itself is session state — see config_announce_page.
       - id: param
         type: u1
         enum: head_amp_param
