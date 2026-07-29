@@ -11,14 +11,15 @@ with the parser ksc generates from the spec.
 
 Dev-only, and deliberately outside `make check` and CI: it needs a libreac
 checkout and a C toolchain that the spec repo does not otherwise depend on.
+Needs libreac >= 0.5.0 — that is the release where `reac_decode()` was fixed to
+un-braid and the old plain-LE reading moved to `reac_decode_plain_le()`.
 
 WHAT AGREEMENT HERE PROVES, EXACTLY
 -----------------------------------
 `reac.ksy` was written by reading libreac. Agreement between the two is
 therefore *internal consistency*, not independent confirmation of the wire
-format: both sides can be wrong together, and on the downstream audio layout at
-least one of libreac's own two readings must be (see below). What agreement
-does buy is real but bounded:
+format: both sides can be wrong together. What agreement does buy is real but
+bounded:
 
   * the spec is EXECUTABLE and matches the running code, field for field, on
     every golden — so it can be handed to a third party as a parser, not as
@@ -32,15 +33,16 @@ Independent confirmation of the LAYOUT comes from elsewhere entirely — three
 codebases that never saw this spec (per-gron/reacdriver, norihiro/obs-h8819)
 and the rig's listening tests. This script cannot and does not add to that.
 
-THE ONE PLACE THE TWO SIDES ARE KNOWN TO DISAGREE
--------------------------------------------------
-The downstream audio layout. libreac ships two different readings of the same
-1492 bytes: `reac_decode()` (plain LE, sample-major) and the braid oracle
-`reac_braid_pos()`, which is what `reac_downstream_build()` ENCODES with. They
-cannot both describe the wire. `reac.ksy` describes the braid. This script
-reports the divergence numerically rather than hiding it, and the assertion it
-makes is only that the spec agrees with the ENCODER — see the downstream check
-below for what that is and is not worth.
+THE DOWNSTREAM LAYOUT, WHICH USED TO BE THE SORE POINT
+------------------------------------------------------
+Up to libreac 0.4.0 the library shipped two incompatible readings of the same
+1492 bytes — `reac_decode()` read plain LE while `reac_downstream_build()`
+encoded the braid — and this script existed partly to report that divergence.
+libreac 0.5.0 fixed it: `reac_decode()` un-braids, so the codec round-trips and
+all three of the spec, the encoder and the decoder describe one layout. The
+plain-LE reading survives as `reac_decode_plain_le()`, a diagnostic, and this
+script still dumps it — not as a live alternative, but to show numerically that
+it is a different reading of the same bytes and that the spec does not follow it.
 """
 import argparse
 import json
@@ -179,21 +181,27 @@ def check_downstream(binary, R, rep):
     got = ksy_planar(p, MAX_CHANNELS)
     rep.eq("downstream.braid_pcm_vs_oracle", got, c["braid_pcm"])
     rep.eq("downstream.braid_pcm_vs_encoder_input", got, c["encoded_pcm"])
+    # libreac >= 0.5.0: the shipped decoder un-braids, so the spec, the encoder
+    # and the decoder are one layout. A mismatch here is a real failure, not a
+    # known divergence — that is the whole point of the 0.5.0 fix.
+    rep.eq("downstream.braid_pcm_vs_reac_decode", got, c["decode_pcm"])
     rep.samples += MAX_CHANNELS * SAMPLES_PER_PKT
     return c, got
 
 
-def report_downstream_divergence(c, ksy_pcm):
-    """The known open question, quantified rather than asserted away."""
+def report_plain_le_divergence(c, ksy_pcm):
+    """The refuted reading, quantified — so the claim is a number, not prose."""
     plain = c.get("plain_le_pcm")
     if plain is None:
-        return "libreac's plain-LE reac_decode() refused the frame"
+        return ("libreac's reac_decode_plain_le() refused the frame "
+                "(libreac < 0.5.0 does not export it)")
     differing = sum(1 for a, b in zip(ksy_pcm, plain) for x, y in zip(a, b) if x != y)
     total = MAX_CHANNELS * SAMPLES_PER_PKT
     agree = total - differing
-    return (f"{differing}/{total} samples differ between the braid (what the "
-            f"spec and reac_downstream_build() use) and libreac's plain-LE "
-            f"reac_decode(); {agree} agree by coincidence of the byte map")
+    return (f"{differing}/{total} samples differ between the braid (spec, "
+            f"reac_downstream_build() and reac_decode() alike) and the "
+            f"reac_decode_plain_le() diagnostic; {agree} coincide where the "
+            f"byte map happens to land on itself")
 
 
 def main(argv=None):
@@ -221,10 +229,11 @@ def main(argv=None):
     for f in rep.failures:
         print(f"    FAIL {f}")
     print()
-    print("open question, not a failure — the downstream audio layout:")
-    print(f"  {report_downstream_divergence(c, ksy_pcm)}")
-    print("  libreac ships both readings; reac.ksy describes the braid and says")
-    print("  so. Only a downstream capture settles which one a console emits.")
+    print("the refuted plain-LE reading, for the record — not a failure:")
+    print(f"  {report_plain_le_divergence(c, ksy_pcm)}")
+    print("  There is one downstream layout and it is the braid. reac_decode()")
+    print("  reads it as of libreac 0.5.0 and is checked above; plain LE is kept")
+    print("  as reac_decode_plain_le(), a diagnostic for historical captures.")
     return 0 if rep.ok() else 1
 
 
