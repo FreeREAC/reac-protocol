@@ -127,6 +127,7 @@ level readout.
 The op-`0103` channel map remains the per-input **presence / enrol** stream; its per-record marker byte
 is a constant hardware-bank tag (the `0x28` / `0x38` byte in the channel-info records above) and **not**
 a phantom bit.
+
 ## Master split/mirror output vs a true split device [V]
 
 A master REAC port configured as a split / mirror output emits a passive copy of the
