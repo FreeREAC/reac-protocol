@@ -146,23 +146,32 @@ A receiver recovers the master from `data[6]==0x0D` (master announce),
 MAC = `data[9..14]`, in = `data[15]`, out = `data[16]`. A master also connected to a
 slave doubles the advertised channel counts.
 
-## Audio de-interleave — two device families [V][S]
+## Audio de-interleave — one layout, every generation [V]
 
-Audio is 40 ch × 12 samp × 3 B = 1440 B. Two distinct in-payload byte layouts exist
-across Roland generations:
+Audio is 40 ch × 12 samp × 3 B = 1440 B, laid out as the **even/odd braid**
+(obs-h8819's `convert_to_pcm24lep`): per channel, `base = (ch & ~1)*3` and stride 120
+(= n_channels × 3); even ch → `[sptr[3], sptr[0], sptr[1]]`, odd ch →
+`[sptr[4], sptr[5], sptr[2]]`, treated as 24-bit little-endian. Equivalently a
+16-bit-word byte swap of the channel pair packed big-endian.
 
-1. **obs-h8819 even/odd braid** (`convert_to_pcm24lep`): per channel,
-   `base = (ch & ~1)*3` and stride 120 (= n_channels × 3); even ch →
-   `[sptr[3], sptr[0], sptr[1]]`, odd ch → `[sptr[4], sptr[5], sptr[2]]`, treated as
-   24-bit little-endian. Faithful to the device obs-h8819 targets. **[S]**
-2. **Plain LE sample-major** (the M-5000): channel `ch` / time-sample `s` starts at
-   `(s*n_channels + ch)*3`, a straight 3-byte copy. **[V]** — decoding a live M-5000
-   stream the plain way is coherent (coherence ~0.999); the obs-h8819 braid scrambles
-   the same payload into noise.
+One layout, both directions, **every mixer generation**. Confirmed by
+per-gron/reacdriver, by obs-h8819 (listening-validated against a real M-200i), by the
+zoneA/zoneB M-5000 goldens (coherence 0.99 / spectral flatness 0.002 braided, noise
+under every other layout × offset) and by the upstream rig goldens at three box widths.
+`spec/reac.ksy` carries the full evidence trail.
 
-REAC's wire endianness (24-bit LE) is common across devices, but the in-payload
-channel-pair byte ordering is **not** identical across generations. `reaccapture`
-additionally ships big-endian and 16-bit truncation variants of the same
+**Plain LE sample-major is refuted, and there is no per-generation split.** This
+section previously described "two device families", with plain LE
+(`(s*n_channels + ch)*3`) attributed to the M-5000 on the strength of an on-rig
+coherence ~0.999. That reading was overturned: the coherence came from a mid-byte lane
+shift amplifying quiet *braided* audio 256×. libreac 0.5.0 accordingly fixed
+`reac_decode()` to un-braid — before the fix the library could not read back a frame
+its own encoder had built, 0 of 480 samples agreeing (libreac#13) — and kept plain LE
+only as `reac_decode_plain_le()`, a diagnostic for historical captures. The
+"OHRCA-generation gear may differ downstream" corollary was never evidence, only an
+untested guess at that same discrepancy, and it is refuted with it.
+
+`reaccapture` additionally ships big-endian and 16-bit truncation variants of the same
 de-interleave; s24le is the verified justification at 48 kHz.
 
 ## Channel-info block (in the CONTROL stream) [S][?]
@@ -633,9 +642,12 @@ downstream broadcast: it carries the box's *own* input count, not the fabric's
 40-channel block. At 96 kHz a **16-channel** box returns ~628 B (= ~49–52 B header +
 576 B audio + trailer; 576 = 16 ch × 3 B × 12 samples) and an **8-channel** box
 returns ~340 B (= header + 288 B audio + trailer; 288 = 8 ch × 3 B × 12 samples).
-**Plain 24-bit LE, sample-major** — identical packing to the verified M-5000
-downstream; the injected tone decodes clean reading 3 consecutive LE bytes, confirming
-the obs-h8819 braid does not apply upstream.
+The packing is the **same even/odd braid as downstream** — see "Audio de-interleave"
+above. (This paragraph once read "plain 24-bit LE, sample-major … the obs-h8819 braid
+does not apply upstream", inferred from a single injected tone against the then-current
+plain-LE reading of the M-5000 downstream. Both halves of that inference fell with the
+plain-LE reading; the upstream braid is since confirmed on real captures at three box
+widths — the goldens in `spec/fixtures/upstream.json`.)
 
 The audio is intact on the wire (every tone decoded clean) but the channel **MAP** is
 scrambled — the wire does **not** carry input N → channel N. The scramble is

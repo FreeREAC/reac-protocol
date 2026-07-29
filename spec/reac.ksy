@@ -95,53 +95,57 @@ doc: |
   norihiro/obs-h8819-source (convert_to_pcm24lep, listening-validated against a
   real M-200i) and by the FreeREAC rig goldens.
 
-  ## The DOWNSTREAM audio layout is not settled — this grammar picks a side
+  ## One layout, both directions — and why plain LE was ever entertained
 
-  Read this before trusting the audio region of a 1492 B frame.
+  There is ONE audio layout in REAC and it is the braid above. It holds in both
+  directions and across every mixer generation; there is no per-generation
+  variant, downstream or otherwise.
 
-  UPSTREAM (box -> master) is settled. It is the braid, on real captures, at
-  three widths: the goldens in fixtures/upstream.json are decoded by
-  reac_upstream_decode() and by this grammar to the same 1056 samples, and the
-  loud channel of the rig capture reads +0.998 lag-1 autocorrelation under the
-  braid while every idle channel collapses to the mic noise floor.
+  UPSTREAM (box -> master) is confirmed on real captures at three widths: the
+  goldens in fixtures/upstream.json are decoded by reac_upstream_decode() and by
+  this grammar to the same 1056 samples, and the loud channel of the rig capture
+  reads +0.998 lag-1 autocorrelation under the braid while every idle channel
+  collapses to the mic noise floor.
 
-  DOWNSTREAM (master -> fabric) is NOT settled, and libreac — the oracle this
-  spec is checked against — ships TWO INCOMPATIBLE READINGS of the same 1492
-  bytes:
+  DOWNSTREAM (master -> fabric) is the same braid. The evidence:
 
-    - reac_decode() reads PLAIN LE, sample-major: channel ch at time s starts at
-      (s*40 + ch)*3, a straight de-interleave. It is still the default path for
-      an existing consumer (reac-aes67), and its own header marks the layout
-      CONTESTED;
-    - reac_braid_pos() is the braid above, and reac_downstream_build() ENCODES
-      with it — so libreac currently emits one layout and, through reac_decode(),
-      reads another.
+    - the zoneA/zoneB goldens (one M-5000's two REAC ports, program audio) read
+      coherence 0.99 / spectral flatness 0.002 braided, and noise under every
+      other layout x offset;
+    - obs-h8819-source decodes it as the braid and was listening-validated
+      against a real M-200i, a DIFFERENT generation from the M-5000 above — so
+      the two ends of the generation range are covered by independent work;
+    - libreac's own encoder, reac_downstream_build(), lays down the braid, and
+      since 0.5.0 reac_decode() reads it back. The library that emits the format
+      and the library that reads it are finally the same library.
 
-  They are not close: on a 40-channel frame built by reac_downstream_build(),
-  all 480 samples differ between the two readings (spec/xcheck_c_oracle.py
-  reports the count). At most one of them is what a console puts on the wire.
+  ### Plain LE: a refuted reading, kept only as history
 
-  This grammar describes the BRAID, for the reasons in the evidence list above
-  and because it is the layout the encoder commits to. That is a choice made on
-  the evidence available, NOT a settled fact, and it should be read as such:
+  A plain-LE sample-major reading (channel ch at time s starting at
+  (s*40 + ch)*3) was once libreac's downstream default, on the strength of an
+  on-rig "coherence 0.999". That reading was overturned: the coherence came from
+  a mid-byte lane shift amplifying quiet BRAIDED audio 256x into a
+  coherent-looking image. It is not a layout the wire ever carried.
 
-    - the case for the braid downstream rests on the zoneA/zoneB goldens (one
-      M-5000's two REAC ports, program audio, coherence 0.99 / spectral flatness
-      0.002 braided and noise under every other layout x offset) and on
-      obs-h8819 having been listening-validated against a real M-200i;
-    - the case that once favoured plain LE — an on-rig "coherence 0.999" — was
-      overturned as a mid-byte lane shift amplifying quiet braided audio 256x
-      into a coherent-looking image;
-    - what is still open is whether OHRCA-generation (M-5000 / M-480) gear
-      differs from the V-Mixer generation downstream. A rig capture is the
-      experiment that settles it.
+  libreac 0.5.0 fixed reac_decode() accordingly — before the fix the library
+  could not read back a frame it had just built, 0 of 480 samples agreeing with
+  its own encoder (libreac#13). Plain LE survives there only as
+  reac_decode_plain_le(), a DIAGNOSTIC for reading historical captures stored
+  that way and for reproducing the lane shift.
 
-  There is NO downstream fixture in this repo. Every committed golden is an
-  upstream return. The downstream side of this grammar is checked only against
-  frames libreac's own encoder built, which tests the envelope and the
-  structure, not the layout — see spec/xcheck_c_oracle.py, which states the
-  same boundary. When the downstream capture lands, either this section becomes
-  a fact or the audio_region type changes.
+  The companion speculation — that OHRCA-generation (M-5000 / M-480) gear might
+  differ from the V-Mixer generation downstream — is likewise refuted, and was
+  never evidence in the first place: it was an untested hypothesis raised to
+  explain a discrepancy that turned out to be the lane shift. All mixers produce
+  the same downstream format. Do not reopen it without a capture that
+  contradicts the braid.
+
+  What IS a real limitation of this repo: there is NO downstream fixture here.
+  Every committed golden is an upstream return, so the downstream side of the
+  grammar is checked only against frames libreac's own encoder built, which
+  tests the envelope, the structure and agreement with the codec — not a console
+  on a wire. That gap is about this repo's corpus, not about the layout; see
+  spec/xcheck_c_oracle.py, which states the same boundary.
 
   # Checksums
 
@@ -670,12 +674,13 @@ types:
       braid. Structural only — see the braid map in the top-level doc; the
       permutation is validated by cross-check, not by this grammar.
 
-      The STRUCTURE below (12 samples x n/2 six-byte pair groups) is the same
-      either way and holds regardless: a plain-LE region is the identical byte
-      count in the identical place. Only the permutation INSIDE a group is in
-      question, and only downstream — see "The DOWNSTREAM audio layout is not
-      settled" in the top-level doc. Upstream the braid is confirmed on real
-      captures at three widths.
+      One layout, both directions, every generation. The braid is confirmed
+      upstream on real captures at three widths and downstream by the zoneA/zoneB
+      goldens, obs-h8819's listening-validated M-200i decode and libreac's own
+      encoder; the plain-LE reading it was once weighed against is refuted. See
+      "One layout, both directions" in the top-level doc — and note the structure
+      below (12 samples x n/2 six-byte pair groups) would be the same byte count
+      in the same place either way, so it is not what carries that claim.
     seq:
       - id: time_samples
         type: time_sample
