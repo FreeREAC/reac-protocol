@@ -15,7 +15,7 @@ peers:
 |---|---|---|
 | **libreac** (`FreeREAC/libreac`) | the **executable C oracle** — the layout as running code: `reac_braid_pos()`, `reac_frame_clean_len()`, `reac_upstream_channels()`, the frame constants | what the tools actually do |
 | **`reac.ksy`** (this repo) | the **formal spec** — the layout as a declarative grammar, with the evidence trail in its `doc:` blocks | what the protocol *is* |
-| the **generated parser** | the **referee** — ksc turns the spec into a parser, [`reac_xcheck.py`](reac_xcheck.py) runs it over the checked-in goldens and asserts field-for-field agreement with the oracle | catches drift between the two |
+| the **generated parser** | the **referee** — ksc turns the spec into a parser; [`reac_xcheck.py`](reac_xcheck.py) runs it over the checked-in goldens (hermetic), and [`xcheck_c_oracle.py`](xcheck_c_oracle.py) runs it against the compiled libreac (dev-only) | catches drift between the two |
 
 Drift between a spec and its implementation is normally invisible until something
 breaks in the field. Here it is a red test.
@@ -81,11 +81,54 @@ Everything it reads is committed beside it: no network, no capture files, no rig
 
 ### Direct comparison against the C oracle
 
-The committed harness compares against the numbers the C tests are held to, which
-keeps it hermetic. To diff against the compiled oracle itself, build libreac and
-decode the same fixtures through `reac_upstream_decode()` / `reac_frame_clean_len()` /
-`reac_upstream_channels()`; scalars and every PCM sample must match. That comparison
-was run when this spec landed: 4 frames, 1056 samples, agreement on every field.
+The harness above is hermetic by design: it compares against the numbers the C tests
+are held to, plus Python transcriptions of the C contracts. A transcription is a
+second reading of the same header, and a reading can be wrong the same way twice —
+so there is a second, **dev-only** check that links the real thing:
+
+```sh
+make -C spec check-oracle LIBREAC=../../libreac
+```
+
+That builds libreac, links [`c_oracle_dump.c`](c_oracle_dump.c) against it, and diffs
+the compiler's actual output — `reac_frame_clean_len()`, `reac_upstream_channels()`,
+`reac_frame_counter()`, `reac_upstream_decode()`, `reac_downstream_build()`,
+`reac_braid_pos()`, `reac_decode()` — against the parser ksc generates from
+`reac.ksy`. It is out of `make check` and out of CI on purpose: it needs a libreac
+checkout and a C toolchain the spec repo does not otherwise depend on, and the
+hermetic gate should stay hermetic.
+
+Latest run — 4 upstream goldens plus one downstream frame built by libreac's own
+encoder:
+
+```
+field checks : 49
+PCM samples  : 1536
+mismatches   : 0
+```
+
+## What that agreement proves — and what it does not
+
+`reac.ksy` was written by reading libreac. Agreement between the two is therefore
+**internal consistency, not independent confirmation of the wire format**. Both sides
+can be wrong together; on the downstream audio layout at least one of libreac's own
+two readings must be. A green `check-oracle` is not evidence about Roland's protocol.
+
+What it does buy, and this is real:
+
+- the spec is **executable** and matches the running code field for field on every
+  golden, so it can be handed to a third party as a parser rather than as prose that
+  may or may not have kept up;
+- **drift** between spec and implementation is a red test instead of a field failure;
+- the C oracle's contracts are pinned against a declarative description written
+  independently of its control flow — a shape mismatch (an off-by-one region, a
+  mis-sized field) shows up even though a shared assumption would not.
+
+Independent confirmation of the **layout** comes from elsewhere entirely: three
+codebases that never saw this spec (per-gron/reacdriver's `MbufUtils`,
+norihiro/obs-h8819's `convert_to_pcm24lep`, listening-validated against a real
+M-200i) and the rig's own listening and autocorrelation tests. Neither harness here
+adds to that, and neither should be cited as if it did.
 
 ## Fixtures
 
@@ -112,6 +155,20 @@ editing the JSON by hand. Each array is `frame[16:50]`, so index *i* is frame of
 *16+i*.
 
 ## Scope — what the spec does not cover
+
+**The downstream audio layout is an open question, and the grammar picks a side.**
+Upstream is settled: the braid, on real captures, at three box widths. Downstream is
+not. libreac ships two incompatible readings of the same 1492 bytes — `reac_decode()`
+reads plain LE sample-major and is still a consumer's default; `reac_braid_pos()` is
+the braid, and `reac_downstream_build()` *encodes* with it. On a frame built by that
+encoder all **480/480** samples differ between the two readings. `reac.ksy` describes
+the braid, on the evidence listed in its own doc, and says in the same breath that
+this is a choice and not a fact. Whether OHRCA-generation gear differs downstream is
+what a rig capture has to settle. Note also that **there is no downstream fixture in
+this repo** — every committed golden is an upstream return, so the downstream side of
+the grammar is checked only against frames libreac's encoder built, which exercises
+the envelope and the structure, not the layout.
+
 
 **Slot placement is not in the grammar, on purpose.** Why an S-1608 is addressed at
 `0x20` while an S-0808 and an S-4000S are both at `0x00` is *negotiated session state*
