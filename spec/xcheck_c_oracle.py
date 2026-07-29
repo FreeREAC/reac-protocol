@@ -130,7 +130,7 @@ def check_upstream(binary, R, rep):
         rep.eq(f"{name}.clean_len", p.clean_len, c["clean_len"])
         rep.eq(f"{name}.num_channels", p.num_channels, c["upstream_channels"])
         rep.eq(f"{name}.counter", p.counter, c["counter"])
-        rep.eq(f"{name}.has_trailer", p.has_ohrca_trailer,
+        rep.eq(f"{name}.has_fcs_residue", p.has_fcs_residue,
                c["raw_len"] != c["clean_len"])
         rep.eq(f"{name}.len_audio", p.len_audio,
                c["upstream_channels"] * 36)
@@ -139,8 +139,10 @@ def check_upstream(binary, R, rep):
         got = ksy_planar(p, c["upstream_channels"])
         rep.eq(f"{name}.pcm", got, c["upstream_pcm"])
         rep.samples += c["upstream_channels"] * SAMPLES_PER_PKT
-        # the frame's own end marker, past the audio, with the trailer stripped
+        # the frame's own end marker, and nothing claimed past it: the grammar
+        # stops at clean_len and leaves any FCS residue unread
         rep.eq(f"{name}.end_marker", bytes(p.end_marker), b"\xc2\xea")
+        rep.eq(f"{name}.bytes_consumed", p._io.pos(), c["clean_len"])
 
 
 def check_downstream(binary, R, rep):
@@ -165,7 +167,7 @@ def check_downstream(binary, R, rep):
     rep.eq("downstream.num_channels", p.num_channels, MAX_CHANNELS)
     rep.eq("downstream.is_downstream_width", p.is_downstream_width, True)
     rep.eq("downstream.counter", p.counter, c["counter"])
-    rep.eq("downstream.has_trailer", p.has_ohrca_trailer, False)
+    rep.eq("downstream.has_fcs_residue", p.has_fcs_residue, False)
     rep.eq("downstream.end_marker", bytes(p.end_marker), b"\xc2\xea")
     rep.eq("downstream.eth_dst", bytes(p.eth_dst), b"\xff" * 6)
     rep.eq("downstream.type_word", p.control.type_word,
