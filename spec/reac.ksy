@@ -23,49 +23,58 @@ doc: |
       32 B control block                                  (offset 18..49)
        n_channels * 36 B braided s24 audio region         (offset 50)
        2 B 0xC2 0xEA end marker
-     [ 2 B trailer ]                                      (see below)
+     [ 2 B FCS residue — not protocol, see below ]
 
-  so a clean frame is `52 + n_channels * 36` bytes:
+  so a frame is `52 + n_channels * 36` bytes:
 
-    | direction  | width | clean | with the +2 trailer |
-    |------------|-------|-------|---------------------|
-    | downstream |    40 |  1492 |                1494 |
-    | upstream   |     8 |   340 |                 342 |
-    | upstream   |    16 |   628 |                 630 |
-    | upstream   |    32 |  1204 |                1206 |
+    | direction  | width | frame | as some captures store it |
+    |------------|-------|-------|---------------------------|
+    | downstream |    40 |  1492 |                      1494 |
+    | upstream   |     8 |   340 |                       342 |
+    | upstream   |    16 |   628 |                       630 |
+    | upstream   |    32 |  1204 |                      1206 |
+
+  The right-hand column is NOT a second frame format. It is the same frame with
+  two bytes of the capture's own Ethernet FCS left on the end.
 
   The downstream broadcast is always 40 channels and rate-INVARIANT: 12 samples
   per frame at 44.1 / 48 / 96 kHz alike, the sample rate carried by the packet
   rate (pps = rate / 12 -> 3675 / 4000 / 8000). An upstream return is the same
   shape sized to the box's own input width.
 
-  # The +2 trailer — two different things that look identical
+  # The +2 is Ethernet FCS residue — explained, stripped, NOT modelled
 
-  A length of `52 + n*36 + 2` carries two trailing bytes after the end marker.
-  The grammar parses them as opaque `ohrca_trailer` because the BYTES CANNOT
-  distinguish the two causes; the capture can:
+  A length of `52 + n*36 + 2` carries two bytes past the end marker. They are
+  the low 16 bits of the frame's OWN Ethernet FCS (crc32 over the preceding
+  bytes, little-endian), left behind by the capture path. They are not a REAC
+  field, they carry no protocol meaning, and nothing may ever emit them.
 
-  - UPSTREAM (340+2 / 628+2 / 1204+2): a REAL per-frame OHRCA CRC-16 field that
-    the box puts on the wire. Proven on the S-4000S 32-channel return: in one
-    capture our own downstream frames are all 1492 B (no +2) while the box's
-    upstream are all 1206 B, and the same box mixes ~1/8 frames at 1204 B. Strip
-    it or the frame fails the `% 36` width check and the audio path goes silent.
-    Evidence: reac-pw docs/OHRCA-UPSTREAM-DUPLICATE-FRAMES.md ("Fix" section) and
-    libreac <reac/reac.h> REAC_FRAME_BYTES_OHRCA / reac_frame_clean_len().
+  The measurement and the reasoning live in libreac <reac/reac.h> (libreac#15);
+  the short form is that the identity holds for 100% of frames checked, in both
+  directions and across generations, which no genuine trailer could do, and that
+  the variable is the capture rig — mirroring RX and TX of one port, so a
+  transiting frame is seen twice, one copy clean and one with the residue. It is
+  NOT OHRCA-specific: it appears on non-OHRCA rigs and is absent on OHRCA ones.
+  It is not a VLAN tag either — every frame here reads 0x8819 at offset 12, and
+  a tag would sit four bytes BEFORE the ethertype, not two bytes after the end
+  marker.
 
-  - DOWNSTREAM 1494: usually NOT a REAC field at all — it is the ETHERNET FCS,
-    mirrored into the capture by a switch SPAN/monitor port that does not strip
-    it. The M-200i grant capture is the worked example: every grant frame appears
-    twice, one 1494 B and one 1492 B, sharing an IDENTICAL frame counter. That is
-    one transmission seen twice by the mirror, not two frames and not a protocol
-    field. Treat a downstream +2 as a CAPTURE ARTIFACT unless the capture is from
-    a non-mirrored port. (A genuine OHRCA console does also append a real trailer
-    downstream — measured on a live M-5000 — so "downstream +2" is ambiguous by
-    construction and must be resolved by how the capture was taken, never by the
-    two bytes themselves.)
+  ## How the grammar expresses that
 
-  `clean_len` implements libreac's one rule for both directions: a length of
-  `52 + n*36 + 2` comes back reduced by 2, anything else is returned unchanged.
+  By NOT declaring a field for it. The `seq` ends at `end_marker`, so a parse of
+  a residue-carrying capture consumes exactly the frame and leaves the two stray
+  bytes unread at the end of the stream — tolerated, ignored, and impossible to
+  emit from a serializer generated out of this grammar. A `size: 2` field, however
+  it were named, would say the opposite: that the bytes belong to the format.
+
+  What the grammar DOES keep is the length arithmetic, because every derived
+  quantity depends on it. `has_fcs_residue` is a statement about the CAPTURE, not
+  about the frame, and `clean_len` is libreac's one rule for both directions: a
+  length of `52 + n*36 + 2` comes back reduced by 2, anything else is returned
+  unchanged.
+
+  A residue-carrying frame and a clean one therefore parse identically, field for
+  field, and differ only in how many bytes are left over afterwards.
 
   # The audio region and the braid
 
@@ -182,20 +191,27 @@ seq:
     type: audio_region
   - id: end_marker
     contents: [0xC2, 0xEA]
-  - id: ohrca_trailer
-    size: 2
-    if: has_ohrca_trailer
-    doc: See the +2 discussion in the top-level doc. Opaque by design.
+    doc: |
+      The frame ENDS here. A capture that kept two bytes of the Ethernet FCS
+      leaves them past this point; the grammar deliberately declares no field for
+      them, so they are read by nothing and can be emitted by nothing. See "The
+      +2 is Ethernet FCS residue" in the top-level doc.
 instances:
   raw_len:
     value: _io.size
-    doc: The captured frame length, trailer included.
-  has_ohrca_trailer:
+    doc: The size of the buffer handed to the parser — the frame plus whatever
+      the capture left on it.
+  has_fcs_residue:
     value: (raw_len - 52) % 36 == 2
-    doc: A clean REAC frame is 52 + n*36, so a remainder of 2 is the trailer.
+    doc: |
+      True when the buffer is 2 bytes longer than any valid 52 + n*36 frame,
+      i.e. when the capture kept the low half of the Ethernet FCS. A statement
+      about the CAPTURE, not about the frame: it changes no field below, only
+      how many bytes go unread after end_marker.
   clean_len:
-    value: 'has_ohrca_trailer ? raw_len - 2 : raw_len'
-    doc: libreac reac_frame_clean_len(). Every other length passes through.
+    value: 'has_fcs_residue ? raw_len - 2 : raw_len'
+    doc: libreac reac_frame_clean_len(). The actual frame length. Every length
+      that is not 52 + n*36 + 2 passes through unchanged.
   num_channels:
     value: (clean_len - 52) / 36
     doc: |
