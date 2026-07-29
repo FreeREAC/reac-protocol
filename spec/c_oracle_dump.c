@@ -17,9 +17,13 @@
 // in CI's hermetic gate — it needs a libreac checkout and a C compiler that the
 // spec repo otherwise does not depend on. See `make check-oracle`.
 //
+// Needs libreac >= 0.5.0: it calls reac_decode_plain_le(), which is where the
+// refuted plain-LE reading went when reac_decode() was fixed to un-braid.
+//
 //   c_oracle_dump upstream  < hexlines   one hex frame per line -> one JSON object per line
 //   c_oracle_dump downstream             synthesize a 40-ch downstream frame and dump
-//                                        BOTH of libreac's downstream readings of it
+//                                        what libreac decodes it to, plus the plain-LE
+//                                        diagnostic reading of the same bytes
 
 #define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
@@ -155,15 +159,12 @@ static int do_downstream(void)
 	}
 	printf("]");
 
-	/* libreac's TWO downstream readings of the very same bytes. They are
-	 * different layouts and they do NOT agree — that disagreement is the point,
-	 * see reac.ksy's "the downstream decode is not settled" section.
-	 *
-	 * There is no exported braid DECODER for the downstream width:
-	 * reac_upstream_decode() rejects 40 channels by contract (that width is the
-	 * master broadcast, never a box return). So the braid reading goes through
-	 * reac_braid_pos() — the layout oracle itself, the same inline the encoder
-	 * used — rather than through a guard that would refuse the frame. */
+	/* The braid, read straight off the layout oracle. There is no exported
+	 * braid DECODER for the downstream width: reac_upstream_decode() rejects 40
+	 * channels by contract (that width is the master broadcast, never a box
+	 * return). So the braid reading goes through reac_braid_pos() — the same
+	 * inline the encoder used — rather than through a guard that would refuse
+	 * the frame. */
 	printf(",\"braid_samples\":%d", REAC_SAMPLES_PER_PKT);
 	printf(",\"braid_pcm\":[");
 	for (int ch = 0; ch < REAC_MAX_CHANNELS; ch++) {
@@ -181,7 +182,20 @@ static int do_downstream(void)
 	}
 	printf("]");
 
+	/* The shipped decoder. Since libreac 0.5.0 this un-braids, so it must agree
+	 * with braid_pcm above and with encoded_pcm — the library reads back what it
+	 * writes. Before 0.5.0 it read plain LE and agreed with neither. */
 	int ns = reac_decode(frame, (size_t)len, reac_mode_for(48000), pcm);
+	printf(",\"decode_samples\":%d", ns);
+	if (ns > 0) {
+		printf(",\"decode_pcm\":");
+		print_planar(pcm, REAC_MAX_CHANNELS, ns);
+	}
+
+	/* The refuted plain-LE reading, kept in libreac as a named diagnostic. Dumped
+	 * so the spec can show it is a DIFFERENT reading of the same bytes rather
+	 * than asserting the point in prose. */
+	ns = reac_decode_plain_le(frame, (size_t)len, reac_mode_for(48000), pcm);
 	printf(",\"plain_le_samples\":%d", ns);
 	if (ns > 0) {
 		printf(",\"plain_le_pcm\":");
