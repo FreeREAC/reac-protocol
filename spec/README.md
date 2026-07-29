@@ -94,26 +94,32 @@ make -C spec check-oracle LIBREAC=../../libreac
 That builds libreac, links [`c_oracle_dump.c`](c_oracle_dump.c) against it, and diffs
 the compiler's actual output — `reac_frame_clean_len()`, `reac_upstream_channels()`,
 `reac_frame_counter()`, `reac_upstream_decode()`, `reac_downstream_build()`,
-`reac_braid_pos()`, `reac_decode()` — against the parser ksc generates from
-`reac.ksy`. It is out of `make check` and out of CI on purpose: it needs a libreac
-checkout and a C toolchain the spec repo does not otherwise depend on, and the
-hermetic gate should stay hermetic.
+`reac_braid_pos()`, `reac_decode()`, `reac_decode_plain_le()` — against the parser ksc
+generates from `reac.ksy`. It is out of `make check` and out of CI on purpose: it needs
+a libreac checkout and a C toolchain the spec repo does not otherwise depend on, and the
+hermetic gate should stay hermetic. It needs **libreac >= 0.5.0**, the release where
+`reac_decode()` was fixed to un-braid.
 
 Latest run — 4 upstream goldens plus one downstream frame built by libreac's own
-encoder:
+encoder, against libreac 0.5.0:
 
 ```
-field checks : 53
+field checks : 54
 PCM samples  : 1536
 mismatches   : 0
 ```
+
+The downstream frame is now checked against `reac_decode()` as well as against
+`reac_braid_pos()` and the encoder's input, because as of 0.5.0 those are one layout.
+The `reac_decode_plain_le()` diagnostic is dumped alongside and reported — 480/480
+samples differ from the braid — so the refuted reading stays a measured number rather
+than a claim in prose.
 
 ## What that agreement proves — and what it does not
 
 `reac.ksy` was written by reading libreac. Agreement between the two is therefore
 **internal consistency, not independent confirmation of the wire format**. Both sides
-can be wrong together; on the downstream audio layout at least one of libreac's own
-two readings must be. A green `check-oracle` is not evidence about Roland's protocol.
+can be wrong together. A green `check-oracle` is not evidence about Roland's protocol.
 
 What it does buy, and this is real:
 
@@ -157,18 +163,15 @@ editing the JSON by hand. Each array is `frame[16:50]`, so index *i* is frame of
 
 ## Scope — what the spec does not cover
 
-**The downstream audio layout is an open question, and the grammar picks a side.**
-Upstream is settled: the braid, on real captures, at three box widths. Downstream is
-not. libreac ships two incompatible readings of the same 1492 bytes — `reac_decode()`
-reads plain LE sample-major and is still a consumer's default; `reac_braid_pos()` is
-the braid, and `reac_downstream_build()` *encodes* with it. On a frame built by that
-encoder all **480/480** samples differ between the two readings. `reac.ksy` describes
-the braid, on the evidence listed in its own doc, and says in the same breath that
-this is a choice and not a fact. Whether OHRCA-generation gear differs downstream is
-what a rig capture has to settle. Note also that **there is no downstream fixture in
-this repo** — every committed golden is an upstream return, so the downstream side of
-the grammar is checked only against frames libreac's encoder built, which exercises
-the envelope and the structure, not the layout.
+**There is no downstream fixture in this repo.** The audio layout itself is settled —
+one braid, both directions, every generation (`reac.ksy` carries the evidence, and the
+per-generation "M-5000 plain LE vs the rest" idea is refuted, never having been more
+than an untested guess at a discrepancy that turned out to be a mid-byte lane shift).
+What this repo lacks is a *captured* downstream frame: every committed golden is an
+upstream return, so the downstream side of the grammar is checked only against frames
+libreac's encoder built. That exercises the envelope, the structure and agreement with
+the codec — not a console on a wire. A downstream capture would close the gap in the
+corpus; it is not needed to decide the layout.
 
 
 **Slot placement is not in the grammar, on purpose.** Why an S-1608 is addressed at
