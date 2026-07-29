@@ -1,5 +1,10 @@
 # ksc-generated parsers — regenerated from reac.ksy, never committed
 reac.py
+# and the stale one from reac_control.ksy, a control-record-only grammar that
+# reac.ksy subsumes. That spec never landed on main (it lives on the branch
+# docs/headamp-dt1-sysex-and-commit); older checkouts still have its parser
+# sitting in the tree, and it has no generator here to rebuild it.
+reac_control.py
 cpp/
 out/
 __pycache__/
