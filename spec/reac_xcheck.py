@@ -57,11 +57,12 @@ REAC_MAX_CHANNELS = 40
 # --------------------------------------------------------------------------
 
 def oracle_clean_len(n):
-    """libreac reac_frame_clean_len(): strip the +2 trailer if present.
+    """libreac reac_frame_clean_len(): strip the +2 FCS residue if present.
 
-    A clean REAC frame is 52 + n*36 for some channel width n, so a length of
-    52 + n*36 + 2 carries the trailer and comes back reduced by 2. Every other
-    length, including every clean one, is returned unchanged.
+    A REAC frame is 52 + n*36 for some channel width n, so a length of
+    52 + n*36 + 2 is a frame the capture left two bytes of its own Ethernet FCS
+    on, and comes back reduced by 2. Every other length, including every clean
+    one, is returned unchanged.
     """
     if n > REAC_UPSTREAM_OVERHEAD and (n - REAC_UPSTREAM_OVERHEAD) % REAC_UPSTREAM_BYTES_PER_CH == 2:
         return n - 2
@@ -165,7 +166,7 @@ GRANT_CELLS = CONTROL["grant_sweep"]["head_amp_cells"]
 
 
 # --------------------------------------------------------------------------
-# frame geometry: clean_len, the +2, derived width
+# frame geometry: clean_len, the +2 FCS residue, derived width
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
@@ -174,23 +175,51 @@ def test_frame_geometry_matches_oracle(name, fx):
     assert p.raw_len == fx["raw_len"]
     assert p.clean_len == oracle_clean_len(fx["raw_len"])
     assert p.num_channels == fx["channels"] == oracle_upstream_channels(fx["raw_len"])
-    assert p.has_ohrca_trailer == (fx["raw_len"] != p.clean_len)
+    assert p.has_fcs_residue == (fx["raw_len"] != p.clean_len)
     assert p.len_audio == p.num_channels * REAC_UPSTREAM_BYTES_PER_CH
     assert not p.is_downstream_width
 
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
-def test_trailer_is_parsed_only_when_present(name, fx):
+def test_fcs_residue_is_left_unread_not_modelled(name, fx):
+    """The grammar stops at the end marker and never claims the residue.
+
+    This is the whole design of the +2 handling, so it is pinned as a test: the
+    parser consumes exactly `clean_len` bytes whether or not the capture kept
+    the FCS, no field is declared for the leftovers, and nothing generated from
+    this grammar can therefore emit them.
+    """
     p = parse_frame(fx["hex"])
-    if p.has_ohrca_trailer:
-        assert len(p.ohrca_trailer) == 2
-    else:
-        # a conditional field the generator skips entirely, not a None
-        assert not hasattr(p, "ohrca_trailer")
+    assert p._io.pos() == p.clean_len
+    assert p._io.size() - p._io.pos() == (2 if p.has_fcs_residue else 0)
+    assert not hasattr(p, "ohrca_trailer")
+    assert not hasattr(p, "fcs_residue")
+
+
+@pytest.mark.parametrize("name,fx", UP_FRAMES)
+def test_residue_changes_no_field(name, fx):
+    """A frame parses the same with the residue and with it stripped.
+
+    Residue is capture noise, so removing it must be a no-op on every field.
+    The 342/1206 B goldens exercise the "with" side; slicing gives the "without"
+    side of the very same frame.
+    """
+    p = parse_frame(fx["hex"])
+    if not p.has_fcs_residue:
+        pytest.skip("golden has no residue to strip")
+    stripped = parse_frame(bytes.fromhex(fx["hex"])[:-2].hex())
+    assert not stripped.has_fcs_residue
+    assert stripped.clean_len == p.clean_len
+    assert stripped.num_channels == p.num_channels
+    assert stripped.counter == p.counter
+    assert stripped.len_audio == p.len_audio
+    assert bytes(stripped.end_marker) == bytes(p.end_marker) == b"\xc2\xea"
+    assert [[bytes(g) for g in ts.pair_groups] for ts in stripped.audio.time_samples] \
+        == [[bytes(g) for g in ts.pair_groups] for ts in p.audio.time_samples]
 
 
 def test_clean_len_rule_over_the_whole_frame_family():
-    """Both directions, clean and trailered, against the oracle's one rule."""
+    """Both directions, clean and residue-carrying, against the oracle's one rule."""
     for width in (8, 16, 32, 40):
         clean = REAC_UPSTREAM_OVERHEAD + width * REAC_UPSTREAM_BYTES_PER_CH
         assert oracle_clean_len(clean) == clean
