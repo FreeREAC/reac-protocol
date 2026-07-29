@@ -3,6 +3,12 @@
 #   make parser   generate reac.py from reac.ksy
 #   make check    generate + run the cross-validation harness
 #   make cpp      prove the C-family target also generates (CI gate)
+#   make check-oracle
+#                 DEV-ONLY: diff the generated parser against the COMPILED
+#                 libreac rather than a Python transcription of it. Needs a
+#                 libreac checkout and a C compiler, so it is out of `check`
+#                 and out of CI, both of which stay hermetic.
+#                   make check-oracle LIBREAC=../../libreac
 #   make clean    remove generated parsers
 #
 # The generated parser is NEVER committed: reac.ksy is the source of truth and
@@ -11,8 +17,9 @@
 KSC ?= kaitai-struct-compiler
 PYTHON ?= python3
 KSY := reac.ksy
+LIBREAC ?= ../../libreac
 
-.PHONY: all parser check cpp clean ksc-help
+.PHONY: all parser check check-oracle cpp clean ksc-help
 
 all: check
 
@@ -25,13 +32,16 @@ reac.py: $(KSY)
 check: parser
 	$(PYTHON) -m pytest reac_xcheck.py -q
 
+check-oracle: parser
+	$(PYTHON) xcheck_c_oracle.py --libreac $(LIBREAC)
+
 cpp: $(KSY)
 	@command -v $(KSC) >/dev/null 2>&1 || { $(MAKE) --no-print-directory ksc-help; exit 1; }
 	$(KSC) -t cpp_stl --outdir cpp $(KSY)
 	test -f cpp/reac.cpp && test -f cpp/reac.h
 
 clean:
-	rm -rf reac.py cpp/ __pycache__/ .pytest_cache/
+	rm -rf reac.py cpp/ __pycache__/ .pytest_cache/ c_oracle_dump
 
 ksc-help:
 	@echo 'kaitai-struct-compiler (ksc) not found. It is not in the distro repos;'
