@@ -59,9 +59,10 @@ on every change to `spec/**`.
 
 Everything it reads is committed beside it: no network, no capture files, no rig.
 
-- **frame geometry** — `clean_len` and the `+2` rule in both directions, and the
-  channel width derived from the frame size (REAC carries no width field in an audio
-  frame);
+- **frame geometry** — `clean_len` and the `+2` rule in both directions, the channel
+  width derived from the frame size (REAC carries no width field in an audio frame),
+  and that the parser stops at the end marker: a capture's FCS residue is left unread,
+  never claimed as a field, and changes no other value;
 - **the braid** — the audio region decoded through the spec's pair-group structure
   must reproduce, sample for sample, the planar s24 tables libreac's own
   `tests/test_upstream.c` asserts. The permutation itself is documented in the spec
@@ -102,7 +103,7 @@ Latest run — 4 upstream goldens plus one downstream frame built by libreac's o
 encoder:
 
 ```
-field checks : 49
+field checks : 53
 PCM samples  : 1536
 mismatches   : 0
 ```
@@ -134,7 +135,7 @@ adds to that, and neither should be cited as if it did.
 
 `fixtures/upstream.json` — real MAC-sanitized rig captures with their PCM truth
 tables, the same arrays libreac pins (`UP8` 340 B / `UP16` 628 B / `UP32A`, `UP32B`
-1206 B with the OHRCA trailer).
+1206 B — 1204 B frames the capture left two bytes of Ethernet FCS on).
 
 `fixtures/control.json` — 43 control blocks stored as `frame[16:50]` windows (the type
 word plus the checksummed block, which is the form the C goldens use), plus the full
