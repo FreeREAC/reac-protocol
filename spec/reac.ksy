@@ -23,49 +23,58 @@ doc: |
       32 B control block                                  (offset 18..49)
        n_channels * 36 B braided s24 audio region         (offset 50)
        2 B 0xC2 0xEA end marker
-     [ 2 B trailer ]                                      (see below)
+     [ 2 B FCS residue — not protocol, see below ]
 
-  so a clean frame is `52 + n_channels * 36` bytes:
+  so a frame is `52 + n_channels * 36` bytes:
 
-    | direction  | width | clean | with the +2 trailer |
-    |------------|-------|-------|---------------------|
-    | downstream |    40 |  1492 |                1494 |
-    | upstream   |     8 |   340 |                 342 |
-    | upstream   |    16 |   628 |                 630 |
-    | upstream   |    32 |  1204 |                1206 |
+    | direction  | width | frame | as some captures store it |
+    |------------|-------|-------|---------------------------|
+    | downstream |    40 |  1492 |                      1494 |
+    | upstream   |     8 |   340 |                       342 |
+    | upstream   |    16 |   628 |                       630 |
+    | upstream   |    32 |  1204 |                      1206 |
+
+  The right-hand column is NOT a second frame format. It is the same frame with
+  two bytes of the capture's own Ethernet FCS left on the end.
 
   The downstream broadcast is always 40 channels and rate-INVARIANT: 12 samples
   per frame at 44.1 / 48 / 96 kHz alike, the sample rate carried by the packet
   rate (pps = rate / 12 -> 3675 / 4000 / 8000). An upstream return is the same
   shape sized to the box's own input width.
 
-  # The +2 trailer — two different things that look identical
+  # The +2 is Ethernet FCS residue — explained, stripped, NOT modelled
 
-  A length of `52 + n*36 + 2` carries two trailing bytes after the end marker.
-  The grammar parses them as opaque `ohrca_trailer` because the BYTES CANNOT
-  distinguish the two causes; the capture can:
+  A length of `52 + n*36 + 2` carries two bytes past the end marker. They are
+  the low 16 bits of the frame's OWN Ethernet FCS (crc32 over the preceding
+  bytes, little-endian), left behind by the capture path. They are not a REAC
+  field, they carry no protocol meaning, and nothing may ever emit them.
 
-  - UPSTREAM (340+2 / 628+2 / 1204+2): a REAL per-frame OHRCA CRC-16 field that
-    the box puts on the wire. Proven on the S-4000S 32-channel return: in one
-    capture our own downstream frames are all 1492 B (no +2) while the box's
-    upstream are all 1206 B, and the same box mixes ~1/8 frames at 1204 B. Strip
-    it or the frame fails the `% 36` width check and the audio path goes silent.
-    Evidence: reac-pw docs/OHRCA-UPSTREAM-DUPLICATE-FRAMES.md ("Fix" section) and
-    libreac <reac/reac.h> REAC_FRAME_BYTES_OHRCA / reac_frame_clean_len().
+  The measurement and the reasoning live in libreac <reac/reac.h> (libreac#15);
+  the short form is that the identity holds for 100% of frames checked, in both
+  directions and across generations, which no genuine trailer could do, and that
+  the variable is the capture rig — mirroring RX and TX of one port, so a
+  transiting frame is seen twice, one copy clean and one with the residue. It is
+  NOT OHRCA-specific: it appears on non-OHRCA rigs and is absent on OHRCA ones.
+  It is not a VLAN tag either — every frame here reads 0x8819 at offset 12, and
+  a tag would sit four bytes BEFORE the ethertype, not two bytes after the end
+  marker.
 
-  - DOWNSTREAM 1494: usually NOT a REAC field at all — it is the ETHERNET FCS,
-    mirrored into the capture by a switch SPAN/monitor port that does not strip
-    it. The M-200i grant capture is the worked example: every grant frame appears
-    twice, one 1494 B and one 1492 B, sharing an IDENTICAL frame counter. That is
-    one transmission seen twice by the mirror, not two frames and not a protocol
-    field. Treat a downstream +2 as a CAPTURE ARTIFACT unless the capture is from
-    a non-mirrored port. (A genuine OHRCA console does also append a real trailer
-    downstream — measured on a live M-5000 — so "downstream +2" is ambiguous by
-    construction and must be resolved by how the capture was taken, never by the
-    two bytes themselves.)
+  ## How the grammar expresses that
 
-  `clean_len` implements libreac's one rule for both directions: a length of
-  `52 + n*36 + 2` comes back reduced by 2, anything else is returned unchanged.
+  By NOT declaring a field for it. The `seq` ends at `end_marker`, so a parse of
+  a residue-carrying capture consumes exactly the frame and leaves the two stray
+  bytes unread at the end of the stream — tolerated, ignored, and impossible to
+  emit from a serializer generated out of this grammar. A `size: 2` field, however
+  it were named, would say the opposite: that the bytes belong to the format.
+
+  What the grammar DOES keep is the length arithmetic, because every derived
+  quantity depends on it. `has_fcs_residue` is a statement about the CAPTURE, not
+  about the frame, and `clean_len` is libreac's one rule for both directions: a
+  length of `52 + n*36 + 2` comes back reduced by 2, anything else is returned
+  unchanged.
+
+  A residue-carrying frame and a clean one therefore parse identically, field for
+  field, and differ only in how many bytes are left over afterwards.
 
   # The audio region and the braid
 
@@ -85,6 +94,58 @@ doc: |
   Confirmed independently by per-gron/reacdriver (MbufUtils), by
   norihiro/obs-h8819-source (convert_to_pcm24lep, listening-validated against a
   real M-200i) and by the FreeREAC rig goldens.
+
+  ## One layout, both directions — and why plain LE was ever entertained
+
+  There is ONE audio layout in REAC and it is the braid above. It holds in both
+  directions and across every mixer generation; there is no per-generation
+  variant, downstream or otherwise.
+
+  UPSTREAM (box -> master) is confirmed on real captures at three widths: the
+  goldens in fixtures/upstream.json are decoded by reac_upstream_decode() and by
+  this grammar to the same 1056 samples, and the loud channel of the rig capture
+  reads +0.998 lag-1 autocorrelation under the braid while every idle channel
+  collapses to the mic noise floor.
+
+  DOWNSTREAM (master -> fabric) is the same braid. The evidence:
+
+    - the zoneA/zoneB goldens (one M-5000's two REAC ports, program audio) read
+      coherence 0.99 / spectral flatness 0.002 braided, and noise under every
+      other layout x offset;
+    - obs-h8819-source decodes it as the braid and was listening-validated
+      against a real M-200i, a DIFFERENT generation from the M-5000 above — so
+      the two ends of the generation range are covered by independent work;
+    - libreac's own encoder, reac_downstream_build(), lays down the braid, and
+      since 0.5.0 reac_decode() reads it back. The library that emits the format
+      and the library that reads it are finally the same library.
+
+  ### Plain LE: a refuted reading, kept only as history
+
+  A plain-LE sample-major reading (channel ch at time s starting at
+  (s*40 + ch)*3) was once libreac's downstream default, on the strength of an
+  on-rig "coherence 0.999". That reading was overturned: the coherence came from
+  a mid-byte lane shift amplifying quiet BRAIDED audio 256x into a
+  coherent-looking image. It is not a layout the wire ever carried.
+
+  libreac 0.5.0 fixed reac_decode() accordingly — before the fix the library
+  could not read back a frame it had just built, 0 of 480 samples agreeing with
+  its own encoder (libreac#13). Plain LE survives there only as
+  reac_decode_plain_le(), a DIAGNOSTIC for reading historical captures stored
+  that way and for reproducing the lane shift.
+
+  The companion speculation — that OHRCA-generation (M-5000 / M-480) gear might
+  differ from the V-Mixer generation downstream — is likewise refuted, and was
+  never evidence in the first place: it was an untested hypothesis raised to
+  explain a discrepancy that turned out to be the lane shift. All mixers produce
+  the same downstream format. Do not reopen it without a capture that
+  contradicts the braid.
+
+  What IS a real limitation of this repo: there is NO downstream fixture here.
+  Every committed golden is an upstream return, so the downstream side of the
+  grammar is checked only against frames libreac's own encoder built, which
+  tests the envelope, the structure and agreement with the codec — not a console
+  on a wire. That gap is about this repo's corpus, not about the layout; see
+  spec/xcheck_c_oracle.py, which states the same boundary.
 
   # Checksums
 
@@ -166,20 +227,27 @@ seq:
     type: audio_region
   - id: end_marker
     contents: [0xC2, 0xEA]
-  - id: ohrca_trailer
-    size: 2
-    if: has_ohrca_trailer
-    doc: See the +2 discussion in the top-level doc. Opaque by design.
+    doc: |
+      The frame ENDS here. A capture that kept two bytes of the Ethernet FCS
+      leaves them past this point; the grammar deliberately declares no field for
+      them, so they are read by nothing and can be emitted by nothing. See "The
+      +2 is Ethernet FCS residue" in the top-level doc.
 instances:
   raw_len:
     value: _io.size
-    doc: The captured frame length, trailer included.
-  has_ohrca_trailer:
+    doc: The size of the buffer handed to the parser — the frame plus whatever
+      the capture left on it.
+  has_fcs_residue:
     value: (raw_len - 52) % 36 == 2
-    doc: A clean REAC frame is 52 + n*36, so a remainder of 2 is the trailer.
+    doc: |
+      True when the buffer is 2 bytes longer than any valid 52 + n*36 frame,
+      i.e. when the capture kept the low half of the Ethernet FCS. A statement
+      about the CAPTURE, not about the frame: it changes no field below, only
+      how many bytes go unread after end_marker.
   clean_len:
-    value: 'has_ohrca_trailer ? raw_len - 2 : raw_len'
-    doc: libreac reac_frame_clean_len(). Every other length passes through.
+    value: 'has_fcs_residue ? raw_len - 2 : raw_len'
+    doc: libreac reac_frame_clean_len(). The actual frame length. Every length
+      that is not 52 + n*36 + 2 passes through unchanged.
   num_channels:
     value: (clean_len - 52) / 36
     doc: |
@@ -553,7 +621,31 @@ types:
 
       DISPATCH: a genuine record is op 0x0403 AND wrapper 00 02 00 fe AND
       F0 41 ... — all three are asserted below by `contents`, which is what
-      rejects the look-alikes.
+      rejects the look-alikes. The look-alike to beat is the box-upstream braid,
+      which carries cd ea 04 03 with the bytes 02 00 fe 00 where the wrapper
+      belongs and no SysEx envelope at all.
+
+      WORKED EXAMPLE — an S-1608 input 1 phantom-ON edit, as the leading 25 bytes
+      of the frame[16:50] window (zero padding and the block checksum follow):
+
+        cd ea 04 03 00 13 00 02 00 fe 0e f0 41 0a 00 00 12 12 01 01 20 00 01 5d f7
+
+        cd ea        type word, control
+        04 03        op, this container
+        00 13        op_len -> record_len 6, data_len 3
+        00 02 00 fe  wrapper
+        0e           len_echo, op_len - 5
+        f0 41        SysEx start + Roland manufacturer id
+        0a           device id
+        00 00 12     model id
+        12           command, DT1 (a write)
+        01 01        TAG, the head-amp page
+        20 00 01     data: CH 0x20, PARAM phantom, VALUE on
+        5d           inner checksum
+        f7           SysEx end
+
+      The inner sum spans the record only: 01+01+20+00+01+5d = 0x80. CH 0x20 is
+      input 1 of a box based at 0x20, not channel 32 of anything.
     seq:
       - id: wrapper
         contents: [0x00, 0x02, 0x00, 0xfe]
@@ -612,10 +704,10 @@ types:
         type: u1
         doc: |
           The WIRE channel: model_base + (box_input - 1), in the 48-slot head-amp
-          space 0x00..0x2f. NOT an audio fabric slot (that space is 40 wide), and
-          a table bounded by 40 silently rejects the top half of a 16-input box
-          based at 0x20. The base itself is session state — see
-          config_announce_page.
+          space 0x00..0x2f. It addresses a BOX INPUT — not a console channel
+          strip, and not an audio fabric slot (that space is 40 wide). A table
+          bounded by 40 silently rejects the top half of a 16-input box based at
+          0x20. The base itself is session state — see config_announce_page.
       - id: param
         type: u1
         enum: head_amp_param
@@ -637,6 +729,14 @@ types:
       12 time samples of `num_channels` s24 channels in the channel-pair byte
       braid. Structural only — see the braid map in the top-level doc; the
       permutation is validated by cross-check, not by this grammar.
+
+      One layout, both directions, every generation. The braid is confirmed
+      upstream on real captures at three widths and downstream by the zoneA/zoneB
+      goldens, obs-h8819's listening-validated M-200i decode and libreac's own
+      encoder; the plain-LE reading it was once weighed against is refuted. See
+      "One layout, both directions" in the top-level doc — and note the structure
+      below (12 samples x n/2 six-byte pair groups) would be the same byte count
+      in the same place either way, so it is not what carries that claim.
     seq:
       - id: time_samples
         type: time_sample
