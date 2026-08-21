@@ -98,12 +98,44 @@ doc: |
 
   Both are asserted for every checked-in fixture by spec/reac_xcheck.py.
 
+  # The session, and its two reconnects
+
+  A stagebox appearing on a segment is not a special case: it is a lost
+  connection and a reconnect, and the frames that mark it are all in this
+  grammar. The box drives it — nothing has to provoke it. Measured end to end on
+  a live swap (2026-08-21, an S-1608 pulled and an S-0808 plugged in):
+
+    peer silent past the master's hold      -> the session is over
+    +3.4 s  box UNICAST upstream, its own eth_src   (`upstream` frame)
+            box CONFIG ANNOUNCE, op 01 03 0x0010    (`config_announce_page`)
+    +0.8 s  box JOIN burst, op 04 03 tags 0014/0016/001a  (`dt1_record`)
+            box HEARTBEAT, op 01 03 0x0001
+    +5.0 s  granted; the box's return carries audio
+
+  The FIRST frame carrying the new `eth_src` is what announces the peer. There
+  are two flavours, and `eth_src` alone cannot tell them apart:
+
+  - COLD — a DIFFERENT eth_src. A new peer with its own declared geometry (see
+    the port table in `config_announce_page`), so everything derived from the old
+    one is void: width, fabric placement, and the receiver's channel count.
+  - WARM — the SAME eth_src returning. The geometry stands, but it is still a NEW
+    SESSION: the frame counter at offset 14 restarts wherever the box's does, so
+    stream state keyed on the peer's identity alone silently survives into a
+    session it does not belong to. A receiver that kept it read the seam as lost
+    frames and reported thousands of counter gaps on a clean reconnect.
+
+  Both are the same event with different consequences, which is why a consumer
+  must key per-session state on (peer, session), never on the peer alone.
+
   # Anti-goals
 
-  This grammar deliberately does NOT model: the establishment FSM (a sequence of
-  frames, not a layout), the probe rotation law, the per-model fabric slot BASE
-  (see `config_announce_page`), or anything that is negotiated session state
-  rather than a field on the wire.
+  This grammar does NOT model the establishment FSM as STRUCTURE — a sequence of
+  frames is not a layout, and Kaitai has no way to say it. The lifecycle above is
+  documented rather than parsed, and it names the frame each transition is
+  carried by so the sequence is at least discoverable from the spec. Also not
+  modelled: the probe rotation law, the per-model fabric slot BASE (see
+  `config_announce_page`), or anything that is negotiated session state rather
+  than a field on the wire.
 seq:
   - id: eth_dst
     size: 6
