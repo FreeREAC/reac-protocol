@@ -495,30 +495,102 @@ def test_head_amp_params_and_value_ranges():
 # the establishment ops
 # --------------------------------------------------------------------------
 
-def test_probe_window_and_rotation_alphabet():
-    """The probe payload is a 27-byte sliding window over a period-10 sequence.
-    The grammar models the window; the rotation is a sequence law and stays in
-    prose. What is checkable here is the alphabet and the sub-state byte."""
-    subs = set()
+SCENE_BODY = (pathlib.Path(__file__).parent / "fixtures" / "scene-m200i-8904.bin").read_bytes()
+
+
+def test_scene_body_fixture_is_a_complete_transfer():
+    """The recovered body must be exactly what the master declares, or every
+    offset asserted below is measured against a truncated capture. 8904 is not a
+    magic number here: it is 0x37c + 8 + 800*10 + 4, the SCEN block's own
+    arithmetic, and the box carries the 800 independently in its literal pool."""
+    assert len(SCENE_BODY) == 0x22c8 == 8904
+    assert 0x37c + 8 + 800 * 10 + 4 == len(SCENE_BODY)
+
+
+def test_scene_chunks_are_slices_of_the_body():
+    """Every op-0100 payload in the corpus is a literal 26-byte slice of the
+    scene body at 24 + 26k. This is the whole case that op-0100 is a scene
+    continuation and not a probe, and it is a VALUE test across the boundary:
+    bytes captured off the wire as 'probe windows' against bytes reassembled
+    from a different capture of the transfer.
+
+    The negative control matters as much as the positive: a payload that is NOT
+    in the body must not be found, or the test would pass on any input."""
+    chunks = {SCENE_BODY[24 + 26 * k:24 + 26 * k + 26] for k in range(341)}
+    assert len(chunks) == 15, "the corpus catalogued 15 distinct op-0100 payloads"
+
+    seen_cells = set()
+    n = 0
     for name, blk in BLOCKS:
         if not name.startswith("probe_"):
             continue
         t = parse_block(blk["hex"])
-        assert t.op_len_raw == 0x001a
-        w = bytes(t.block.payload.window)
-        assert len(w) == 27
-        assert set(w) <= {0x00, 0x01, 0x02, 0x03}
-        subs |= set(w) & {0x02, 0x03}
-        assert t.block.payload.checksum == t.raw_block[31]
-    assert subs == {0x02, 0x03}   # hunting and established both represented
+        assert t.op_raw == 0x0100
+        assert t.op_len_raw == 0x001a == 26, "op_len is the CHUNK LENGTH"
+        p = t.block.payload
+        assert p.chunk_reserved == 0
+        assert bytes(p.chunk) in chunks, f"{name} is not a slice of the body"
+        assert p.checksum == t.raw_block[31]
+        seen_cells |= set(bytes(p.chunk)) & {0x02, 0x03}
+        n += 1
+    assert n == 10
+    # 0x02 / 0x03 are inventory_cell values reached by the 10-byte record
+    # stride, not the master sub-states they were read as.
+    assert seen_cells == {0x02, 0x03}
+    assert bytes(range(0x40, 0x40 + 26)) not in chunks   # negative control
 
 
-def test_sub01_identity_constant():
+def test_scene_header_declares_the_total_not_a_model_constant():
     t = parse_block(next(b for n, b in BLOCKS if n == "sub01")["hex"])
     p = t.block.payload
     assert t.op_raw == 0x0101
-    assert p.model_const == 0x22c8
-    assert bytes(p.ident_ascii) == b"1234"
+    assert t.op_len_raw == 0x0018 == 24, "op_len is this chunk's length"
+    assert p.scene_total_len == len(SCENE_BODY) == 0x22c8
+    assert bytes(p.body_head) == SCENE_BODY[:24]
+    assert bytes(p.body_head)[:4] == b"1234"
+
+
+def test_scene_final_carries_the_tail():
+    t = parse_block(next(b for n, b in BLOCKS if n == "sub02")["hex"])
+    assert t.op_raw == 0x0102
+    assert t.op_len_raw == 0x000e == 14 == (8904 - 24) % 26
+    assert bytes(t.block.payload.chunk)[:14] == SCENE_BODY[-14:]
+
+
+def test_scene_body_parses_and_its_offsets_are_where_the_box_reads_them():
+    """The S-1608 resolves these offsets out of its own literal pool against one
+    staging base. Parsing must land each field on the same byte."""
+    b = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY)))
+    assert bytes(b.magic) == b"1234"
+    assert b.unit_map_select == 1            # +0x04, every desk, every box
+    assert b.map_a_arg == 4                  # +0x08
+    assert b.revision == 0                   # +0x14, 1 on an M-5000
+    assert len(b.slots) == 80                # +0x1a, 800 bytes
+    assert bytes(b.master_id)[:3] == bytes.fromhex("0040ab")   # Roland OUI
+    assert bytes(b.sysp.tag) == b"SYSP"      # +0x368
+    assert bytes(b.scen.tag) == b"SCEN"      # +0x37c
+    assert len(b.scen.entries) == 800
+    # the offsets themselves, so a layout drift cannot pass quietly
+    assert SCENE_BODY[0x1a:0x1a + 800] == b"".join(
+        SCENE_BODY[0x1a + 10 * i:0x1a + 10 * i + 10] for i in range(80))
+    assert SCENE_BODY[0x340:0x346] == bytes(b.master_id)
+    assert SCENE_BODY[0x368:0x36c] == b"SYSP"
+    assert SCENE_BODY[0x37c:0x380] == b"SCEN"
+
+
+def test_scene_declares_twelve_inventory_cells_like_the_box_does():
+    """The box's commit walks twelve cells at a stride of 0x28 over the slot
+    table — four records each — so the desk declares its inventory in exactly the
+    vocabulary the box declares its own in config_announce_page. An M-200i sends
+    eight analog-input cells and four absent: 32 declared inputs."""
+    b = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY)))
+    cells = [b.slots[4 * i].cell for i in range(12)]
+    assert cells.count(R.Reac.InventoryCell.analog_input) == 8
+    assert cells.count(R.Reac.InventoryCell.absent) == 4
+    assert sum(4 for c in cells if c == R.Reac.InventoryCell.analog_input) == 32
+    # the scene carries no per-channel head-amp values: the commit is the GATE,
+    # the values arrive as op-0403 TAG 0x0101 records.
+    assert {(s.field_2, s.field_4, s.field_6, s.field_8) for s in b.slots} == {(0, 1, 0, 0)}
 
 
 def test_chanmap_ring_is_identical_for_every_box():
