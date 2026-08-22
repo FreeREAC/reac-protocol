@@ -188,13 +188,48 @@ doc: |
   Both are the same event with different consequences, which is why a consumer
   must key per-session state on (peer, session), never on the peer alone.
 
+  # What the MASTER sends to enrol a box, in order
+
+  The mirror of the section above, measured on a real M-200i driving a real
+  S-1608 (m200i-s1608-48k-mirror__real-m200-s1608-coldboot, 2026-07-11) and
+  anchored in the master's own transfer routine. Times are relative to the box
+  falling silent.
+
+    steady, box present  master  cfea announce at 1 Hz
+                                 op 01 03 page 0x0019 at 1 Hz
+                         box     op 01 03 page 0x0001 heartbeat, unicast, 1 Hz
+    box goes silent      master  keeps announcing; page 0x0019 slows to ~2 s
+    +7.2 s               master  THE SCENE TRANSFER: op 01 01 header,
+                                 341 x op 01 00, op 01 02 final — 0.684 s
+                                 then one page 0x0019
+                                 and the WHOLE TRANSFER AGAIN every 2.695 s
+    +17.8 s              box     op 01 03 page 0x0010 config-announce, then
+                                 op 04 03 tags 0100 / 0000 / 0302, then heartbeat
+    +19.5 s              master  the head-amp sweep: 48 op 04 03 TAG 0101
+                                 records in 0.145 s — 16 wire channels 0x20..0x2f
+                                 x phantom, pad, sens
+    after                master  back to 1 Hz cfea + page 0x0019; the scene
+                                 transfer never runs again for this session
+
+  Two properties of that order are easy to get wrong and both are load-bearing:
+
+  - The scene transfer is REPEATED UNTIL ANSWERED, not sent once. Four complete
+    bodies here, ten in an M-300 establish capture, all at the same 2.695 s
+    period and all byte-identical. It stops the moment the box announces itself.
+    The period is a RETRY interval on a bounded transfer, not a free-running
+    cadence, and a box joining mid-transfer must not cancel it — the box joining
+    is what it is for.
+  - The head-amp sweep has NO bank structure. Sixteen contiguous wire channels,
+    all three parameters each, one pass. A master does not address halves of a
+    box and does not repeat the sweep.
+
   # Anti-goals
 
   This grammar does NOT model the establishment FSM as STRUCTURE — a sequence of
   frames is not a layout, and Kaitai has no way to say it. The lifecycle above is
   documented rather than parsed, and it names the frame each transition is
   carried by so the sequence is at least discoverable from the spec. Also not
-  modelled: the probe rotation law, the per-model fabric slot BASE (see
+  modelled: the per-model fabric slot BASE (see
   `config_announce_page`), or anything that is negotiated session state rather
   than a field on the wire.
 seq:
@@ -343,8 +378,9 @@ types:
     doc: |
       Type word 0x0000: an audio-only frame, no control op, CHECKSUM-EXEMPT. The
       32 bytes are 16 two-byte descriptor slot words. Downstream, a real console
-      repeats the CHECKSUM of the probe currently in force across every FILLER
-      until the next probe; upstream, a box emits a constant word (0x007a on the
+      repeats the CHECKSUM of the control frame currently in force across every
+      FILLER until the next one — during an establishment that is the scene chunk
+      in flight; upstream, a box emits a constant word (0x007a on the
       S-0808/S-1608 returns, 0x00f4 on the S-4000S). The presence-flood a box
       broadcasts before it links zeroes the block entirely.
     seq:
@@ -971,7 +1007,9 @@ types:
           range +20 dB. The box applies the shift, not the console.
   join_grant_data:
     doc: TAG 0x0100 — the join grant. Observed as 06 00 XX 00 with XX the box's
-      join state, climbing 0x01 -> 0x09 as it locks to the probe rotation.
+      join state, climbing 0x01 -> 0x09 over the establishment. The climb was
+      read as the box "locking to the probe rotation"; there is no probe and no
+      rotation, so what advances it is UNRESOLVED — it is not modelled here.
     seq:
       - id: body
         size-eos: true
