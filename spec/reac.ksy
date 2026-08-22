@@ -480,6 +480,29 @@ types:
       The chanmap is IDENTICAL for every box on every console, so it carries NO
       per-box placement information; a study of 82 captures found the same full
       ring everywhere. It is the master's established heartbeat, nothing more.
+
+      GROUP ANCHORS. The S-1608 firmware's per-record push consumes only entries
+      where `(slot & 3) == 0`, deriving a group index `slot >> 2` and storing the
+      value byte's HIGH NIBBLE — an `inventory_cell` code — into a 12-position
+      map. Only 12 of the 49 ring entries reach it: slots 0x00,0x04,…,0x2c giving
+      groups 0..11. The `is_group_anchor` / `group` / `cell_type` instances on
+      chanmap_entry expose that derivation.
+
+      What it yields is a CONSTANT, which is the load-bearing point: every console
+      (M-200i, M-300, M-5000) and reac-pw alike write groups 0..9 = analog_input
+      (nibble 2) and groups 10..11 = absent (nibble 3), for an S-0808, an S-1608
+      and an S-4000S without distinction. A 32-channel box receives the same
+      12-group map as an 8-channel one, so this map cannot be how a console
+      selects a box's head-amp banks — it describes the MASTER's own 40-channel
+      fabric (0x00..0x27 populated, 0x28..0x2f past its end).
+
+      The 0xfe wrap marker is NOT an anchor (`0xfe & 3 == 2`), so it never reaches
+      the group map; it is dispatched down a separate path.
+
+      EVIDENCED (82-capture corpus): the ring, the 3-byte stride, the values, the
+      box-independence, and that 0xfe is not an anchor.
+      INFERRED (firmware image, not the wire): that these anchor nibbles are what
+      the box stores as its group map.
     seq:
       - id: page_id
         type: u1
@@ -502,6 +525,25 @@ types:
         doc: 0x28 for slots below 0x28, 0x38 for 0x28..0x2f, 0x00 on the marker.
       - id: pad
         type: u1
+    instances:
+      is_group_anchor:
+        value: 'slot != 0xfe and (slot & 3) == 0'
+        doc: |
+          True on the 12 entries the box's per-record push consumes (every 4th
+          fabric slot). The 0xfe wrap marker is excluded explicitly: 0xfe & 3 is
+          2, so it is not an anchor and never feeds the group map.
+      group:
+        value: 'slot >> 2'
+        doc: |
+          Head-amp group index this entry anchors, 0..11, meaningful only where
+          is_group_anchor. Derived from the firmware's push, not from the wire.
+      cell_type:
+        value: 'bank >> 4'
+        enum: inventory_cell
+        doc: |
+          The value byte's high nibble, the code stored into the group map:
+          2 analog_input for groups 0..9, 3 absent for groups 10..11, on every
+          console and every box model observed.
   config_announce_page:
     doc: |
       op-0103 0x0010: the box's SETUP DECLARATION at cold connect — what the
