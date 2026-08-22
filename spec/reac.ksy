@@ -322,7 +322,7 @@ types:
             and dt1_tag == 0x0101 ? ctrl_kind::head_amp : ctrl_kind::grant) :
           op_raw == 0x0103 and op_len_raw == 0x0019 ? ctrl_kind::master_hb :
           op_raw == 0x0103 and op_len_raw == 0x0001 ? ctrl_kind::box_hb :
-          (op_raw >> 8) == 0x01 ? ctrl_kind::probe :
+          (op_raw >> 8) == 0x01 ? ctrl_kind::scene_transfer :
           ctrl_kind::unknown_ctrl
         enum: ctrl_kind
         doc: |
@@ -334,7 +334,8 @@ types:
               0x0302 / 0x0500 / 0x0000 all land here);
             - op 0x0103 sub-pages other than chanmap (0x0019) and box heartbeat
               (0x0001) — that is, config-announce 0x0010 and the enroll group map
-              0x000d — fall through to `probe`, because the consumer only tests
+              0x000d — fall through to `scene_transfer`, because the consumer only
+              tests
               the high op byte. Read `page_kind` for the real sub-page.
           `none` is never produced here: a non-REAC frame fails the ethertype
           contents check before classification.
@@ -363,21 +364,30 @@ types:
         type: u2
         doc: |
           Big-endian, and op-specific in meaning — a length for the DT1 container
-          (record_len = op_len - 0x0d) but a SUB-PAGE SELECTOR for op 0x0103 and
-          a fixed constant for the rest. It is not a generic frame length.
+          (record_len = op_len - 0x0d), the CHUNK LENGTH for the three scene ops
+          (0x0018 header / 0x001a chunk / 0x000e final), a SUB-PAGE SELECTOR for
+          op 0x0103, and a fixed constant for the rest. It is not a generic frame
+          length.
+
+          EVIDENCED (image): the master writes it with a big-endian 16-bit store
+          from the same variable it passes to the memcpy that fills the payload,
+          and the box reads it back as the memcpy length. Our earlier reading of
+          0x001a as "a fixed constant of the probe" was a coincidence of the
+          scene's chunk size.
       - id: payload
         size: 28
         type:
           switch-on: op
           cases:
-            'control_op::probe': probe_payload
-            'control_op::sub01': sub01_payload
+            'control_op::scene_chunk': scene_chunk_payload
+            'control_op::scene_header': scene_header_payload
+            'control_op::scene_final': scene_final_payload
             'control_op::page_0103': page_0103
             'control_op::dt1_container': dt1_record
             'control_op::announce': cfea_payload
-        doc: Unmodelled ops (sub02 0x0102, the ASCII name frame 0x0401, the extra
-          cold-connect 0x0402) fall through as raw bytes on purpose — their
-          interiors are not decoded to a level worth pinning.
+        doc: Unmodelled ops (the ASCII name frame 0x0401, the extra cold-connect
+          0x0402) fall through as raw bytes on purpose — their interiors are not
+          decoded to a level worth pinning.
     instances:
       block_checksum:
         pos: 31
@@ -418,36 +428,277 @@ types:
       - id: rest
         size-eos: true
         doc: Zero padding, last byte the block checksum.
-  probe_payload:
+  scene_chunk_payload:
     doc: |
-      op 0x0100, the master's hunt/probe (op_len 0x001a). `window` is a 27-byte
-      sliding view of the period-10 sequence {0,0,0,1,0,0,0,0,0,SUB}, SUB = 0x02
-      while probing and 0x03 once established, the phase stepping +6 (mod 10)
-      every two emissions. A box advances its own join state by tracking this
-      rotation, so a master that emits only a subset of the phases leaves the box
-      latched part-way. The rotation is a SEQUENCE law, not a layout, and is
-      therefore documented rather than modelled.
+      op 0x0100 — a CONTINUATION CHUNK of the master's scene transfer, 26 bytes
+      of `scene_body` (see that type). op_len carries the chunk length, 0x001a.
+
+      EVIDENCED (image, M-200i + M-480, byte-identical routine): the master
+      writes block[1] = 0 for a continuation, stores the chunk length big-endian
+      at block[2:4], and memcpy's the chunk to block[5]. EVIDENCED (corpus): every
+      one of the ten distinct op-0100 payloads in `fixtures/control.json` is a
+      literal 26-byte slice of the recovered 8904-byte body, at an offset of
+      24 + 26k; a random 26-byte control is not.
+
+      THIS IS NOT A PROBE. It was read as one for a year, and the "period-10
+      rotation with a phase step of +6 and a sub-state byte of 0x02 or 0x03" was
+      the scene's own 10-byte `scene_record` stride seen through a 26-byte
+      window: 26 mod 10 = 6, and gcd(26,10) = 2 leaves exactly the five even
+      phases the corpus catalogued. The "sub-state" is the record's
+      `inventory_cell` — 0x02 where the chunk lands in the desk's declared analog
+      inputs, 0x03 where it lands in the absent tail — not a master state. A
+      master that "emits only a subset of the phases" is a master that truncates
+      the transfer, which is the real defect the phase-counting was detecting.
     seq:
-      - id: window
-        size: 27
+      - id: chunk_reserved
+        type: u1
+        doc: block[4], zero. The box refuses the frame unless it is zero.
+      - id: chunk
+        size: 26
+        doc: block[5:31] — scene_body[24 + 26*k .. +26] for the k-th chunk.
       - id: checksum
         type: u1
-  sub01_payload:
-    doc: op 0x0101, establishment handshake step 1; op 0x0102 (sub02) follows it
-      about 0.68 s later and is a fixed block with no decoded interior.
+  scene_header_payload:
+    doc: |
+      op 0x0101 — the FIRST phase of the scene transfer. Declares the total and
+      carries the body's first 24 bytes. Its payload starts two bytes later than
+      a continuation's: the total occupies block[5:7], so the body begins at
+      block[7], not block[5].
+
+      EVIDENCED (image): `movi20 #0x22c8` then a big-endian 16-bit store to
+      block[5]; the box gates on it (`if (declared_total != 8904) refuse`) before
+      staging 24 bytes from block[7].
     seq:
-      - id: reserved
+      - id: header_reserved
         type: u1
-      - id: model_const
+        doc: block[4], zero.
+      - id: scene_total_len
         type: u2
-        doc: Protocol identity constant, 0x22c8 on the S-1608 family. The box's
-          config-accept gate rejects a mismatch, which blocks ESTABLISHMENT (it
-          has nothing to do with head-amp latching).
-      - id: ident_ascii
-        size: 4
-        doc: ASCII "1234".
-      - id: rest
+        doc: |
+          block[5:7] — the TOTAL length of the scene body that follows, 0x22c8 =
+          8904 on every desk generation seen.
+
+          EVIDENCED both. This was previously named `model_const` and documented
+          as "a protocol identity constant, 0x22c8 on the S-1608 family". The
+          firmware says otherwise on both sides and the firmware wins: it is a
+          length, it is the MASTER's, and it is hardcoded before the master knows
+          what box is attached. It is 8904 because the body is
+          0x37c + 8 + 800*10 + 4 — the SCEN block's own arithmetic, which the box
+          carries independently as a record count of 800.
+      - id: body_head
+        size: 24
+        doc: block[7:31] — scene_body[0:24], which is why a capture of this frame
+          alone shows the ASCII "1234" that opens the body.
+      - id: checksum
+        type: u1
+  scene_final_payload:
+    doc: |
+      op 0x0102 — the LAST chunk, and the phase the box's commit is gated on.
+      op_len is 0x000e = 14 = 8880 mod 26, so it is a length like any other
+      chunk's, not a fixed block.
+
+      EVIDENCED (image): the master sets block[1] = 2 when the remaining count
+      has fallen to 26 or below; the box's reassembler accepts block[1] in {0, 2}
+      and finishes on 2 with remaining reaching zero, which is what enters the
+      state-4 commit. A transfer that never delivers this frame leaves the box in
+      reassembly for the life of the link, with head-amp staged and never active.
+    seq:
+      - id: final_reserved
+        type: u1
+      - id: chunk
         size-eos: true
+        doc: block[5:5+op_len] — the tail of the body, 14 bytes, then padding to
+          the block end. Sized to end-of-stream rather than to op_len so a short
+          or padded final frame still parses; read op_len for the true count.
+  scene_body:
+    doc: |
+      THE SCENE — the 8904-byte body the three ops above carry, reassembled as
+      `scene_header.body_head` + each `scene_chunk.chunk` in emission order +
+      `scene_final.chunk`. It is NOT a frame, so nothing in `seq` reaches it;
+      parse it from a recovered body (reac-pw tools/recover-scene.py).
+
+      It is a property of the DESK, not of the box: an M-300 sends the same bytes
+      to an S-1608 and to an S-0808, and the only bytes that differ between an
+      M-200i's and an M-300's are the four low bytes of `master_id`.
+
+      # Endianness
+
+      Fields here are LITTLE-endian, against the frame's big-endian everywhere
+      else. EVIDENCED (image): the box is an SH-4 in little-endian mode and reads
+      these with native `*(short *)` loads, so LE is what the desk must write for
+      the box to agree — and every value reads as a small number that way and as
+      a large one the other.
+
+      # What the box does with it
+
+      Every offset below is a pointer resolved out of the S-1608's own literal
+      pool against one staging base, and every one lands on a boundary the wire
+      body shows independently. The box stages the whole body into one buffer,
+      then its state-4 commit reads `unit_map_select`, publishes `revision`,
+      copies 800 bytes of `slots` and 6 bytes of `master_id` into its live
+      tables, pushes twelve `inventory_cell`s, and emits the `01 03 00 10`
+      committed report. That commit is the only unconditional promoter of
+      head-amp state in the box.
+    seq:
+      - id: magic
+        contents: [0x31, 0x32, 0x33, 0x34]
+        doc: ASCII "1234". EVIDENCED both.
+      - id: unit_map_select
+        type: u2le
+        doc: |
+          +0x04. Selects which of two maps the commit applies: 1 takes
+          `map_a_arg`, anything else takes `map_b`. EVIDENCED both — the box
+          branches on it at commit, and the wire reads 0x0001 on every desk
+          generation and against every box.
+      - id: reserved_06
+        size: 2
+      - id: map_a_arg
+        type: u2le
+        doc: +0x08. The value the commit passes on when `unit_map_select` is 1.
+          EVIDENCED (image) that it is read there; 0x0004 on every capture. What
+          it selects is UNRESOLVED.
+      - id: unknown_0a
+        size: 10
+        doc: +0x0a..+0x13. Constant across every desk seen (01 80 02 00 01 00 01
+          00 01 00). No reader located in either image. UNRESOLVED.
+      - id: revision
+        type: u2le
+        doc: |
+          +0x14. The box caches this and compares it before it will re-read the
+          three sub-objects: a body whose revision differs is treated as changed
+          without any further comparison. EVIDENCED both — the compare is in the
+          image, and it is one of only two non-padding bytes that differ between
+          a V-Mixer desk (0x0000) and an M-5000 (0x0001).
+      - id: reserved_16
+        size: 4
+      - id: slots
+        type: scene_record
+        repeat: expr
+        repeat-expr: 80
+        doc: |
+          +0x1a, 800 bytes. EVIDENCED both: the box memcmp's exactly 800 bytes
+          here and its commit loop copies 80 records at a stride of 10.
+
+          The first 48 records are the same 48-slot declaration space the box
+          declares back in `config_announce_page`: the commit walks twelve cells
+          at a stride of 0x28 — four records each — and pushes record[4i].cell
+          into its cell table. So the desk declares its inventory to the box in
+          exactly the vocabulary the box declares its own. An M-200i sends eight
+          cells of `analog_input` and four of `absent`: 32 declared inputs.
+
+          What records 48..79 are for is UNRESOLVED — the commit copies them, no
+          reader has been located, and they read `absent` on every capture.
+      - id: reserved_33a
+        size: 6
+      - id: master_id
+        size: 6
+        doc: |
+          +0x340. The desk's own MAC, and the six bytes the commit copies into
+          the box's live master-id slot. EVIDENCED both: the pool pointer resolves
+          to staging + 0x340, and the four low bytes are the ONLY difference
+          between an M-200i's scene and an M-300's.
+      - id: reserved_346
+        size: 4
+      - id: peer_id_1
+        size: 6
+        doc: +0x34a. ff:ff:ff:ff:ff:ff on every capture. INFERRED that it is a
+          peer slot, from position and shape alone — no reader located.
+      - id: reserved_350
+        size: 4
+      - id: peer_id_2
+        size: 6
+        doc: +0x354. As peer_id_1. INFERRED.
+      - id: map_b
+        size: 14
+        doc: +0x35a. The value the commit passes on when `unit_map_select` is NOT
+          1. EVIDENCED (image) that the commit reads here; its length is bounded
+          only by the next named field, and it is all zero on every capture, so
+          the SHAPE is INFERRED.
+      - id: sysp
+        type: scene_sysp
+        doc: +0x368.
+      - id: scen
+        type: scene_scen
+        doc: +0x37c.
+  scene_record:
+    doc: |
+      The 10-byte record the scene uses in both its tables. EVIDENCED (image):
+      the commit copies fields at +2, +4, +6 and +8 from staging to live and
+      pointedly does NOT copy +0, which is instead read by the twelve-cell loop.
+
+      Every record in every capture reads (cell, 0, 1, 0, 0), so the scene does
+      NOT carry per-channel head-amp values — those arrive separately as op-0403
+      TAG 0x0101 records. The commit is the GATE that makes staged head-amp
+      active, not the payload that sets it.
+    seq:
+      - id: cell
+        type: u2le
+        enum: inventory_cell
+        doc: +0. Not committed; read by the twelve-cell declaration loop at every
+          fourth record. INFERRED that the enum is the same vocabulary as
+          `config_announce_page.cells` — the values coincide (0x02 analog input,
+          0x03 absent), the cell count and the four-channel grouping coincide, and
+          nothing in either image names it.
+      - id: field_2
+        type: u2le
+      - id: field_4
+        type: u2le
+        doc: 0x0001 in every record of every capture.
+      - id: field_6
+        type: u2le
+      - id: field_8
+        type: u2le
+  scene_sysp:
+    doc: |
+      +0x368, 20 bytes — the desk's SYSTEM sub-object. EVIDENCED both: the tag is
+      one of only three ASCII runs in the whole body and sits exactly at the
+      offset the box's change-detector hard-codes. That detector compares just two
+      cells of it, `key` and `flag`.
+    seq:
+      - id: tag
+        contents: [0x53, 0x59, 0x53, 0x50]
+      - id: version
+        type: u2le
+        doc: 0x0001 on every capture.
+      - id: key
+        type: u2le
+        doc: +6. One of the two cells the box compares. EVIDENCED (image).
+      - id: flag
+        type: u1
+        doc: +8. The other. EVIDENCED (image).
+      - id: rest
+        size: 11
+  scene_scen:
+    doc: |
+      +0x37c to the end — the desk's SCENE sub-object, and the bulk of the body.
+      EVIDENCED both: the tag sits at the offset the box hard-codes, the box
+      compares `key` and then memcmp's `entries` at a length of its own record
+      count times ten, and that count resolves out of the image as 800.
+
+      The body's total length is this block's arithmetic and nothing else:
+      0x37c + 8 + 800*10 + 4 = 0x22c8 = 8904. The number the master hardcodes and
+      the box gates on is the size of this structure, not a magic constant.
+    seq:
+      - id: tag
+        contents: [0x53, 0x43, 0x45, 0x4e]
+      - id: version
+        type: u2le
+        doc: 0x0001 on every capture.
+      - id: key
+        type: u2le
+        doc: +6. Compared by the box before it looks at `entries`.
+      - id: entries
+        type: scene_record
+        repeat: expr
+        repeat-expr: 800
+        doc: |
+          8000 bytes. Same record shape as `slots` — the box memcmp's it at a
+          stride of ten — but reached through a different sink, so the two are
+          not the same table. Every entry reads `absent` on every capture, which
+          is what an empty scene should look like; nothing here has been seen
+          populated, so what an entry MEANS is UNRESOLVED.
+      - id: trailer
+        size: 4
   page_0103:
     doc: |
       op 0x0103 is a multiplexer whose sub-page is selected by op_len, not by a
@@ -758,9 +1009,9 @@ enums:
     0xcdea: control
     0xcfea: announce
   control_op:
-    0x0100: probe
-    0x0101: sub01
-    0x0102: sub02
+    0x0100: scene_chunk
+    0x0101: scene_header
+    0x0102: scene_final
     0x0103: page_0103
     0x0401: name_frame
     0x0402: extra_cold_connect
@@ -775,7 +1026,7 @@ enums:
   ctrl_kind:
     0: none
     1: filler
-    2: probe
+    2: scene_transfer
     3: master_hb
     4: master_announce
     5: grant
