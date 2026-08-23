@@ -67,6 +67,39 @@ Kaitai cannot close this on its own: it has no plain-C backend and it emits pars
 than serialisers. So the convergence is not "compile the ksy into libreac" — it is this
 file plus the cross-parse below.
 
+### The corpus is a regression suite, not a demonstration
+
+[`corpus-check.py`](corpus-check.py) parses **every capture** in the FreeREAC corpus with the
+grammar and refuses a regression against [`corpus-baseline.json`](corpus-baseline.json).
+
+```
+make corpus-check CAPTURES=~/Devel/audio/reac-captures
+make corpus-selftest CAPTURES=~/Devel/audio/reac-captures
+```
+
+The unit suite and the corpus are DIFFERENT EVIDENCE. The unit suite runs on the checked-in
+goldens, so it stays green while a grammar edit quietly stops parsing a capture we used to
+handle — which is the easiest defect here to ship, because the new fields all read correctly on
+the frames you were looking at. The baseline records per-file counts (the corpus itself is
+private), so `ok` going down or `failed` going up in any single file exits non-zero, and a file
+that starts parsing is reported in the other direction.
+
+Two things the checker had to learn, both of which had already produced a wrong answer:
+
+- **A snaplen-truncated record is not a short frame.** Several captures were taken at snaplen
+  64/128/200/400, and a truncated frame's length can land on `52 + 36n` by coincidence, reach the
+  parser and fail the end marker — 3200 "grammar failures" that were nothing of the kind. Every
+  pcap record carries `caplen` and `origlen`; compare them.
+- **Discarding those records silently is the other half of the same trap.** SEVEN of the 72
+  captures are truncated in every record, so a whole-frame-only check reads zero frames from them
+  and still calls the corpus clean. A snaplen of 50 or more carries the ENTIRE control block, so
+  those records are parsed as a bare `frame[16:50]` typed_block and counted separately. That turns
+  seven silent files into live coverage and adds 44 400 control blocks from records that were
+  being thrown away.
+
+`--self-test` corrupts every frame and requires the run to go red, because a checker that cannot
+fail reports success over any grammar at all.
+
 ### The ratchet
 
 [`facts_xcheck.py`](facts_xcheck.py) runs inside `make check` and asserts `reac.ksy` still
