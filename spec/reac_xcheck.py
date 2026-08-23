@@ -578,6 +578,38 @@ def test_scene_body_parses_and_its_offsets_are_where_the_box_reads_them():
     assert SCENE_BODY[0x37c:0x380] == b"SCEN"
 
 
+SCENE_BODY_M5000 = (pathlib.Path(__file__).parent / "fixtures" / "scene-m5000-8904.bin").read_bytes()
+
+
+def test_scene_is_the_desks_not_the_boxs():
+    """Two desk generations, and the bytes that differ are countable.
+
+    Across the whole capture corpus 8 of 8904 bytes vary between real desks: the
+    revision, the low half of the master id, and four bytes of M-5000 padding
+    that change between that desk's own runs. An emitter therefore fills in two
+    fields and copies the rest — which is the whole reason this grammar can be
+    instantiated from rather than only parsed with."""
+    a, b = SCENE_BODY, SCENE_BODY_M5000
+    assert len(a) == len(b) == 8904
+    differ = {i for i in range(8904) if a[i] != b[i]}
+    assert differ == {0x14, 0x343, 0x344, 0x345, 0x366, 0x367, 0x22c6, 0x22c7}
+    # the two that are FIELDS
+    assert a[0x14] == 0 and b[0x14] == 1                      # revision
+    assert a[0x340:0x343] == b[0x340:0x343] == bytes.fromhex("0040ab")
+    # everything structural is byte-identical, including both record tables
+    assert a[0x1a:0x1a + 800] == b[0x1a:0x1a + 800]
+    assert a[0x384:0x384 + 8000] == b[0x384:0x384 + 8000]
+
+
+def test_scene_body_parses_on_a_second_desk_generation():
+    m = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY_M5000)))
+    assert bytes(m.magic) == b"1234"
+    assert m.unit_map_select == 1
+    assert m.revision == 1                       # 0 on a V-Mixer desk
+    assert len(m.slots) == 80 and len(m.scen.entries) == 800
+    assert bytes(m.sysp.tag) == b"SYSP" and bytes(m.scen.tag) == b"SCEN"
+
+
 def test_scene_declares_twelve_inventory_cells_like_the_box_does():
     """The box's commit walks twelve cells at a stride of 0x28 over the slot
     table — four records each — so the desk declares its inventory in exactly the
