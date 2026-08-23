@@ -6,6 +6,14 @@ Roland DT1 record container with its tag dispatch, the two nested checksums, and
 audio region described structurally. The prose in [`../wire-format.md`](../wire-format.md)
 is the readable rendering of the same facts; this file is the one a machine can check.
 
+**One grammar, not one per plane.** `reac.ksy` is the whole frame family — audio and
+control, both directions, the scene transfer, the chanmap and the config announce. There is
+deliberately no separate control-only grammar: the control ops are reached by dispatch from
+the same envelope (`typed_block` → `control_block` → the op types), and splitting them into a
+second file gives two envelopes to keep in step and a second place for a constant to drift.
+That is the defect [`protocol-facts.yaml`](protocol-facts.yaml) exists to close, so
+reintroducing it in the grammar itself would be moving backwards.
+
 ## Roles — the decision, and the reasoning
 
 There are three artefacts describing one wire format, and they are deliberately not
