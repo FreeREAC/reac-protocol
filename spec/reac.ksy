@@ -1321,22 +1321,41 @@ types:
       TAG 0x0101 — the console's preamp command, and the ONLY three things a box
       owns on the head-amp page.
 
-      # "Head-amp" is THREE granularities, and one name for them would be wrong
+      # WIRE ENCODING and HARDWARE ACTUATION are two axes, not one scale
 
-      EVIDENCED (executed trace) — each watched by running the box's code both
-      ways:
+      This doc used to list three granularities in a single column — per
+      channel, per four, per eight. They do not belong on one scale: two are
+      about which record carries a field, one is about how many channels a
+      write switches, and a consumer reading them as one list gets whichever it
+      picks wrong.
 
-        SENS and the flag bits   PER CHANNEL          ch
-        phantom                  PER GROUP OF FOUR    ch >> 2
-        the readback nibble      PER EIGHT            ch >> 3
+      WIRE ENCODING. This record, {CH, PARAM, VALUE}, is one channel per record
+      for all three params. The per-four thing lives in the OTHER head-amp
+      carrier, the slot map (op-0103 subtype 0x01): FUN_0c002d42 writes its sens
+      byte and three flag bits for EVERY slot, and gates only the high nibble —
+      the INVENTORY CELL — on `(slot & 3) == 0`.
 
-      Two consequences a consumer must not miss. **Only a record whose channel is
-      a multiple of four carries the phantom group byte** — a record to 0x24 moves
-      group 9, one to 0x27 moves nothing, so sweeping phantom per channel writes
-      three records in four into the void. And **the readback nibble and the
-      phantom command do not address the same thing**, being per eight and per
-      four; they are named apart here for that reason and must stay apart in any
-      API generated from this.
+      HARDWARE ACTUATION. Per channel, for phantom, pad and sens alike.
+      FUN_0c007fbc(bank, group) sets its cursor to `group << 3` and loops eight
+      times, and each iteration passes its own within-bank index and that slot's
+      own value to FUN_0c00ac1e, FUN_0c00ac96 and FUN_0c007e6a. Eight is the
+      preamp BANK width and the loop's batch size — the writers take
+      (bank, 0..7), two banks covering an S-1608's sixteen inputs — and nothing
+      is switched eight channels at a time.
+
+      "PHANTOM IS PER FOUR" IS THEREFORE DISPUTED. The image holds exactly one
+      channel-indexed `(x & 3) == 0` test, it is FUN_0c002d42's inventory-cell
+      gate, and it is not on this record's path. The claim's grade is an
+      executed trace, so it stands in protocol-facts.yaml unchanged with the
+      conflict and the discriminating experiment recorded beside it — send
+      phantom to 0x24 and to 0x25 and read the box's re-broadcast back. Do not
+      generate a per-four sweep from this doc until that runs.
+
+      The readback nibble's `ch >> 3` coincides arithmetically with the apply
+      loop's bank index over the same 80 slots, so it may be that same bank
+      reported back rather than a third axis. Not asserted: FUN_0c007fbc has no
+      caller in the function-only export, so what drives the banking cannot be
+      traced from this image.
 
       # A record writes the ACTIVE table, and the commit overwrites it
 
