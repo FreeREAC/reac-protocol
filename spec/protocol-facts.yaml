@@ -38,7 +38,7 @@
 #     reac-firmware-re or openmixer, so putting numbers here would be inventing
 #     a fact and dressing it as a shared one. What DOES exist and is captured
 #     above is the CONFIG-ANNOUNCE SELECTOR (0x82 the S-1608 family, 0x84 the
-#     S-0808 and S-4000S family, in reac.ksy's config_announce_page) and the
+#     S-0808 and S-4000S family, in reac.ksy's commit_report_page) and the
 #     twelve-cell inventory the width is read from. If a device-type enum turns
 #     out to be real, it lands here with its evidence line and both sides pick
 #     it up; until then this schema does not claim one.
@@ -301,8 +301,9 @@ groups:
         value: 0x0103
         fmt: hex4
         ksy_name: page_0103
-        why: A multiplexer with TWO discriminators — op_len selects the
-          sub-page, payload[0] selects the subtype.
+        why: Class 1 carried whole in one frame — the fragment field is 3, both
+          FIRST and LAST. payload[0] is the only discriminator; op_len beside it
+          is a length, not a second selector. See the control_header group.
         evidence: EVIDENCED (image + executed trace).
       - name: OP_DT1_FIRST_FRAGMENT
         value: 0x0401
@@ -428,11 +429,35 @@ groups:
         why: 26 — the largest continuation chunk, and exactly 31 - 5.
         evidence: EVIDENCED (image).
         derived: (CTRL_CKSUM_OFF_IN_BLOCK) - SEG_CONT_PAYLOAD_OFF
+      - name: CTRL_RECLEN_BASE
+        value: 4
+        why: |
+          The block offset the length counts from, INCLUSIVE — for every class
+          and subtype except one. A sister branch published this as universal;
+          it is not, and the exception is the commonest record on the wire.
+          See RECLEN_BULK_EXCEPTION.
+        evidence: EVIDENCED (image + corpus).
+      - name: RECLEN_BULK_EXCEPTION
+        value: 0
+        fmt: hex2
+        why: |
+          The one subtype whose length does NOT count from block[4]: the
+          session-class bulk transfer. Its length is THIS FRAGMENT'S PAYLOAD
+          ONLY, at block[7] on a FIRST fragment and block[5] on any other.
+
+          The scene body is 8904 bytes and arrives as 0x18 + 341 x 0x1a + 0x0e
+          = 24 + 8866 + 14. Under a base of 4 the payloads would be 21 and 25,
+          and 8904 - 21 - 14 = 8869 is not a multiple of 25 — the transfer
+          cannot be reassembled under that reading at all. The box's own sender
+          passes the chunk size both to the length store and to the memcpy that
+          fills block+7 or block+5.
+        evidence: EVIDENCED (image, S-1608 FUN_0c003398 @0c003398) + the
+          reassembly arithmetic, asserted both ways in spec/reac_xcheck.py.
 
   - id: chanmap_record
     title: The chanmap's three-byte record and the table it writes
     doc: |
-      Each record is `{slot, flags, value}` and it is the same shape in both
+      Each record is `{slot, cell_and_flags, sens}` and it is the same shape in both
       directions: the box's transmitter is the inverse of its receiver, cell for
       cell. EVIDENCED (image), `FUN_0c002bb2` @0c002bb2 (build) and
       `FUN_0c002d42` @0c002d42 (apply), S-1608; `FUN_0c014488` and `FUN_0c014674`
@@ -513,34 +538,143 @@ groups:
         evidence: EVIDENCED (image). NEVER OBSERVED — the cursor wraps at 0x30,
           so the branch is unreachable on that path.
 
+  - id: commit
+    title: The state-4 commit — what it flushes
+    doc: |
+      WHAT THE COMMIT IS. The box runs a scene FSM, S-1608 FUN_0c0037ee, over
+      one RAM cell. State 2 takes the master's opening scene fragment, state 3
+      reassembles the continuations, and state 4 is FUN_0c003c8a — the COMMIT.
+      Nothing else promotes staged state into the active table; the head-amp
+      apply FUN_0c007fbc reads the ACTIVE table and only the commit writes it
+      wholesale.
+
+      THREE THINGS ARE TWELVE WIDE AND ONLY ONE OF THEM IS A GROUP FLUSH. This
+      was the open question and the firmware answers it: the commit touches TWO
+      of the three, and NEITHER of them is a phantom flush.
+
+        1. The slot table copy is EIGHTY wide, not twelve. staging 0x0c0cd52e
+           -> active 0x0c0cf85a, fields +2 +4 +6 +8, `while (i < 0x50)`,
+           unconditional — there is no per-slot enrolled test in the commit.
+
+        2. The twelve-wide loop `FUN_0c00f9aa(i, *(u16*)(staging + i*0x28))`
+           reads field +0 of every FOURTH slot record (0x28 = four 10-byte
+           records) and writes a 12-entry u16 array at 0x0c0f62fa. That array
+           is the PEER INVENTORY MIRROR: what the master has declared each
+           group of four channels to be. Its reader is FUN_0c00fa1a, which
+           refuses to answer unless the link word is 1; its reset FUN_0c00fa58
+           fills it with 3 = absent. The SAME array is written by the slot-map
+           ingest FUN_0c002d42 from the high nibble of byte 1, at group anchors
+           only. It touches no hardware.
+
+        3. The twelve bytes in the emitted report come from a DIFFERENT array —
+           the box's OWN inventory, 12 records of 6 bytes at 0x0c080920, read
+           through FUN_0c00f6ca and initialised by FUN_0c00f7f8. This is the
+           declared inventory, and it is what reaches the wire.
+
+      SO "THE COMMIT FLUSHES 12 PHANTOM GROUPS" IS WRONG in both halves. There
+      is no phantom in either twelve-wide structure; phantom reaches hardware
+      from the ACTIVE table through FUN_0c007fbc, in groups of EIGHT, ten of
+      them, and the commit does not call it. The two twelve-wide things the
+      commit does touch are both INVENTORY — one inbound, one outbound.
+
+      Cross-checked on a second image: S-4000.BIN has the identical shape — the
+      0x50-slot copy, the six-byte master id, the `i * 0x28` twelve-group loop
+      over its own staging table 0x0c0cd66a, and the same report.
+
+      ON THE S-4000 ADDRESSES, because a base error would silently invalidate
+      these citations while leaving the conclusion right. They are quoted in the
+      address space of `devices/S-4000S/decompile/S-4000_alldecomp.c`, which is
+      0x0C000000, and that space was CHECKED rather than assumed: all 832
+      PTR_FUN literal values in that image resolve exactly to addresses of
+      functions listed in the same decompilation. At a base of 0x0BFF0000 only
+      20 of 832 resolve. Real code also begins at file offset 0x10 and the
+      listing's functions span file offsets 0x890..0x41e68, so there is no
+      unmapped 0x10000 prefix that would reconcile the two. File offsets, which
+      survive any re-basing: the commit at 0x13834, its literals at 0x1382c,
+      0x13750, 0x13752.
+
+      The RAM pointers these literals hold (0x0c0cd66a and the rest) are values
+      baked into the image and are correct as runtime addresses whatever base
+      the code is read at.
+    facts:
+      - name: COMMIT_SLOT_TABLE_ENTRIES
+        value: 0x50
+        fmt: dec_hex
+        why: |
+          Slots copied staging -> active by the commit, unconditionally. Eighty,
+          not forty-eight — the box's addressable channel space is 48 (the slot
+          map ingest gates slot < 0x30) but the table it lives in is 80 deep and
+          the head-amp apply walks ten groups of eight over it.
+        evidence: EVIDENCED (image, S-1608 FUN_0c003c8a + S-4000 same loop).
+      - name: COMMIT_SLOT_RECORD_BYTES
+        value: 10
+        why: Stride of the staging and active slot tables. Fields +2 sens,
+          +4/+6/+8 the three per-slot booleans; +0 is not copied and is read at
+          four-slot stride as the group's inventory cell.
+        evidence: EVIDENCED (image, S-1608 FUN_0c003c8a + FUN_0c002d42).
+      - name: COMMIT_MASTER_ID_BYTES
+        value: 6
+        why: The granted master's identity, copied staging -> active by the
+          commit. Zeroed on link loss by FUN_0c003a64; a mismatch against the
+          observed master forces the FSM to state 0 (FUN_0c0045ec), which is
+          why a takeover resets the box's head-amp.
+        evidence: EVIDENCED (image).
+      - name: HEADAMP_APPLY_GROUP_CHANNELS
+        value: 8
+        why: |
+          The head-amp hardware apply FUN_0c007fbc(bank, group) walks EIGHT
+          slots, `group << 3`, for group 0..9. This is the geometry that
+          actually reaches hardware, and it is a different axis from the
+          four-channel inventory cell. Confusing the two is how "twelve
+          phantom groups" got written down.
+        evidence: EVIDENCED (image, S-1608 FUN_0c007fbc).
+      - name: HEADAMP_APPLY_GROUPS
+        value: 10
+        why: Groups of eight the apply accepts, 0..9, covering the 80-slot
+          active table.
+        evidence: EVIDENCED (image, S-1608 FUN_0c007fbc).
+
   - id: page_0103
     title: op-0103 sub-pages and subtypes
     doc: |
-      op 0x0103 multiplexes on two axes at once, and reading only one of them
-      is how `01 03 00 10` and a head-amp block got taken for the same message.
+      `payload[0]` — block[4], the byte a scene frame requires to be zero — is
+      the SUBTYPE SELECTOR, and it is the ONLY discriminator. That is how
+      `01 03 00 10` and a head-amp block came to be taken for one message.
 
-      `op_len` selects the SUB-PAGE. `payload[0]` — block[4], the byte a scene
-      frame requires to be zero — is a SUBTYPE SELECTOR, not a reserved byte.
+      THE FOUR `PAGE_*` NUMBERS BELOW ARE LENGTHS, NOT SELECTORS, and this
+      group used to say otherwise. op_len is a plain record byte count on every
+      op — see the control_header group for the firmware that writes it. Each
+      subtype happens to have a fixed size today, so keying a parser on op_len
+      appears to work and then fails silently on the first short frame. Key on
+      the subtype; the lengths stay here because an emitter must still fill
+      op_len correctly, and they are named `LEN_` to say what they are.
     facts:
-      - name: PAGE_CHANMAP
+      - name: LEN_SUB_CHANMAP
         value: 0x0019
         fmt: hex4
-        why: op_len of the master's established chanmap heartbeat.
+        why: |
+          Record length of the master's slot-map window — the subtype byte plus
+          eight 3-byte slot records. S-1608 FUN_0c002c70 builds it.
         evidence: EVIDENCED (corpus).
-      - name: PAGE_CONFIG_ANNOUNCE
+      - name: LEN_SUB_COMMIT_REPORT
         value: 0x0010
         fmt: hex4
-        why: op_len of the box's setup declaration — and of the commit report.
+        why: |
+          Record length of the box's state-4 commit report — the subtype byte,
+          two zero bytes, the board-configuration code, twelve inventory cells.
+          S-1608 FUN_0c003c8a builds it; S-4000 has the same shape.
         evidence: EVIDENCED (corpus).
-      - name: PAGE_ENROLL_GROUP_MAP
+      - name: LEN_SUB_ENROLL_GROUP_MAP
         value: 0x000d
         fmt: hex4
-        why: op_len of the master's prepare-to-grant frame.
+        why: Record length of the master's prepare-to-grant frame.
         evidence: EVIDENCED (image + corpus).
-      - name: PAGE_BOX_HEARTBEAT
+      - name: LEN_SUB_LINK_ACK
         value: 0x0001
         fmt: hex4
-        why: op_len of the box's heartbeat.
+        why: |
+          Record length of the box's link-check ack — the subtype byte and
+          nothing else. S-1608 FUN_0c003fe2 builds it, from scene-FSM state 7.
         evidence: EVIDENCED (corpus).
       - name: SUB_0103_OFF
         value: 4
@@ -554,18 +688,85 @@ groups:
         why: Subtype 0 — scene. A scene frame requires this byte to be zero and
           the box refuses the frame otherwise.
         evidence: EVIDENCED (executed trace, image).
-      - name: SUB_0103_HEADAMP
+      - name: SUB_0103_SLOT_MAP
         value: 0x01
         fmt: hex2
-        why: Subtype 1 — head-amp, 1 + 3k bytes of {ch, flags, sens}, eight
-          records to a frame.
-        evidence: EVIDENCED (executed trace, image).
+        why: |
+          Subtype 1 — the master's SLOT MAP, eight 3-byte records to a frame.
+          This group used to call it "head-amp" and reac.ksy calls the same
+          frame the chanmap; both names are half of it. The box's ingest
+          FUN_0c002d42 splits each record three ways: the high nibble of byte 1
+          is the inventory cell for the group this slot anchors and is consumed
+          only where (slot & 3) == 0; bits 3, 2 and 1 of byte 1 are three
+          per-slot booleans; byte 2 is the SENS step, and it lands in the same
+          active-table field the head-amp apply FUN_0c007fbc reads back. So it
+          IS a channel map and it DOES carry head-amp state.
+        evidence: EVIDENCED (image, S-1608 FUN_0c002d42 + FUN_0c002bb2).
+      - name: SUB_REPLY_BIT
+        value: 0x80
+        fmt: hex2
+        why: |
+          Bit 7 of the subtype marks a record travelling BOX -> MASTER. Every
+          box-built subtype has it (0x81 the link ack, 0x80/0x82/0x83/0x84 the
+          commit report) and no master-built one does (0x00 scene, 0x01 slot
+          map, 0x10 enroll group map).
+        evidence: EVIDENCED (image + corpus).
+      - name: SUB_0103_LINK_ACK
+        value: 0x81
+        fmt: hex2
+        why: The box's link-check ack, S-1608 FUN_0c003fe2, from scene-FSM
+          state 7. It was called SLAVE_ANNOUNCE4 in the inherited dissector.
+        evidence: EVIDENCED (image + corpus).
+      - name: SUB_0103_ENROLL_GROUP_MAP
+        value: 0x10
+        fmt: hex2
+        why: The master's prepare-to-grant frame, once about 1.6 s before the
+          grant burst.
+        evidence: EVIDENCED (corpus).
       - name: SUB_0103_COMMIT_REPORT
         value: 0x82
         fmt: hex2
-        why: Subtype 0x82 — the commit's report. The report builder also has a
-          0x80 arm; what selects it is UNEXPLAINED.
-        evidence: EVIDENCED (executed trace, image).
+        why: |
+          The box's state-4 COMMIT REPORT — NOT a slave announce, which is what
+          reacdriver called it and what our dissector repeated until
+          2026-08-23. S-1608 FUN_0c003c8a builds it after promoting staging to
+          active, and it is reached only from state 4 of the scene FSM
+          FUN_0c0037ee, i.e. after the master's scene transfer has completed.
+
+          0x82 IS THE S-1608'S NUMBER, NOT THE PROTOCOL'S, and a consumer must
+          not match on it. The builder picks between two model-specific
+          literals on a link-state test: S-1608 0x82 linked (DAT_0c00401c) and
+          0x80 otherwise (DAT_0c00401e); S-4000 0x84 linked (DAT_0c013750) and
+          0x83 otherwise (DAT_0c013752). What selects the second arm used to be
+          recorded here as UNEXPLAINED and now is not: on the S-1608 it is
+          FUN_0c00f9f2 returning something other than 1, which happens whenever
+          the peer-declared word is unset or the link word is not 1. Observed
+          on the wire: S-1608 0x82, S-0808 and S-4000S both 0x84. Match the
+          family with SUB_REPLY_BIT, not the literal.
+        evidence: EVIDENCED (image, S-1608 FUN_0c003c8a + S-4000 same shape;
+          corpus, three box models).
+      - name: SUB_0103_DECLARATION_ALT
+        value: 0x80
+        fmt: hex2
+        why: |
+          The commit report's OTHER subtype. FUN_0c003c8a @0c003c8a picks
+          between two literal-pool bytes on a predicate, DAT_0c00401c = 0x82
+          and DAT_0c00401e = 0x80, both read out of the image; the 0x80 arm
+          also forces block[7] to zero. FIRMWARE-ONLY: no capture carries one,
+          so what selects it (FUN_0c00f9f2 @0c00f9f2) is unresolved.
+        evidence: EVIDENCED (image). NEVER OBSERVED.
+      - name: SUB_0103_COMMIT_REPORT_83
+        value: 0x83
+        fmt: hex2
+        why: The commit report as some boxes send it. Parsed by the same page;
+          no S-1608 code emits it.
+        evidence: EVIDENCED (corpus).
+      - name: SUB_0103_COMMIT_REPORT_84
+        value: 0x84
+        fmt: hex2
+        why: The commit report from the S-0808 and S-4000S family. No S-1608
+          code emits it either — the S-1608 image holds only 0x82 and 0x80.
+        evidence: EVIDENCED (corpus) — 44 frames in 14 captures.
       - name: SUB_0403_OFF
         value: 4
         why: The SAME block position discriminates op-0403's two forms.
@@ -582,6 +783,54 @@ groups:
         fmt: hex2
         why: The box's upstream return block — 6.05 million of them in the
           corpus, and the look-alike a naive DT1 dispatch acts on.
+        evidence: EVIDENCED (corpus).
+
+  - id: dt1_tag
+    title: DT1 record tags
+    doc: |
+      The two bytes after the DT1 command byte select the register page, and
+      they are the discriminator INSIDE the record link the way the subtype is
+      the discriminator inside the session link. Nothing generated them before,
+      so a consumer that wanted to name a record had to spell the numbers
+      itself — which is the drift this file exists to stop.
+
+      Read them with the class and fragment fields, never alone: the same tag
+      0x0500 appears in a single-frame record at rec_len 0x0016 and 0x001a AND
+      split across the 0x0401 / 0x0402 fragment pair.
+    kind: enum
+    ksy_enum: reg_page
+    facts:
+      - name: DT1_TAG_HEAD_MARK
+        value: 0x0000
+        fmt: hex4
+        ksy_name: head_mark
+        why: The mark record a console emits around a head-amp sweep.
+        evidence: EVIDENCED (corpus).
+      - name: DT1_TAG_JOIN_GRANT
+        value: 0x0100
+        fmt: hex4
+        ksy_name: join_grant
+        why: The join/cold-connect state record, body 06 00 XX 00.
+        evidence: EVIDENCED (corpus).
+      - name: DT1_TAG_HEAD_AMP
+        value: 0x0101
+        fmt: hex4
+        ksy_name: head_amp
+        why: The preamp command — {CH, PARAM, VALUE}. The only tag the
+          classifier treats as its own kind.
+        evidence: EVIDENCED (corpus + rig).
+      - name: DT1_TAG_BOX_READY
+        value: 0x0302
+        fmt: hex4
+        ksy_name: box_ready
+        why: A box-state record in the cold-connect exchange.
+        evidence: EVIDENCED (corpus).
+      - name: DT1_TAG_IDENTITY
+        value: 0x0500
+        fmt: hex4
+        ksy_name: identity
+        why: The identity page — the 6- and 10-byte inventory bodies, and the
+          ASCII model name carried across the 0x0401 / 0x0402 fragment pair.
         evidence: EVIDENCED (corpus).
 
   - id: scene
@@ -756,19 +1005,64 @@ groups:
         evidence: EVIDENCED (image + corpus).
 
   - id: head_amp
-    title: Head-amp — the record, and its three granularities
+    title: Head-amp — the record, its wire encoding and its actuation
     doc: |
       A head-amp record is a Roland DT1 inside op-0403: TAG 0x0101, then
       {CH, PARAM, VALUE}. Two things about it are routinely got wrong.
 
-      IT IS THREE GRANULARITIES UNDER ONE NAME. SENS and the flag bits are PER
-      CHANNEL. Phantom is PER GROUP OF FOUR (ch >> 2). The readback nibble is
-      PER EIGHT (ch >> 3). So only a record whose channel is a multiple of four
-      carries the phantom group byte — a record to 0x24 moves group 9, one to
-      0x27 moves nothing — and sweeping phantom per channel writes three records
-      in four into the void. The readback nibble and the phantom command do not
-      address the same thing and must stay named apart in any API generated from
-      this.
+      TWO AXES, NOT THREE GRANULARITIES. This group used to say "three
+      granularities under one name" and list per-channel, per-four and
+      per-eight side by side. Those are not three points on one scale: two of
+      them are WIRE ENCODING (which record carries a field) and one is HARDWARE
+      ACTUATION (how many channels one write switches). Reading them as one
+      list makes a consumer wrong about whichever it picks.
+
+      AXIS 1 — WIRE ENCODING, what a record carries.
+
+        DT1 head-amp record {CH, PARAM, VALUE}, op-0403 TAG 0x0101
+          PARAM 0x00 phantom, 0x01 pad, 0x02 sens — one channel per record,
+          all three. NO per-four gate exists on this path anywhere in the
+          image; see the DISPUTED note on HEADAMP_GRAN_PHANTOM_SHIFT.
+
+        SLOT MAP record {slot, cell+flags, sens}, op-0103 subtype 0x01
+          FUN_0c002d42 writes the sens byte and the three flag bits (bits 3,
+          2, 1) for EVERY slot, unconditionally. Only the HIGH NIBBLE is
+          per-four: the `(slot & 3) == 0` branch hands `flags >> 4` to
+          FUN_0c00f9aa and FUN_0c004164, the two 12-entry INVENTORY arrays.
+          So the per-four field in this record format is the INVENTORY CELL,
+          not a head-amp parameter.
+
+      AXIS 2 — HARDWARE ACTUATION, what one write switches. PER CHANNEL, for
+      all three parameters. FUN_0c007fbc(bank, group) sets its cursor to
+      `group << 3` and loops EIGHT times; inside the loop, each iteration
+      passes its own within-bank index (0..7) and that slot's own value to
+      FUN_0c00ac1e (phantom), FUN_0c00ac96 (pad) and FUN_0c007e6a ->
+      FUN_0c007e30 (sens). Each channel gets its own value and its own write.
+
+      SO THERE ARE EXACTLY TWO GRANULARITIES, NOT THREE: per channel and per
+      eight. Per channel is the ACTUATION. Per eight is the REFRESH BANKING —
+      and the readback nibble is the same eight, not a third axis. See
+      HEADAMP_BANK_CHANNELS, which is now the single row for both.
+
+      BANK AND GROUP ARE DIFFERENT AXES AND OUR DOCS HAVE MIXED THEM UP.
+      Pinned here, once:
+
+        GROUP  0..9, and `group == ch >> 3`. It selects WHICH EIGHT CHANNELS'
+               DATA — an eight-slot window of the 80-slot active table.
+        BANK   selects WHICH EIGHT PHYSICAL PREAMPS receive it. It is NOT a
+               subdivision of channel space and it does not index the active
+               table.
+
+      They are independent, which is why FUN_0c007fbc takes both. At least one
+      doc has them inverted — FUN_0c012162(k) returns a GROUP 0..9 while its
+      argument k is a BANK — so anything reading either word should check it
+      against this definition rather than against neighbouring prose.
+
+      A NOTE ON A CORRECTION MADE TO THIS FILE'S OWN CORRECTION: the firmware
+      lane's first report said phantom "reaches hardware in groups of EIGHT".
+      That read the loop bound as the actuator width and is wrong in the same
+      shape as the per-four claim it was correcting. The loop is eight long;
+      the write inside it is one channel wide.
 
       A RECORD WRITES THE ACTIVE TABLE, AND THE COMMIT OVERWRITES IT. There is
       no head-amp staging table. So records must FOLLOW the commit, never
@@ -807,7 +1101,8 @@ groups:
           headamp_sens group below; this row is only the count.
         evidence: EVIDENCED (image) — a 56-entry table at 0x0c0327a0 in the
           S-1608 image, reached by both write paths, ending exactly where the
-          "V03.05" version string begins. The count is what that table proves;
+          "V03.05" version string begins — in the S-1608 image; the S-0808 copy
+          is a byte match only. The count is what that table proves;
           reading a gain curve off its stage structure did not survive the rig.
       - name: HEADAMP_CH_SPAN
         libreac: REAC_HEADAMP_MAX_CH
@@ -819,21 +1114,99 @@ groups:
         evidence: EVIDENCED (corpus).
       - name: HEADAMP_GRAN_SENS_SHIFT
         value: 0
+        libreac: REAC_HEADAMP_GRAN_SENS_SHIFT
         why: SENS is per channel — ch >> 0.
         evidence: EVIDENCED (executed trace).
       - name: HEADAMP_GRAN_FLAGS_SHIFT
         value: 0
+        libreac: REAC_HEADAMP_GRAN_FLAGS_SHIFT
         why: The flag bits are per channel — ch >> 0.
         evidence: EVIDENCED (executed trace).
       - name: HEADAMP_GRAN_PHANTOM_SHIFT
         value: 2
-        why: Phantom is per group of FOUR — ch >> 2.
-        evidence: EVIDENCED (executed trace).
-      - name: HEADAMP_GRAN_READBACK_SHIFT
+        libreac: REAC_HEADAMP_GRAN_PHANTOM_SHIFT
+        why: |
+          DISPUTED 2026-08-23, VALUE UNCHANGED PENDING ONE EXPERIMENT. Read as
+          "phantom is per group of FOUR — ch >> 2", and a consumer that trusts
+          it sweeps phantom on multiples of four only.
+
+          THE IMAGE DOES NOT CONTAIN THIS GATE. There is exactly one
+          channel-indexed `(x & 3) == 0` test in S-1608.BIN — FUN_0c002d42, the
+          SLOT-MAP ingest — and what it gates is `flags >> 4`, the inventory
+          cell nibble, handed to the 12-entry inventory arrays at 0x0c0f62fa
+          and 0x0c0cf80e. It does not gate a head-amp parameter, and it is not
+          on the DT1 path at all. Every other `& 3` in the image is pointer
+          alignment. Meanwhile the hardware write is per channel (see
+          HEADAMP_ACTUATION_SHIFT), so there is no per-four actuator for a
+          per-four record to feed.
+
+          The most likely history is that this number and the state diagram's
+          retracted "phantom packed 4 ch/group, group = slot >> 2" are the same
+          misreading of FUN_0c002d42, and that "a record to 0x24 moves group 9"
+          describes the inventory cell moving, not phantom.
+
+          THE STATIC CASE STRENGTHENED ON 2026-08-23 and the row still does not
+          flip. Three things now point the same way: actuation is per channel
+          (HEADAMP_ACTUATION_SHIFT); the only channel-indexed `& 3` test in the
+          image is the inventory-cell gate; and the per-eight axis turned out to
+          be BANKING rather than actuation, so nothing on the hardware side is
+          grouped at all. That is a much better static picture than an hour ago
+          and it is still not an observation.
+
+          NOT CHANGED HERE, because the grade below is an executed trace and
+          inference must not overwrite one however good it gets. THE ONE
+          REMAINING DISCRIMINATOR, which needs no rig: send DT1 phantom records
+          to channels 0x24 and 0x25 in turn and read the box's own re-broadcast
+          back. If 0x25 moves, this row is 0 and phantom is per channel on the
+          wire too.
+        evidence: DISPUTED — EVIDENCED (executed trace) against EVIDENCED
+          (image, S-1608 FUN_0c002d42 + FUN_0c007fbc). Unresolved.
+      - name: HEADAMP_ACTUATION_SHIFT
+        value: 0
+        why: |
+          HARDWARE ACTUATION IS PER CHANNEL, for phantom, pad and sens alike.
+          FUN_0c007fbc's loop passes a per-channel index and that slot's own
+          value to each of the three writers on every one of its eight
+          iterations. This is the number that says what one write switches, and
+          it is the axis the three old "granularity" rows never had.
+        evidence: EVIDENCED (image, S-1608 FUN_0c007fbc -> FUN_0c00ac1e /
+          FUN_0c00ac96 / FUN_0c007e6a).
+      - name: HEADAMP_BANK_CHANNELS
+        value: 8
+        why: |
+          THE PER-EIGHT GRANULARITY, and there is only one of them. This row
+          folds together what used to be two — "the hardware bank" and "the
+          readback nibble is per eight" — because they are arithmetically the
+          same thing and were being read as two independent pieces of evidence.
+
+          FUN_0c007fbc sets its cursor to `group << 3` and loops exactly eight
+          times, so group g covers [g*8, g*8+8) and therefore `g == ch >> 3` —
+          which is the readback nibble's own index. One axis, two spellings:
+          this width 8 and HEADAMP_BANK_SHIFT's 3.
+
+          It is a REFRESH AND READBACK banking, not an actuation width: the
+          writers take (bank, 0..7) and each of the eight iterations writes one
+          channel. Two banks of eight cover an S-1608's sixteen analog inputs.
+        evidence: EVIDENCED (image) — S-1608 FUN_0c007fbc for the loop and the
+          per-channel writes; its caller, recovered 2026-08-23 from a function
+          Ghidra never disassembled (clean prologue past the previous function's
+          rts, absent from the 1395-entry map, reached by a plain bsr), for
+          `group == ch >> 3`. Supersedes the earlier UNRESOLVED note that the
+          caller could not be traced.
+      - name: HEADAMP_BANK_SHIFT
         value: 3
-        why: The readback nibble is per EIGHT — ch >> 3. A different axis from
-          phantom, deliberately named apart.
-        evidence: EVIDENCED (executed trace).
+        why: |
+          `ch >> 3` gives the bank/group index. THE SAME FACT AS
+          HEADAMP_BANK_CHANNELS above, spelled as a shift instead of a width —
+          consult one or the other, never both as corroboration.
+
+          It was called HEADAMP_GRAN_READBACK_SHIFT and sat beside the bank row
+          as if the readback were a third, independent granularity. It is not:
+          the apply loop's group index and the readback nibble are the same
+          `ch >> 3` over the same 80 slots.
+        evidence: EVIDENCED (executed trace for the readback nibble; image for
+          the apply loop's identical index — S-1608 FUN_0c007fbc and its
+          caller). The two agree, which is why they are one row.
       - name: HEADAMP_SWEEP_RECORDS_PER_CH
         libreac: REAC_HEADAMP_NPARAMS
         value: 3
@@ -863,6 +1236,71 @@ groups:
       the law declared here is the round decibel and not the fitted 0.988. The pad
       measured 20.12 and 20.20 dB at two different steps — the check that this dB
       axis is the box's own.
+
+      THE FIRMWARE HOLDS THE CURVE AS A TABLE, and here it is. S-1608.BIN at
+      0x0c0327a0, 56 entries of two bytes, read by FUN_0c007e30 which clamps
+      the step to 0x37 and hands the pair to the preamp writer FUN_0c00af2a.
+      In the S-1608 image the table ends exactly where the ASCII version banner
+      "V03.05" begins, which is how we know its extent is 56 and not a run of
+      padding.
+
+      The same 112 bytes appear in S-0808.BIN at file offset 0x45ec8. THAT IS A
+      RAW BYTE MATCH AND NOTHING MORE: there is no S-0808 decompilation, the
+      image is not a code image loadable at the S-1608's base, and its own
+      pointers are a different width and order (big-endian 0x0003xxxx). The
+      banner control above does NOT apply there — S-0808 has zero padding after
+      the table, not a banner. Nothing in this group is sourced from S-0808
+      disassembly; the byte match corroborates the table's content across two
+      models and the reading of it comes from the S-1608 alone.
+
+        step  stage  fine      step  stage  fine      step  stage  fine      step  stage  fine
+        0x00   3    0x00      0x0e   2    0x0c      0x1c   1    0x08      0x2a   0    0x04
+        0x01   3    0x02      0x0f   2    0x0e      0x1d   1    0x0a      0x2b   0    0x06
+        0x02   3    0x04      0x10   2    0x10      0x1e   1    0x0c      0x2c   0    0x08
+        0x03   3    0x06      0x11   2    0x12      0x1f   1    0x0e      0x2d   0    0x0a
+        0x04   3    0x08      0x12   2    0x14      0x20   1    0x10      0x2e   0    0x0c
+        0x05   3    0x0a      0x13   2    0x16      0x21   1    0x12      0x2f   0    0x0e
+        0x06   3    0x0c      0x14   2    0x18      0x22   1    0x14      0x30   0    0x10
+        0x07   3    0x0e      0x15   2    0x1a      0x23   1    0x16      0x31   0    0x12
+        0x08   2    0x00      0x16   2    0x1c      0x24   1    0x18      0x32   0    0x14
+        0x09   2    0x02      0x17   2    0x1e      0x25   1    0x1a      0x33   0    0x16
+        0x0a   2    0x04      0x18   1    0x00      0x26   1    0x1c      0x34   0    0x18
+        0x0b   2    0x06      0x19   1    0x02      0x27   1    0x1e      0x35   0    0x1a
+        0x0c   2    0x08      0x1a   1    0x04      0x28   0    0x00      0x36   0    0x1c
+        0x0d   2    0x0a      0x1b   1    0x06      0x29   0    0x02      0x37   0    0x1e
+
+      HOW TO READ IT. The two bytes are not decibels — they are two hardware
+      registers. `stage` is a two-bit coarse range: FUN_0c00af2a drives it onto
+      a pair of GPIO pins per channel, so it is an analog range switch, and
+      FUN_0c007f20 compares ONLY this byte between two steps, which is a
+      "does this change need the range to move" test. `fine` is a serial gain
+      code, clamped to 0x24 by the writer, and it steps by exactly 2 for every
+      step of the SENS index, everywhere in the table with no exception.
+
+      WHAT THE TABLE PROVES, AND WHAT IT DOES NOT. It proves the shape: the
+      step is UNIFORM within a range, so any departure from a flat law can only
+      live at the three range breaks, which fall between steps 0x07/0x08,
+      0x17/0x18 and 0x27/0x28. It does not carry a decibel — the dB per fine
+      LSB and the dB of each range tap are analog component values, in the
+      preamp and not in the image.
+
+      The stages begin at index 0, 8, 24 and 40, and the fine field restarts at
+      zero at each. That placement is itself a statement: a break sits exactly
+      where the fine field would run out, so the designer intended the ranges
+      to abut with no gap and no overlap. Take the fine LSB as the usual half
+      decibel and the whole table reads out as gain_dB = step, 0 through 55,
+      with the range taps at 0, 8, 24 and 40 dB. That is the round law, and the
+      table is its decomposition into two registers.
+
+      SO THE LAW IS THE FIRMWARE'S TABLE AND 54.60 IS A MEASUREMENT OF IT. The
+      two are not rival claims about the same quantity. The deficit is 0.40 dB
+      over 55 steps against a sweep whose own maximum residual was 0.44 dB, so
+      the measurement cannot separate 54.60 from 55.00 and does not contradict
+      it. What the rig DID settle, and the table could not, is that the three
+      range breaks are continuous: A/B/A gave +0.92/+1.12, +1.36/+1.31 and
+      +0.97/+0.84 dB at exactly the three indices the table puts them at. That
+      is the firmware's structure and the rig's numbers agreeing on the same
+      three places, which is the strongest form this fact can take.
 
       WHAT THIS SETTLES, because it was the schema's one openly contested number.
       Three readings were live: reac.ksy and reac-pw both spelled the flat 1 dB
@@ -911,13 +1349,48 @@ groups:
         value: 100
         why: One decibel, every step, all 55 transitions. The number that was
           disputed, and the one thing a consumer cannot get wrong quietly.
-        evidence: EVIDENCED (rig) — 2026-08-23 loopback sweep of all 56 steps,
-          span 54.60 dB, slope 0.988 dB/step, and all three predicted
-          duplicate-gain pairs refuted by A/B/A at ~1 dB against controls of
-          0.08 to 0.34 dB.
+        evidence: |
+          EVIDENCED (image + rig). Image — the S-1608 table at 0x0c0327a0 steps
+          its fine register by exactly 2 for every SENS step with no exception,
+          so the law is uniform inside each of its four ranges and can only
+          break at three indices. Rig — the 2026-08-23 loopback sweep of all 56
+          steps, span 54.60 dB, slope 0.988, and A/B/A at each of those three
+          indices giving about a decibel against controls of 0.08 to 0.34 dB.
+          The 0.40 dB the span falls short is inside that sweep's own 0.44 dB
+          maximum residual, so it does not stand against the table.
         ksy: types/head_amp_data/seq/2/doc
         ksy_as: substring
         ksy_value: "1 dB"
+      - name: HEADAMP_SENS_STEPS
+        value: 56
+        why: Entries in the firmware's SENS table, steps 0x00..0x37. The writer
+          FUN_0c007e30 clamps anything above 0x37 to 0x37, so 0x37 is the top
+          of the travel and not merely the last one observed.
+        evidence: EVIDENCED (image, S-1608 0x0c0327a0 = file 0x527a0; the same
+          112 bytes at S-0808 file 0x45ec8 as a raw byte match, not a
+          disassembly — there is no S-0808 decompilation).
+      - name: HEADAMP_SENS_STAGES
+        value: 4
+        why: Coarse analog ranges the table selects between, driven onto two
+          GPIO pins per channel by FUN_0c00af2a.
+        evidence: EVIDENCED (image).
+      - name: HEADAMP_SENS_STAGE_BREAK_1
+        value: 0x08
+        fmt: hex2
+        why: First step of the second range. The three breaks are the only
+          places a uniform step could fail, and the rig measured all three
+          at about a decibel.
+        evidence: EVIDENCED (image + rig).
+      - name: HEADAMP_SENS_STAGE_BREAK_2
+        value: 0x18
+        fmt: hex2
+        why: First step of the third range.
+        evidence: EVIDENCED (image + rig).
+      - name: HEADAMP_SENS_STAGE_BREAK_3
+        value: 0x28
+        fmt: hex2
+        why: First step of the fourth range.
+        evidence: EVIDENCED (image + rig).
       - name: HEADAMP_PAD_CDB
         libreac: REAC_HEADAMP_PAD_CDB
         value: 2000
@@ -981,7 +1454,7 @@ groups:
         value: 12
         why: 12 x 4 = the 48-channel fabric.
         evidence: EVIDENCED (corpus).
-        ksy: types/config_announce_page/seq/3/repeat-expr
+        ksy: types/commit_report_page/seq/3/repeat-expr
       - name: PORTS_CH_PER_SLOT
         libreac: REAC_PORTS_CH_PER_SLOT
         value: 4
