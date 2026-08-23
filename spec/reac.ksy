@@ -615,9 +615,19 @@ types:
       the only two that contain a tag. That independently reproduces the field map
       above, which was built from resolved pointers rather than from execution.
 
-      So an instantiator MUST get those twelve bytes right and cannot be caught by
-      the box for getting anything else wrong. That is a reason for more care, not
-      less: a wrong value elsewhere is promoted silently into the live tables.
+      **The tags are a GATE, not a description of what the box uses.** Measured on
+      real hardware: a body of zeros carrying only the three tags PASSES the
+      commit — the box accepts the transfer and replies — and leaves it reporting
+      `model=unknown` with ZERO capture ports, where the recovered body gives
+      `model=s1608` with sixteen. So the box reads far more of the 8904 than it
+      checks, and the parts it reads without checking are the ones that decide
+      what it thinks it is.
+
+      Read that before concluding the unvalidated 8892 bytes are free. They are
+      not: a wrong value outside the tags is not rejected, it is accepted and
+      acted on. An emitter should REPRODUCE the constant this grammar describes,
+      not improvise it — and the two fields at +0x14 and +0x340 are the only ones
+      it should be filling in at all.
 
       # What it does NOT carry
 
