@@ -14,6 +14,15 @@
 #                 over the committed corpus. This is the check that catches a
 #                 MISUNDERSTANDING rather than a typo.
 #                   make check-ctrl-oracle LIBREAC=../../libreac
+#   make corpus-check
+#                 DEV-ONLY: parse EVERY capture in the corpus with the grammar
+#                 and refuse a regression against spec/corpus-baseline.json.
+#                 The unit suite runs on the goldens; this runs on the whole
+#                 body of evidence, and they are not the same check.
+#                   make corpus-check CAPTURES=~/Devel/audio/reac-captures
+#   make corpus-selftest
+#                 corrupt every frame and require the corpus check to go RED.
+#                 A checker that cannot fail reports success over any grammar.
 #   make check-oracle
 #                 DEV-ONLY: diff the generated parser against the COMPILED
 #                 libreac rather than a Python transcription of it. Needs a
@@ -31,7 +40,7 @@ KSY := reac.ksy
 LIBREAC ?= ../../libreac
 
 .PHONY: all parser check check-oracle check-ctrl-oracle facts \
-        facts-idempotent cpp clean ksc-help
+        facts-idempotent cpp clean ksc-help corpus-check corpus-selftest
 
 all: check
 
@@ -57,6 +66,14 @@ facts-idempotent:
 	@cd out/facts-idem && $(PYTHON) gen-facts.py >/dev/null
 	@diff -r out/facts-idem/generated.first out/facts-idem/generated
 	@$(PYTHON) gen-facts.py --check
+
+CAPTURES ?= $(HOME)/Devel/audio/reac-captures
+
+corpus-check:
+	$(PYTHON) corpus-check.py --captures $(CAPTURES)
+
+corpus-selftest:
+	$(PYTHON) corpus-check.py --captures $(CAPTURES) --self-test --quiet
 
 check-oracle: parser
 	$(PYTHON) xcheck_c_oracle.py --libreac $(LIBREAC)
