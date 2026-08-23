@@ -419,7 +419,7 @@ types:
             'control_op::scene_header': scene_header_payload
             'control_op::scene_final': scene_final_payload
             'control_op::page_0103': page_0103
-            'control_op::dt1_container': dt1_record
+            'control_op::dt1_container': container_0403
             'control_op::announce': cfea_payload
         doc: Unmodelled ops (the ASCII name frame 0x0401, the extra cold-connect
           0x0402) fall through as raw bytes on purpose — their interiors are not
@@ -990,6 +990,54 @@ types:
           (input_groups[4] == 0x41 ? 8 : 0)
         doc: The width the master is enrolling, 8 channels per input group. The
           five groups span exactly the 40-slot audio fabric.
+  container_0403:
+    doc: |
+      op 0x0403 carries TWO different things, discriminated by `payload[0]` —
+      block[4], the same position that discriminates op-0103's subtypes:
+
+        0x00  a genuine Roland DT1 record            -> dt1_record
+        0x02  the BOX's upstream return block        -> box_return_block
+
+      The 0x02 form was previously documented only as "the look-alike to beat"
+      and rejected by dt1_record's `contents`. Rejecting it is right for DISPATCH
+      and wrong for a grammar: the corpus holds 6.05 million of them and a spec
+      that cannot parse the commonest control block on the wire is incomplete.
+      It is now a named subtype, so the dispatch signature still holds and the
+      bytes are still accounted for.
+    seq:
+      - id: body
+        size-eos: true
+        type:
+          switch-on: subtype
+          cases:
+            0x00: dt1_record
+            0x02: box_return_block
+    instances:
+      subtype:
+        pos: 0
+        type: u1
+        doc: block[4]. 0x00 a DT1 record, 0x02 the box's upstream return block.
+  box_return_block:
+    doc: |
+      op 0x0403 subtype 0x02 — a CONSTANT block the box repeats on its upstream
+      return frames. Not a record container: there is no SysEx envelope at all,
+      and the `02 00 fe` sits one byte before where a DT1 wrapper's `00 02 00 fe`
+      would.
+
+      EVIDENCED (corpus): 6,053,140 frames in one M-200i/S-0808 session carry
+      exactly ONE distinct 32-byte block, from the box's own MAC, on 628- and
+      630-byte upstream frames, with a valid block checksum. Its INTERIOR is
+      UNEXPLAINED — the observed constant is
+
+        04 03 00 14 02 00 fe 00 00 41 00 00  then zeros, then the checksum
+
+      so `00 41` after the marker is documented as observed, not named. Nothing in
+      either firmware image has been shown to read it.
+    seq:
+      - id: marker
+        contents: [0x02, 0x00, 0xfe]
+      - id: rest
+        size-eos: true
   dt1_record:
     doc: |
       op 0x0403 is a RECORD CONTAINER, not a single opcode: it wraps a genuine
@@ -1069,10 +1117,10 @@ types:
         doc: Zero fill out to the 32-byte block, last byte the block checksum.
     instances:
       record_len:
-        value: _parent.op_len - 0x0d
+        value: _parent._parent.op_len - 0x0d
         doc: TAG(2) + data + inner checksum(1).
       data_len:
-        value: _parent.op_len - 0x10
+        value: _parent._parent.op_len - 0x10
         doc: 3 for head-amp, 4 for the join grant, 6 or 10 for identity.
   head_amp_data:
     doc: |
