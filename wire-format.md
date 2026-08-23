@@ -381,6 +381,46 @@ data[21]     = CKSUM_inner
 data[22]     = 0xf7         terminator
 ```
 
+### One name, three granularities [V]
+
+The record looks uniform and is not. Three different things travel under `PARAM`, and each
+addresses a different sized thing:
+
+| PARAM | granularity | index the box derives |
+|---|---|---|
+| `02` SENS | **per channel** | `ch` |
+| `01` pad / the flag bits | **per channel** | `ch` |
+| `00` phantom +48V | **per group of FOUR** | `ch >> 2` |
+| *(readback nibble)* | **per group of EIGHT** | `ch >> 3` |
+
+So **only a record whose channel is a multiple of four carries phantom**. A record to `0x24`
+moves group 9; a record to `0x25`, `0x26` or `0x27` moves nothing. Sweeping phantom per
+channel writes three records in four into the void — the bytes are right, the checksums are
+right, the box acknowledges, and nothing happens. A console's own full push does send a
+phantom record per channel; that is the console being uniform, not the box being per-channel.
+
+The readback nibble (`ch >> 3`) is a **different axis** from phantom (`ch >> 2`). Any API
+generated from this must keep the two named apart; collapsing them is a silent aliasing bug.
+
+The constants and their evidence grades are in
+[`spec/protocol-facts.yaml`](spec/protocol-facts.yaml) (`head_amp` group), which is the one
+declarative source `spec/reac.ksy` and libreac are both checked against.
+
+### Records follow the commit — never precede it [V]
+
+**There is no head-amp staging table.** A record writes the ACTIVE table directly, and the
+State-4 commit **overwrites** that table wholesale. A record sent before the commit is
+therefore erased, silently.
+
+A channel is digitally **silent** until the commit promotes head-amp into the active table.
+The commit is the sole promoter: it flushes the twelve groups and replies `01 03 00 10`.
+Neither an establishment handshake nor an enrol frame arms a bank on its own. The transfer
+that carries it, and what the box validates in it, is the scene transfer — see
+[firmware-findings.md](firmware-findings.md) and the `scene` groups of
+[`spec/protocol-facts.yaml`](spec/protocol-facts.yaml).
+
+Ordering, for an implementer: **establish → scene transfer → commit → head-amp records.**
+
 **Two nested checksums — an implementation must set BOTH, inner first.**
 
 | | span | rule |
