@@ -1001,34 +1001,115 @@ types:
       - id: rest
         size-eos: true
   chanmap_entry:
+    doc: |
+      A three-byte record: `{slot, flags, value}`. It is the SAME record shape
+      in both directions, and the box's own transmitter is the inverse of its
+      receiver, field for field.
+
+      EVIDENCED (image), S-1608 `FUN_0c002bb2` @0c002bb2 building a record from
+      the per-slot table at `DAT_0c002e70` (resolves to 0x0c0cf85a) with a
+      10-byte stride:
+
+        rec[0] = slot
+        rec[1] = (cell << 4 & 0xf0)
+               | (tbl[slot*10 + 4] & 1) << 3
+               | (tbl[slot*10 + 8] & 1) << 2
+               | (tbl[slot*10 + 6] & 1) << 1
+        rec[2] = (u8) tbl[slot*10 + 2]
+
+      and `FUN_0c002d42` @0c002d42 applying one, writing exactly those four
+      cells back. The mask 0xf0 is `DAT_0c002d7c`, read out of the image, so
+      the cell code really is a full four bits.
+
+      THE THIRD BYTE IS NOT PADDING. It is the per-slot VALUE, and the cell it
+      writes — table + 2 — is the same cell the box's own gain path reads:
+      `FUN_0c007fbc` @0c007fbc copies `table[+2]` into its actuation shadow and
+      passes it to `FUN_0c007e6a` @0c007e6a, the SENS setter. The record and the
+      head-amp DT1 record therefore reach one table by two routes.
+
+      CORROBORATED, and this is where the corpus and the firmware say different
+      things about USE rather than about layout: over 183 872 chanmap records in
+      72 captures the value byte is 0x00 every single time, and the flags byte
+      takes only 0x28 and 0x38 on real slots. So no console has ever been seen
+      to put a value in this record — the capability is in both box images and
+      nothing exercises it.
     seq:
       - id: slot
         type: u1
-        doc: Fabric channel 0x00..0x2f, or 0xfe for the ring wrap marker.
-      - id: bank
+        doc: |
+          Fabric channel 0x00..0x2f, or one of two record ids that are not
+          channels: 0xfe (`DAT_0c002d7e`) and 0xff (`DAT_0c002d80`), both read
+          out of the image.
+      - id: flags
         type: u1
-        doc: 0x28 for slots below 0x28, 0x38 for 0x28..0x2f, 0x00 on the marker.
-      - id: pad
+        doc: |
+          High nibble = the inventory cell code; bits 3, 2 and 1 = three
+          per-slot flags; bit 0 is never written by the box's builder. On the
+          wire this reads 0x28 on slots below 0x28 and 0x38 above, which is
+          cell 2 or 3 with bit 3 set and nothing else.
+      - id: value
         type: u1
+        doc: The per-slot value, written to table + 2 — the SENS cell.
     instances:
       is_group_anchor:
-        value: 'slot != 0xfe and (slot & 3) == 0'
+        value: 'slot < 0x30 and (slot & 3) == 0'
         doc: |
           True on the 12 entries the box's per-record push consumes (every 4th
-          fabric slot). The 0xfe wrap marker is excluded explicitly: 0xfe & 3 is
-          2, so it is not an anchor and never feeds the group map.
+          fabric slot). Neither non-channel record id can qualify: the guard in
+          `FUN_0c002d42` @0c002d42 is `slot < 0x30`, which is a stronger and
+          more faithful statement than excluding 0xfe by hand.
       group:
         value: 'slot >> 2'
         doc: |
           Head-amp group index this entry anchors, 0..11, meaningful only where
           is_group_anchor. Derived from the firmware's push, not from the wire.
       cell_type:
-        value: 'bank >> 4'
+        value: 'flags >> 4'
         enum: inventory_cell
         doc: |
-          The value byte's high nibble, the code stored into the group map:
+          The flags byte's high nibble, the code stored into the group map:
           2 analog_input for groups 0..9, 3 absent for groups 10..11, on every
           console and every box model observed.
+      flag_slot_4:
+        value: '(flags >> 3) & 1'
+        doc: bit 3 -> table + 4. Set on every real slot in every capture.
+      flag_slot_8:
+        value: '(flags >> 2) & 1'
+        doc: bit 2 -> table + 8. Zero in every capture.
+      flag_slot_6:
+        value: '(flags >> 1) & 1'
+        doc: |
+          bit 1 -> table + 6. Zero in every capture. Of the three, this is the
+          one the S-1608's group apply carries into its shadow and never passes
+          to a setter (`FUN_0c007fbc` @0c007fbc).
+      is_identity_record:
+        value: 'slot == 0xfe'
+        doc: |
+          The record id 0xfe is not a channel and not merely a wrap marker. Its
+          FLAGS byte is routed somewhere no channel record goes:
+          `FUN_0c002d42` @0c002d42 passes it to `FUN_0c0051c4` @0c0051c4, which
+          stores it in the one-word identity cell at 0x0c080616, and to
+          `FUN_0c004158` @0c004158, the 12-slot vector's header.
+
+          That cell is what the box's change detector reads:
+          `FUN_0c0045ec` @0c0045ec compares it against the value it observes and,
+          on a mismatch, latches link-loss and drops the FSM to state 0 — which
+          is the mechanism behind a box resetting when a new master takes over.
+          Both pool slots were resolved from the image (0x0c0046bc -> 0x0c0051ba
+          the getter, 0x0c0046c4 -> 0x0c0051c4 the setter).
+
+          Reading the byte as "the master's identity" is INFERRED from that
+          mechanism; the firmware names nothing. CORROBORATED: 3 804 such
+          records in the corpus, carrying flags 0x00 (3 586) and 0x01 (218),
+          value always 0.
+      is_filler_record:
+        value: 'slot == 0xff'
+        doc: |
+          The id the box's builder emits for a cursor past the sentinel
+          (`DAT_0c002d80` = 0xff), all-zero body. FIRMWARE-ONLY: the cursor
+          wraps at 0x30 so the branch is unreachable on that path — Ghidra says
+          so independently, removing it as dead code — and no capture in the
+          corpus contains one.
   config_announce_page:
     doc: |
       op-0103 0x0010: the box's SETUP DECLARATION at cold connect — what the
