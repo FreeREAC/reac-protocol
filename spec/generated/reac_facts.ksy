@@ -380,9 +380,12 @@ instances:
     value: 0x37
     doc: |
       55 — the 56th and last entry of the box's own step table, which is
-      exactly 56 rows with no spares. [EVIDENCED (image) — a 56-entry table
-      at 0x0c0327a0 in the S-1608 image, reached by both write paths, ending
-      exactly where the "V03.05" version string begins.]
+      exactly 56 rows with no spares. What each step is WORTH in dB is the
+      headamp_sens group below; this row is only the count. [EVIDENCED
+      (image) — a 56-entry table at 0x0c0327a0 in the S-1608 image, reached
+      by both write paths, ending exactly where the "V03.05" version string
+      begins. The count is what that table proves; reading a gain curve off
+      its stage structure did not survive the rig.]
   headamp_ch_span:
     value: 0x30
     doc: |
@@ -415,6 +418,31 @@ instances:
       records for an S-0808, 48 for an S-1608, 96 for an S-4000S. No desk
       addresses a bank, splits a sweep or repeats one. [EVIDENCED (corpus) —
       31 of 47 captures, three desk generations agreeing on the same box.]
+  # ---- The SENS step -> sensitivity curve ----
+  headamp_sens_ref_cdb:
+    value: -1000
+    doc: |
+      Step 0x00 with the pad off, in hundredths of a dBu — the least
+      sensitive setting and the reference the whole travel hangs off.
+      [INFERRED — agreed by every prior reading and not independently
+      measurable through a loopback, which sees only this plus the box's
+      converter reference. The SPAN below is what was measured.]
+  headamp_sens_step_cdb:
+    value: 100
+    doc: |
+      One decibel, every step, all 55 transitions. The number that was
+      disputed, and the one thing a consumer cannot get wrong quietly.
+      [EVIDENCED (rig) — 2026-08-23 loopback sweep of all 56 steps, span
+      54.60 dB, slope 0.988 dB/step, and all three predicted duplicate-gain
+      pairs refuted by A/B/A at ~1 dB against controls of 0.08 to 0.34 dB.]
+  headamp_pad_cdb:
+    value: 2000
+    doc: |
+      The pad's 20 dB, in hundredths, added to the sensitivity when it is
+      on. Independent of the step, and it earns its place here by being the
+      one number in this group whose absolute value the loopback DOES
+      measure. [EVIDENCED (rig) — 20.12 and 20.20 dB by A/B/A at steps 0x37
+      and 0x28, against pad-off controls of 0.11 and 0.16 dB.]
   # ---- Head-amp base per declared width ----
   placement_base_in8:
     value: 0x00

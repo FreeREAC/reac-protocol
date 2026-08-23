@@ -409,9 +409,12 @@
 #define REAC_HEADAMP_PARAM_SENS         0x02
 
 /* 55 — the 56th and last entry of the box's own step table, which is exactly
- * 56 rows with no spares. [EVIDENCED (image) — a 56-entry table at 0x0c0327a0
- * in the S-1608 image, reached by both write paths, ending exactly where the
- * "V03.05" version string begins.]
+ * 56 rows with no spares. What each step is WORTH in dB is the headamp_sens
+ * group below; this row is only the count. [EVIDENCED (image) — a 56-entry
+ * table at 0x0c0327a0 in the S-1608 image, reached by both write paths,
+ * ending exactly where the "V03.05" version string begins. The count is what
+ * that table proves; reading a gain curve off its stage structure did not
+ * survive the rig.]
  */
 #define REAC_HEADAMP_SENS_MAX           0x37
 
@@ -442,6 +445,79 @@
  * three desk generations agreeing on the same box.]
  */
 #define REAC_HEADAMP_SWEEP_RECORDS_PER_CH 3
+
+/* ---- The SENS step -> sensitivity curve ----------------------------------------
+ * One decibel per step, over all 56 steps, with no duplicates anywhere.
+ * Sensitivity runs -10 dBu at 0x00 down to -65 dBu at 0x37 with the pad off,
+ * and the pad shifts the whole travel up by 20 dB:
+ *
+ *   sensitivity_dBu = -10 - value + (pad ? 20 : 0)
+ *
+ * MEASURED 2026-08-23, S-0808, output 1 cabled to input 1 so the source is an
+ * electrical loopback of a level we generated and therefore know — not a
+ * microphone in a room, which is what produced the third and wildest of the
+ * readings this replaces. All 56 steps at three generator levels whose ranges
+ * overlap and agree to 0.05 dB where they meet. Span 54.60 dB against the
+ * 55.00 a flat 1 dB implies; least-squares slope 0.988 dB/step with a maximum
+ * residual of 0.44 dB, which is the size of the measurement's own scatter, so
+ * the law declared here is the round decibel and not the fitted 0.988. The pad
+ * measured 20.12 and 20.20 dB at two different steps — the check that this dB
+ * axis is the box's own.
+ *
+ * WHAT THIS SETTLES, because it was the schema's one openly contested number.
+ * Three readings were live: reac.ksy and reac-pw both spelled the flat 1 dB
+ * law, which is how a number nobody had measured came to look confirmed by two
+ * sources; libreac carried a 56-entry firmware curve spanning 48.75 dB whose
+ * stage breaks at 8, 24 and 40 made three pairs of steps deliver IDENTICAL
+ * gain, so the map was not injective and a round trip through it was a
+ * different function; and a rig measurement of 1.235 dB/step, since shown to
+ * be an artefact of its acoustic source.
+ *
+ * The twins were the discriminating test and they were run: each pair by rapid
+ * A/B/A alternation, twice, at two generator levels, so residual drift shows
+ * as a mismatch between the A readings.
+ *
+ *   7 -> 8 +0.92 and +1.12 dB drift control 0.08 / 0.10 dB
+ *   23 -> 24 +1.36 and +1.31 dB drift control 0.34 / 0.15 dB
+ *   39 -> 40 +0.97 and +0.84 dB drift control 0.26 / 0.08 dB
+ *
+ * Every pair steps by about a decibel, an order of magnitude outside its own
+ * control. The firmware's four coarse stages are real; gain being continuous
+ * across their breaks was an inference from that structure and it is refuted.
+ *
+ * THE ANCHOR, stated honestly because half of it is not measured here. A
+ * loopback measures the SPAN exactly — 54.60 dB between the endpoints, which
+ * is what discriminates 48.75 from 55.00 — but the absolute dBu of either
+ * endpoint needs one constant this experiment cannot separate: the box's own
+ * converter reference, the dBu it puts out at 0 dBFS and the dBFS its
+ * sensitivity spec refers to. The loop measures their SUM. So -10 dBu at step
+ * 0 is carried over unchanged from every source that already agreed on it, and
+ * -65 at 0x37 is what the measured span then makes it. Raw data:
+ * reac-pw docs/measurements/sens-sweep-2026-08-23-*.csv.
+ */
+/* Step 0x00 with the pad off, in hundredths of a dBu — the least sensitive
+ * setting and the reference the whole travel hangs off. [INFERRED — agreed by
+ * every prior reading and not independently measurable through a loopback,
+ * which sees only this plus the box's converter reference. The SPAN below is
+ * what was measured.]
+ */
+#define REAC_HEADAMP_SENS_REF_CDB       -1000
+
+/* One decibel, every step, all 55 transitions. The number that was disputed,
+ * and the one thing a consumer cannot get wrong quietly. [EVIDENCED (rig) —
+ * 2026-08-23 loopback sweep of all 56 steps, span 54.60 dB, slope 0.988
+ * dB/step, and all three predicted duplicate-gain pairs refuted by A/B/A at
+ * ~1 dB against controls of 0.08 to 0.34 dB.]
+ */
+#define REAC_HEADAMP_SENS_STEP_CDB      100
+
+/* The pad's 20 dB, in hundredths, added to the sensitivity when it is on.
+ * Independent of the step, and it earns its place here by being the one
+ * number in this group whose absolute value the loopback DOES measure.
+ * [EVIDENCED (rig) — 20.12 and 20.20 dB by A/B/A at steps 0x37 and 0x28,
+ * against pad-off controls of 0.11 and 0.16 dB.]
+ */
+#define REAC_HEADAMP_PAD_CDB            2000
 
 /* ---- Head-amp base per declared width ------------------------------------------
  * A head-amp record's CH is base + (box_input - 1), and the base depends on
