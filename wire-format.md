@@ -424,26 +424,56 @@ data[21]     = CKSUM_inner
 data[22]     = 0xf7         terminator
 ```
 
-### One name, three granularities [V]
+### Wire encoding and hardware actuation are two axes [V]
 
-The record looks uniform and is not. Three different things travel under `PARAM`, and each
-addresses a different sized thing:
+This section used to be a single table of "three granularities" — per channel, per four,
+per eight. **They are not three points on one scale.** Two are about which record carries a
+field; one is about how many channels a single write switches. Anyone reading them as one
+list gets one of the two wrong, which is exactly what happened.
 
-| PARAM | granularity | index the box derives |
+**Axis 1 — wire encoding: what a record carries.**
+
+| carrier | field | per |
 |---|---|---|
-| `02` SENS | **per channel** | `ch` |
-| `01` pad / the flag bits | **per channel** | `ch` |
-| `00` phantom +48V | **per group of FOUR** | `ch >> 2` |
-| *(readback nibble)* | **per group of EIGHT** | `ch >> 3` |
+| DT1 record `{CH, PARAM, VALUE}` | `00` phantom, `01` pad, `02` SENS | **channel** — one channel per record, all three |
+| slot map `{slot, cell+flags, sens}` | sens byte, flag bits 3/2/1 | **channel** — written for every slot |
+| slot map | high nibble = **inventory cell** | **four** — only where `(slot & 3) == 0` |
 
-So **only a record whose channel is a multiple of four carries phantom**. A record to `0x24`
-moves group 9; a record to `0x25`, `0x26` or `0x27` moves nothing. Sweeping phantom per
-channel writes three records in four into the void — the bytes are right, the checksums are
-right, the box acknowledges, and nothing happens. A console's own full push does send a
-phantom record per channel; that is the console being uniform, not the box being per-channel.
+The per-four field in the slot map is the *inventory cell*, not a head-amp parameter. The
+box's ingest `FUN_0c002d42` writes the sens byte and the three flag bits unconditionally and
+gates only `flags >> 4`.
 
-The readback nibble (`ch >> 3`) is a **different axis** from phantom (`ch >> 2`). Any API
-generated from this must keep the two named apart; collapsing them is a silent aliasing bug.
+**Axis 2 — hardware actuation: what one write switches.** **Per channel**, for phantom, pad
+and SENS alike. `FUN_0c007fbc(bank, group)` sets its cursor to `group << 3` and loops eight
+times; each iteration passes its own within-bank index and that slot's own value to
+`FUN_0c00ac1e` (phantom), `FUN_0c00ac96` (pad) and `FUN_0c007e6a` (SENS).
+
+**The eight is a bank, not an actuator.** The writers take `(bank, 0..7)` — two banks of
+eight, which is an S-1608's sixteen analog inputs — and `group` selects which eight-slot
+window of the 80-slot active table feeds them. It is the preamp's bank width and the refresh
+loop's batch size. Nothing is switched eight channels at a time.
+
+#### "Phantom is per four" is DISPUTED [?]
+
+The claim that only a record whose channel is a multiple of four carries phantom — a record
+to `0x24` moving group 9, one to `0x27` moving nothing — is graded from an executed trace
+and is **not** supported by the image. `S-1608.BIN` holds exactly one channel-indexed
+`(x & 3) == 0` test, it is `FUN_0c002d42`'s inventory-cell gate, and it is not on the DT1
+path; every other `& 3` in the image is pointer alignment. And with actuation per channel
+there is no per-four actuator for a per-four record to feed. The likeliest history is that
+this and the retracted "phantom packed 4 ch/group" note are one misreading of the same
+function.
+
+The constant is left unchanged in
+[`spec/protocol-facts.yaml`](spec/protocol-facts.yaml) rather than overwritten from a static
+read. **The discriminating experiment needs no rig:** send DT1 phantom records to `0x24` and
+to `0x25` in turn and read the box's own re-broadcast back. If `0x25` moves, phantom is per
+channel on the wire too. **Until that runs, do not generate a per-four phantom sweep.**
+
+The readback nibble's `ch >> 3` coincides arithmetically with the apply loop's bank index
+over the same 80 slots, so it may be that bank reported back rather than a third axis. Not
+asserted here: `FUN_0c007fbc` has no caller in the function-only export, so what drives the
+banking cannot be traced from this image.
 
 The constants and their evidence grades are in
 [`spec/protocol-facts.yaml`](spec/protocol-facts.yaml) (`head_amp` group), which is the one
