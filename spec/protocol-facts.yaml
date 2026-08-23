@@ -113,12 +113,40 @@ groups:
         ksy: instances/has_fcs_residue/value
         ksy_as: substring
         ksy_value: "raw_len - 52"
+      - name: PACE_IS_THE_MASTERS
+        value: true
+        why: |
+          The master sets the pace and the slaves follow it unconditionally. There is no
+          per-rate cadence negotiation, no slave-side rate election, and no case in which a box
+          declines a pace. So a frame rate is read off the master's clock, never inferred from
+          a box's model or its declaration.
+          Consequence for our own docs: statements of the form "the upstream cadence at rate R
+          is X" describe what the master chose, not a property the box asserts.
+        evidence: |
+          RULED (operator, 2026-08-23). Consistent with the corpus, which shows one pace per
+          segment and no negotiation exchange.
+      - name: RATE_IS_INDEPENDENT_OF_MODEL
+        value: true
+        why: |
+          A clock rate is NOT a property of a mixer model. Any legal pace may run on any desk,
+          and the two facts must never be derived from one another.
+          This is stated because our corpus makes them look coupled: each desk we own has been
+          run at a single rate, so model and rate are perfectly correlated in the captures. That
+          correlation is an accident of how the rig was used, not a fact about the protocol, and
+          anything reading a per-desk field as a rate class must justify it on its own evidence.
+        evidence: |
+          RULED (operator, 2026-08-23) — LAW. Not an inference from the corpus, and it overrides
+          any correlation the corpus appears to show.
       - name: BYTES_PER_CHANNEL
         libreac: REAC_UPSTREAM_BYTES_PER_CH
         value: 36
         why: 12 samples x 3 bytes, per channel, at EVERY sample rate. The 36 in
           `52 + n*36`.
-        evidence: EVIDENCED (corpus) — holds across 44.1k, 48k and 96k.
+        evidence: |
+          EVIDENCED (corpus) at 48k and 96k; RATE-INVARIANT BY CONSTRUCTION (12 x 3).
+          44.1k is DERIVED, not observed: measuring pps straight from the pcap timestamps puts
+          NOTHING in the 3675 band, while cleanly separating the 48k and 96k files. The earlier
+          wording claimed corpus evidence across 44.1k and did not have it.
         ksy: instances/num_channels/value
         ksy_as: substring
         ksy_value: ") / 36"
