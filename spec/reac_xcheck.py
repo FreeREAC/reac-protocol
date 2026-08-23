@@ -314,7 +314,7 @@ def test_op_dispatch_reads_the_op_the_oracle_reads(name, blk):
     assert t.op_len_raw == (raw[4] << 8) | raw[5]
     if t.type_word == R.Reac.FrameType.control.value:
         assert t.block.op.value if hasattr(t.block.op, "value") else t.block.op
-        assert t.block.op_len == t.op_len_raw
+        assert t.block.rec_len == t.op_len_raw
 
 
 def test_page_0103_subpage_dispatch():
@@ -324,9 +324,9 @@ def test_page_0103_subpage_dispatch():
         if t.op_raw == 0x0103:
             kinds[name] = t.block.payload.page_kind
     assert kinds["chanmap_w00"] == R.Reac.PageKind.chanmap.value
-    assert kinds["s1608_config_block"] == R.Reac.PageKind.config_announce.value
-    assert kinds["s0808_config_block"] == R.Reac.PageKind.config_announce.value
-    assert kinds["s4000s_config_block"] == R.Reac.PageKind.config_announce.value
+    assert kinds["s1608_config_block"] == R.Reac.PageKind.commit_report.value
+    assert kinds["s0808_config_block"] == R.Reac.PageKind.commit_report.value
+    assert kinds["s4000s_config_block"] == R.Reac.PageKind.commit_report.value
     assert kinds["enroll_000d_w8"] == R.Reac.PageKind.enroll_group_map.value
 
 
@@ -334,16 +334,16 @@ def test_page_0103_subpage_dispatch():
 # declared / derived widths — the placement CARRIERS, never a base
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("model,in_ch,out_ch,selector,unit_offset", [
+@pytest.mark.parametrize("model,in_ch,out_ch,selector,board_config_code", [
     ("s0808", 8, 8, 0x84, 0x00),
     ("s1608", 16, 8, 0x82, 0x02),
     ("s4000s", 32, 8, 0x84, 0x00),
 ])
-def test_config_announce_declares_the_box_width(model, in_ch, out_ch, selector, unit_offset):
+def test_commit_report_declares_the_box_width(model, in_ch, out_ch, selector, board_config_code):
     blk = next(b for n, b in BLOCKS if n == f"{model}_config_block")
     page = parse_block(blk["hex"]).block.payload.page
     assert page.selector == selector
-    assert page.unit_offset == unit_offset
+    assert page.board_config_code == board_config_code
     assert page.declared_in_channels == in_ch
     assert page.declared_out_channels == out_ch
     assert len(page.cells) == 12
@@ -355,7 +355,7 @@ def test_config_announce_declares_the_box_width(model, in_ch, out_ch, selector, 
     assert inputs == list(range(in_ch // 4))
 
 
-def test_config_announce_carriers_are_collinear_in_this_corpus():
+def test_commit_report_carriers_are_collinear_in_this_corpus():
     """The three surviving placement carriers agree on every row we hold — which
     is exactly why none of them can be promoted to the law. This test pins the
     collinearity so a future fixture that BREAKS it is noticed immediately."""
@@ -364,9 +364,9 @@ def test_config_announce_carriers_are_collinear_in_this_corpus():
         if not name.endswith("_config_block"):
             continue
         page = parse_block(blk["hex"]).block.payload.page
-        rows.append((page.declared_in_channels, page.selector, page.unit_offset))
-    for width, selector, unit_offset in rows:
-        assert (width == 16) == (selector == 0x82) == (unit_offset == 0x02)
+        rows.append((page.declared_in_channels, page.selector, page.board_config_code))
+    for width, selector, board_config_code in rows:
+        assert (width == 16) == (selector == 0x82) == (board_config_code == 0x02)
 
 
 def test_enroll_group_map_is_a_pure_function_of_width():
@@ -535,7 +535,7 @@ def test_scene_chunks_are_slices_of_the_body():
             continue
         t = parse_block(blk["hex"])
         assert t.op_raw == 0x0100
-        assert t.op_len_raw == 0x001a == 26, "op_len is the CHUNK LENGTH"
+        assert t.op_len_raw == 0x001a == 26, "rec_len is the CHUNK LENGTH"
         p = t.block.payload
         assert p.chunk_reserved == 0
         assert bytes(p.chunk) in chunks, f"{name} is not a slice of the body"
@@ -553,7 +553,7 @@ def test_scene_header_declares_the_total_not_a_model_constant():
     t = parse_block(next(b for n, b in BLOCKS if n == "sub01")["hex"])
     p = t.block.payload
     assert t.op_raw == 0x0101
-    assert t.op_len_raw == 0x0018 == 24, "op_len is this chunk's length"
+    assert t.op_len_raw == 0x0018 == 24, "rec_len is this chunk's length"
     assert p.scene_total_len == len(SCENE_BODY) == 0x22c8
     assert bytes(p.body_head) == SCENE_BODY[:24]
     assert bytes(p.body_head)[:4] == b"1234"
@@ -643,7 +643,7 @@ def test_only_three_tags_are_validated_by_the_box():
 def test_scene_declares_twelve_inventory_cells_like_the_box_does():
     """The box's commit walks twelve cells at a stride of 0x28 over the slot
     table — four records each — so the desk declares its inventory in exactly the
-    vocabulary the box declares its own in config_announce_page. An M-200i sends
+    vocabulary the box declares its own in commit_report_page. An M-200i sends
     eight analog-input cells and four absent: 32 declared inputs."""
     b = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY)))
     cells = [b.slots[4 * i].cell for i in range(12)]
@@ -667,10 +667,10 @@ def test_chanmap_ring_is_identical_for_every_box():
         assert len(page.entries) == 8
         for e in page.entries:
             if e.slot == 0xfe:
-                assert e.bank == 0x00
+                assert e.cell_and_flags == 0x00
                 continue
             assert e.slot < 0x30
-            assert e.bank == (0x38 if e.slot >= 0x28 else 0x28)
+            assert e.cell_and_flags == (0x38 if e.slot >= 0x28 else 0x28)
             seen.add(e.slot)
         assert page.entries[0].slot == bytes.fromhex(blk["hex"])[7]  # sel2 cursor
     assert seen

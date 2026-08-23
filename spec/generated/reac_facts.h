@@ -163,8 +163,10 @@
  */
 #define REAC_OP_SCENE_FINAL             0x0102
 
-/* A multiplexer with TWO discriminators — op_len selects the sub-page,
- * payload[0] selects the subtype. [EVIDENCED (image + executed trace).]
+/* Class 1 carried whole in one frame — the fragment field is 3, both FIRST
+ * and LAST. payload[0] is the only discriminator; op_len beside it is a
+ * length, not a second selector. See the control_header group. [EVIDENCED
+ * (image + executed trace).]
  */
 #define REAC_OP_PAGE_0103               0x0103
 
@@ -182,28 +184,215 @@
 /* The op a cfea announce always carries. [EVIDENCED (corpus).] */
 #define REAC_OP_ANNOUNCE                0xffff
 
-/* ---- op-0103 sub-pages and subtypes --------------------------------------------
- * op 0x0103 multiplexes on two axes at once, and reading only one of them
- * is how `01 03 00 10` and a head-amp block got taken for the same message.
+/* ---- The control record header -------------------------------------------------
+ * The first five bytes of every cd ea control block are four fields, and
+ * until 2026-08-23 two of our artefacts treated them as one opaque opcode
+ * word plus an "op-specific" number. They are not opaque and the number is
+ * not op-specific.
  *
- * `op_len` selects the SUB-PAGE. `payload[0]` — block[4], the byte a scene
- * frame requires to be zero — is a SUBTYPE SELECTOR, not a reserved byte.
+ *   block[0] class 0x01 session, 0x04 parameter
+ *   block[1] fragment bit0 FIRST, bit1 LAST
+ *   block[2:4] rec_len u16 BIG-ENDIAN, counted from block[4] INCLUSIVE
+ *   block[4] subtype what the record is; bit7 set = a box reply
+ *
+ * WHERE THIS COMES FROM. S-1608.BIN, SH-2 little-endian, load base
+ * 0x0BFE0000. The scene sender FUN_0c003398 writes block[1] from a
+ * first/last decision and calls FUN_0c002f7a for block[2:4]; FUN_0c002f7a
+ * is a two-byte store, high byte first, which is what makes rec_len
+ * big-endian. The same routine is called by FUN_0c002c70 (slot map,
+ * rec_len = 0x19), FUN_0c003c8a (commit report, 0x10) and FUN_0c003fe2
+ * (link ack, 0x01). The reader FUN_0c002e94 gates a slot map on
+ * block[0]==1, block[1]==3 and block[4]==1 — three separate fields, never a
+ * string.
+ *
+ * THE FRAGMENT FIELD IS TWO BITS AND EXPLAINS FOUR "OPCODES". The scene
+ * sender emits 1 for a full opening chunk, 0 for a full middle chunk, 2 for
+ * a short closing chunk and 3 when the whole record fits in one frame. So
+ * 0x0100, 0x0101, 0x0102 and 0x0103 are ONE class under four fragment
+ * states, not four opcodes, and the box's reassembler agrees: its state-2
+ * gate is (block[1] & 1), its state-3 gate is block[1] in {0, 2} and its
+ * finish test is block[1] == 2.
+ *
+ * WHAT THIS RETIRES. The wireshark dissector we inherited from reacdriver
+ * matched the five bytes as a STRING and gave the eight it had seen names
+ * that were guesses — CONTROL_ONE..FOUR and SLAVE_ANNOUNCE1..4. Those
+ * strings run a class, a flag field, a LENGTH and a subtype together, so
+ * they are model-specific by accident: an S-0808 and an S-4000S send the
+ * same commit report with subtype 0x84, and `0103001084` fell through the
+ * table as unknown while the identical S-1608 record was labelled.
  */
-/* op_len of the master's established chanmap heartbeat. [EVIDENCED (corpus).] */
-#define REAC_PAGE_CHANMAP               0x0019
+/* Block offset of the record class. [EVIDENCED (image).] */
+#define REAC_CTRL_CLASS_OFF             0
 
-/* op_len of the box's setup declaration — and of the commit report.
- * [EVIDENCED (corpus).]
- */
-#define REAC_PAGE_CONFIG_ANNOUNCE       0x0010
-
-/* op_len of the master's prepare-to-grant frame. [EVIDENCED (image +
+/* Scene transfer, slot map, commit report, link ack. [EVIDENCED (image +
  * corpus).]
  */
-#define REAC_PAGE_ENROLL_GROUP_MAP      0x000d
+#define REAC_CTRL_CLASS_SESSION         0x01
 
-/* op_len of the box's heartbeat. [EVIDENCED (corpus).] */
-#define REAC_PAGE_BOX_HEARTBEAT         0x0001
+/* The DT1 container — head-amp, identity, join grant, box return. [EVIDENCED
+ * (image + corpus).]
+ */
+#define REAC_CTRL_CLASS_PARAMETER       0x04
+
+/* Block offset of the fragment flags. [EVIDENCED (image).] */
+#define REAC_CTRL_FRAG_OFF              1
+
+/* Bit 0 — this frame opens the record. [EVIDENCED (image, S-1608 FUN_0c003398
+ * + FUN_0c003aae).]
+ */
+#define REAC_CTRL_FRAG_FIRST            0x01
+
+/* Bit 1 — this frame closes it. Both set is a whole record. [EVIDENCED
+ * (image, S-1608 FUN_0c003398 + FUN_0c003b88).]
+ */
+#define REAC_CTRL_FRAG_LAST             0x02
+
+/* Block offset of the record length, a big-endian u16. [EVIDENCED (image,
+ * S-1608 FUN_0c002f7a).]
+ */
+#define REAC_CTRL_RECLEN_OFF            2
+
+/* The block offset the length counts FROM, inclusive. Verified on every
+ * record type in the corpus — slot map 0x19 = block[4..28], commit
+ * report 0x10 = block[4..19], link ack 0x01 = block[4], enroll group
+ * map 0x0d = block[4..16], DT1 0x14 = block[4..23] with the record's
+ * own checksum as the last byte. Our grammar used to say this number
+ * was "op-specific in meaning" and "not a generic frame length"; it is
+ * a generic record length and always was.
+ *   [EVIDENCED (image + corpus).]
+ */
+#define REAC_CTRL_RECLEN_BASE           4
+
+/* Block offset of the subtype, the record's only discriminator. [EVIDENCED
+ * (image).]
+ */
+#define REAC_CTRL_SUBTYPE_OFF           4
+
+/* Payload bytes in an opening scene chunk — smaller than a middle chunk
+ * because block[5:7] carries the blob total. [EVIDENCED (image, S-1608
+ * FUN_0c003398).]
+ */
+#define REAC_CTRL_SCENE_CHUNK_FIRST     0x18
+
+/* Payload bytes in a middle or closing scene chunk, at block[5]. [EVIDENCED
+ * (image, S-1608 FUN_0c003398).]
+ */
+#define REAC_CTRL_SCENE_CHUNK_MIDDLE    0x1a
+
+/* ---- The state-4 commit — what it flushes --------------------------------------
+ * WHAT THE COMMIT IS. The box runs a scene FSM, S-1608 FUN_0c0037ee, over
+ * one RAM cell. State 2 takes the master's opening scene fragment, state 3
+ * reassembles the continuations, and state 4 is FUN_0c003c8a — the COMMIT.
+ * Nothing else promotes staged state into the active table; the head-amp
+ * apply FUN_0c007fbc reads the ACTIVE table and only the commit writes it
+ * wholesale.
+ *
+ * THREE THINGS ARE TWELVE WIDE AND ONLY ONE OF THEM IS A GROUP FLUSH. This
+ * was the open question and the firmware answers it: the commit touches TWO
+ * of the three, and NEITHER of them is a phantom flush.
+ *
+ *   1. The slot table copy is EIGHTY wide, not twelve. staging 0x0c0cd52e
+ *      -> active 0x0c0cf85a, fields +2 +4 +6 +8, `while (i < 0x50)`,
+ *      unconditional — there is no per-slot enrolled test in the commit.
+ *
+ *   2. The twelve-wide loop `FUN_0c00f9aa(i, *(u16*)(staging + i*0x28))`
+ *      reads field +0 of every FOURTH slot record (0x28 = four 10-byte
+ *      records) and writes a 12-entry u16 array at 0x0c0f62fa. That array
+ *      is the PEER INVENTORY MIRROR: what the master has declared each
+ *      group of four channels to be. Its reader is FUN_0c00fa1a, which
+ *      refuses to answer unless the link word is 1; its reset FUN_0c00fa58
+ *      fills it with 3 = absent. The SAME array is written by the slot-map
+ *      ingest FUN_0c002d42 from the high nibble of byte 1, at group anchors
+ *      only. It touches no hardware.
+ *
+ *   3. The twelve bytes in the emitted report come from a DIFFERENT array —
+ *      the box's OWN inventory, 12 records of 6 bytes at 0x0c080920, read
+ *      through FUN_0c00f6ca and initialised by FUN_0c00f7f8. This is the
+ *      declared inventory, and it is what reaches the wire.
+ *
+ * SO "THE COMMIT FLUSHES 12 PHANTOM GROUPS" IS WRONG in both halves. There
+ * is no phantom in either twelve-wide structure; phantom reaches hardware
+ * from the ACTIVE table through FUN_0c007fbc, in groups of EIGHT, ten of
+ * them, and the commit does not call it. The two twelve-wide things the
+ * commit does touch are both INVENTORY — one inbound, one outbound.
+ *
+ * Cross-checked on a second image: S-4000.BIN, load base 0x0C000000, has
+ * the identical shape — the 0x50-slot copy, the six-byte master id, the
+ * `i * 0x28` twelve-group loop over its own staging table 0x0c0cd66a, and
+ * the same report.
+ */
+/* Slots copied staging -> active by the commit, unconditionally. Eighty,
+ * not forty-eight — the box's addressable channel space is 48 (the slot
+ * map ingest gates slot < 0x30) but the table it lives in is 80 deep and
+ * the head-amp apply walks ten groups of eight over it.
+ *   [EVIDENCED (image, S-1608 FUN_0c003c8a + S-4000 same loop).]
+ */
+#define REAC_COMMIT_SLOT_TABLE_ENTRIES  80   /* 0x0050 */
+
+/* Stride of the staging and active slot tables. Fields +2 sens, +4/+6/+8 the
+ * three per-slot booleans; +0 is not copied and is read at four-slot stride
+ * as the group's inventory cell. [EVIDENCED (image, S-1608 FUN_0c003c8a +
+ * FUN_0c002d42).]
+ */
+#define REAC_COMMIT_SLOT_RECORD_BYTES   10
+
+/* The granted master's identity, copied staging -> active by the commit.
+ * Zeroed on link loss by FUN_0c003a64; a mismatch against the observed master
+ * forces the FSM to state 0 (FUN_0c0045ec), which is why a takeover resets
+ * the box's head-amp. [EVIDENCED (image).]
+ */
+#define REAC_COMMIT_MASTER_ID_BYTES     6
+
+/* The head-amp hardware apply FUN_0c007fbc(bank, group) walks EIGHT
+ * slots, `group << 3`, for group 0..9. This is the geometry that
+ * actually reaches hardware, and it is a different axis from the
+ * four-channel inventory cell. Confusing the two is how "twelve
+ * phantom groups" got written down.
+ *   [EVIDENCED (image, S-1608 FUN_0c007fbc).]
+ */
+#define REAC_HEADAMP_APPLY_GROUP_CHANNELS 8
+
+/* Groups of eight the apply accepts, 0..9, covering the 80-slot active table.
+ * [EVIDENCED (image, S-1608 FUN_0c007fbc).]
+ */
+#define REAC_HEADAMP_APPLY_GROUPS       10
+
+/* ---- op-0103 sub-pages and subtypes --------------------------------------------
+ * `payload[0]` — block[4], the byte a scene frame requires to be zero — is
+ * the SUBTYPE SELECTOR, and it is the ONLY discriminator. That is how
+ * `01 03 00 10` and a head-amp block came to be taken for one message.
+ *
+ * THE FOUR `PAGE_*` NUMBERS BELOW ARE LENGTHS, NOT SELECTORS, and this
+ * group used to say otherwise. op_len is a plain record byte count on every
+ * op — see the control_header group for the firmware that writes it. Each
+ * subtype happens to have a fixed size today, so keying a parser on op_len
+ * appears to work and then fails silently on the first short frame. Key on
+ * the subtype; the lengths stay here because an emitter must still fill
+ * op_len correctly, and they are named `LEN_` to say what they are.
+ */
+/* Record length of the master's slot-map window — the subtype byte plus
+ * eight 3-byte slot records. S-1608 FUN_0c002c70 builds it.
+ *   [EVIDENCED (corpus).]
+ */
+#define REAC_LEN_SUB_CHANMAP            0x0019
+
+/* Record length of the box's state-4 commit report — the subtype byte,
+ * two zero bytes, the board-configuration code, twelve inventory cells.
+ * S-1608 FUN_0c003c8a builds it; S-4000 has the same shape.
+ *   [EVIDENCED (corpus).]
+ */
+#define REAC_LEN_SUB_COMMIT_REPORT      0x0010
+
+/* Record length of the master's prepare-to-grant frame. [EVIDENCED (image +
+ * corpus).]
+ */
+#define REAC_LEN_SUB_ENROLL_GROUP_MAP   0x000d
+
+/* Record length of the box's link-check ack — the subtype byte and
+ * nothing else. S-1608 FUN_0c003fe2 builds it, from scene-FSM state 7.
+ *   [EVIDENCED (corpus).]
+ */
+#define REAC_LEN_SUB_LINK_ACK           0x0001
 
 /* Block offset of the subtype selector — payload[0]. [EVIDENCED (executed
  * trace).]
@@ -215,13 +404,56 @@
  */
 #define REAC_SUB_0103_SCENE             0x00
 
-/* Subtype 1 — head-amp, 1 + 3k bytes of {ch, flags, sens}, eight records to a
- * frame. [EVIDENCED (executed trace, image).]
+/* Subtype 1 — the master's SLOT MAP, eight 3-byte records to a frame.
+ * This group used to call it "head-amp" and reac.ksy calls the same
+ * frame the chanmap; both names are half of it. The box's ingest
+ * FUN_0c002d42 splits each record three ways: the high nibble of byte 1
+ * is the inventory cell for the group this slot anchors and is consumed
+ * only where (slot & 3) == 0; bits 3, 2 and 1 of byte 1 are three
+ * per-slot booleans; byte 2 is the SENS step, and it lands in the same
+ * active-table field the head-amp apply FUN_0c007fbc reads back. So it
+ * IS a channel map and it DOES carry head-amp state.
+ *   [EVIDENCED (image, S-1608 FUN_0c002d42 + FUN_0c002bb2).]
  */
-#define REAC_SUB_0103_HEADAMP           0x01
+#define REAC_SUB_0103_SLOT_MAP          0x01
 
-/* Subtype 0x82 — the commit's report. The report builder also has a 0x80 arm;
- * what selects it is UNEXPLAINED. [EVIDENCED (executed trace, image).]
+/* Bit 7 of the subtype marks a record travelling BOX -> MASTER. Every
+ * box-built subtype has it (0x81 the link ack, 0x80/0x82/0x83/0x84 the
+ * commit report) and no master-built one does (0x00 scene, 0x01 slot
+ * map, 0x10 enroll group map).
+ *   [EVIDENCED (image + corpus).]
+ */
+#define REAC_SUB_REPLY_BIT              0x80
+
+/* The box's link-check ack, S-1608 FUN_0c003fe2, from scene-FSM state 7. It
+ * was called SLAVE_ANNOUNCE4 in the inherited dissector. [EVIDENCED (image +
+ * corpus).]
+ */
+#define REAC_SUB_0103_LINK_ACK          0x81
+
+/* The master's prepare-to-grant frame, once about 1.6 s before the grant
+ * burst. [EVIDENCED (corpus).]
+ */
+#define REAC_SUB_0103_ENROLL_GROUP_MAP  0x10
+
+/* The box's state-4 COMMIT REPORT — NOT a slave announce, which is what
+ * reacdriver called it and what our dissector repeated until
+ * 2026-08-23. S-1608 FUN_0c003c8a builds it after promoting staging to
+ * active, and it is reached only from state 4 of the scene FSM
+ * FUN_0c0037ee, i.e. after the master's scene transfer has completed.
+ *
+ * 0x82 IS THE S-1608'S NUMBER, NOT THE PROTOCOL'S, and a consumer must
+ * not match on it. The builder picks between two model-specific
+ * literals on a link-state test: S-1608 0x82 linked (DAT_0c00401c) and
+ * 0x80 otherwise (DAT_0c00401e); S-4000 0x84 linked (DAT_0c013750) and
+ * 0x83 otherwise (DAT_0c013752). What selects the second arm used to be
+ * recorded here as UNEXPLAINED and now is not: on the S-1608 it is
+ * FUN_0c00f9f2 returning something other than 1, which happens whenever
+ * the peer-declared word is unset or the link word is not 1. Observed
+ * on the wire: S-1608 0x82, S-0808 and S-4000S both 0x84. Match the
+ * family with SUB_REPLY_BIT, not the literal.
+ *   [EVIDENCED (image, S-1608 FUN_0c003c8a + S-4000 same shape; corpus, three
+ *   box models).]
  */
 #define REAC_SUB_0103_COMMIT_REPORT     0x82
 
@@ -464,6 +696,62 @@
  * measured 20.12 and 20.20 dB at two different steps — the check that this dB
  * axis is the box's own.
  *
+ * THE FIRMWARE HOLDS THE CURVE AS A TABLE, and here it is. S-1608.BIN at
+ * 0x0c0327a0, 56 entries of two bytes, read by FUN_0c007e30 which clamps
+ * the step to 0x37 and hands the pair to the preamp writer FUN_0c00af2a.
+ * The same 112 bytes are in S-0808.BIN at file offset 0x45ec8. The table
+ * ends where the image's ASCII version banner begins, which is how we know
+ * its extent is exactly 56 and not a run of padding.
+ *
+ *   step stage fine step stage fine step stage fine step stage fine
+ *   0x00 3 0x00 0x0e 2 0x0c 0x1c 1 0x08 0x2a 0 0x04
+ *   0x01 3 0x02 0x0f 2 0x0e 0x1d 1 0x0a 0x2b 0 0x06
+ *   0x02 3 0x04 0x10 2 0x10 0x1e 1 0x0c 0x2c 0 0x08
+ *   0x03 3 0x06 0x11 2 0x12 0x1f 1 0x0e 0x2d 0 0x0a
+ *   0x04 3 0x08 0x12 2 0x14 0x20 1 0x10 0x2e 0 0x0c
+ *   0x05 3 0x0a 0x13 2 0x16 0x21 1 0x12 0x2f 0 0x0e
+ *   0x06 3 0x0c 0x14 2 0x18 0x22 1 0x14 0x30 0 0x10
+ *   0x07 3 0x0e 0x15 2 0x1a 0x23 1 0x16 0x31 0 0x12
+ *   0x08 2 0x00 0x16 2 0x1c 0x24 1 0x18 0x32 0 0x14
+ *   0x09 2 0x02 0x17 2 0x1e 0x25 1 0x1a 0x33 0 0x16
+ *   0x0a 2 0x04 0x18 1 0x00 0x26 1 0x1c 0x34 0 0x18
+ *   0x0b 2 0x06 0x19 1 0x02 0x27 1 0x1e 0x35 0 0x1a
+ *   0x0c 2 0x08 0x1a 1 0x04 0x28 0 0x00 0x36 0 0x1c
+ *   0x0d 2 0x0a 0x1b 1 0x06 0x29 0 0x02 0x37 0 0x1e
+ *
+ * HOW TO READ IT. The two bytes are not decibels — they are two hardware
+ * registers. `stage` is a two-bit coarse range: FUN_0c00af2a drives it onto
+ * a pair of GPIO pins per channel, so it is an analog range switch, and
+ * FUN_0c007f20 compares ONLY this byte between two steps, which is a
+ * "does this change need the range to move" test. `fine` is a serial gain
+ * code, clamped to 0x24 by the writer, and it steps by exactly 2 for every
+ * step of the SENS index, everywhere in the table with no exception.
+ *
+ * WHAT THE TABLE PROVES, AND WHAT IT DOES NOT. It proves the shape: the
+ * step is UNIFORM within a range, so any departure from a flat law can only
+ * live at the three range breaks, which fall between steps 0x07/0x08,
+ * 0x17/0x18 and 0x27/0x28. It does not carry a decibel — the dB per fine
+ * LSB and the dB of each range tap are analog component values, in the
+ * preamp and not in the image.
+ *
+ * The stages begin at index 0, 8, 24 and 40, and the fine field restarts at
+ * zero at each. That placement is itself a statement: a break sits exactly
+ * where the fine field would run out, so the designer intended the ranges
+ * to abut with no gap and no overlap. Take the fine LSB as the usual half
+ * decibel and the whole table reads out as gain_dB = step, 0 through 55,
+ * with the range taps at 0, 8, 24 and 40 dB. That is the round law, and the
+ * table is its decomposition into two registers.
+ *
+ * SO THE LAW IS THE FIRMWARE'S TABLE AND 54.60 IS A MEASUREMENT OF IT. The
+ * two are not rival claims about the same quantity. The deficit is 0.40 dB
+ * over 55 steps against a sweep whose own maximum residual was 0.44 dB, so
+ * the measurement cannot separate 54.60 from 55.00 and does not contradict
+ * it. What the rig DID settle, and the table could not, is that the three
+ * range breaks are continuous: A/B/A gave +0.92/+1.12, +1.36/+1.31 and
+ * +0.97/+0.84 dB at exactly the three indices the table puts them at. That
+ * is the firmware's structure and the rig's numbers agreeing on the same
+ * three places, which is the strongest form this fact can take.
+ *
  * WHAT THIS SETTLES, because it was the schema's one openly contested number.
  * Three readings were live: reac.ksy and reac-pw both spelled the flat 1 dB
  * law, which is how a number nobody had measured came to look confirmed by two
@@ -504,12 +792,42 @@
 #define REAC_HEADAMP_SENS_REF_CDB       -1000
 
 /* One decibel, every step, all 55 transitions. The number that was disputed,
- * and the one thing a consumer cannot get wrong quietly. [EVIDENCED (rig) —
- * 2026-08-23 loopback sweep of all 56 steps, span 54.60 dB, slope 0.988
- * dB/step, and all three predicted duplicate-gain pairs refuted by A/B/A at
- * ~1 dB against controls of 0.08 to 0.34 dB.]
+ * and the one thing a consumer cannot get wrong quietly. [EVIDENCED (image +
+ * rig). Image — the S-1608 table at 0x0c0327a0 steps
+ * its fine register by exactly 2 for every SENS step with no exception,
+ * so the law is uniform inside each of its four ranges and can only
+ * break at three indices. Rig — the 2026-08-23 loopback sweep of all 56
+ * steps, span 54.60 dB, slope 0.988, and A/B/A at each of those three
+ * indices giving about a decibel against controls of 0.08 to 0.34 dB.
+ * The 0.40 dB the span falls short is inside that sweep's own 0.44 dB
+ * maximum residual, so it does not stand against the table.
+ * ]
  */
 #define REAC_HEADAMP_SENS_STEP_CDB      100
+
+/* Entries in the firmware's SENS table, steps 0x00..0x37. The writer
+ * FUN_0c007e30 clamps anything above 0x37 to 0x37, so 0x37 is the top of the
+ * travel and not merely the last one observed. [EVIDENCED (image, S-1608
+ * 0x0c0327a0 and S-0808 file 0x45ec8).]
+ */
+#define REAC_HEADAMP_SENS_STEPS         56
+
+/* Coarse analog ranges the table selects between, driven onto two GPIO pins
+ * per channel by FUN_0c00af2a. [EVIDENCED (image).]
+ */
+#define REAC_HEADAMP_SENS_STAGES        4
+
+/* First step of the second range. The three breaks are the only places a
+ * uniform step could fail, and the rig measured all three at about a decibel.
+ * [EVIDENCED (image + rig).]
+ */
+#define REAC_HEADAMP_SENS_STAGE_BREAK_1 0x08
+
+/* First step of the third range. [EVIDENCED (image + rig).] */
+#define REAC_HEADAMP_SENS_STAGE_BREAK_2 0x18
+
+/* First step of the fourth range. [EVIDENCED (image + rig).] */
+#define REAC_HEADAMP_SENS_STAGE_BREAK_3 0x28
 
 /* The pad's 20 dB, in hundredths, added to the sensitivity when it is on.
  * Independent of the step, and it earns its place here by being the one
