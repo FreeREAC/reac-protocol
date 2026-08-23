@@ -304,18 +304,24 @@ groups:
         why: A multiplexer with TWO discriminators — op_len selects the
           sub-page, payload[0] selects the subtype.
         evidence: EVIDENCED (image + executed trace).
-      - name: OP_NAME_FRAME
+      - name: OP_DT1_FIRST_FRAGMENT
         value: 0x0401
         fmt: hex4
-        ksy_name: name_frame
-        why: The ASCII model-name frame.
-        evidence: EVIDENCED (corpus).
-      - name: OP_EXTRA_COLD_CONNECT
+        ksy_name: dt1_first_fragment
+        why: Link 4 with the segment field reading FIRST — the opening fragment
+          of a DT1 record too long for one frame. Previously carried as "the
+          ASCII model-name frame", which is what its one observed use holds.
+        evidence: EVIDENCED (image + corpus) — the segmentation rule is
+          FUN_0c003398 @0c003398 (S-1608); the pairing is proved by the DT1
+          checksum, which closes only across both fragments.
+      - name: OP_DT1_LAST_FRAGMENT
         value: 0x0402
         fmt: hex4
-        ksy_name: extra_cold_connect
-        why: The extra cold-connect frame some models send.
-        evidence: EVIDENCED (corpus).
+        ksy_name: dt1_last_fragment
+        why: The same record's closing fragment, carrying the inner checksum and
+          the SysEx terminator. Previously carried as "the extra cold-connect
+          frame some models send".
+        evidence: EVIDENCED (image + corpus).
       - name: OP_DT1_CONTAINER
         value: 0x0403
         fmt: hex4
