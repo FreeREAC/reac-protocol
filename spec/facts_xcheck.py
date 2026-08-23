@@ -246,11 +246,21 @@ def test_head_amp_space_is_not_the_audio_fabric():
         assert row["base"] + row["in_ch"] <= VALUES["HEADAMP_CH_SPAN"], row
 
 
-def test_phantom_granularity_matches_the_scene_record_stride():
-    """Phantom is per four; the scene's twelve-group loop reads every fourth
-    record. Both sides of that coincidence live here, so it cannot drift apart
-    silently."""
-    assert 1 << VALUES["HEADAMP_GRAN_PHANTOM_SHIFT"] == VALUES["PORTS_CH_PER_SLOT"]
+def test_the_per_four_stride_is_the_inventory_cell_not_phantom():
+    """PORTS_CH_PER_SLOT is 4 and that four is the INVENTORY CELL's width.
+
+    This test used to read `1 << HEADAMP_GRAN_PHANTOM_SHIFT == PORTS_CH_PER_SLOT`
+    and call the agreement a coincidence worth pinning so it "cannot drift apart
+    silently". What it pinned was a misreading — the cell's stride wearing
+    phantom's name — and pinning it mechanically is why the wrong number
+    survived every review of the prose around it. Phantom was measured per
+    channel on 2026-08-23 (see the row), so the two are now asserted APART: the
+    stride belongs to the port table, and phantom has no stride at all.
+    """
+    assert VALUES["HEADAMP_GRAN_PHANTOM_SHIFT"] == 0
+    assert (VALUES["HEADAMP_GRAN_PHANTOM_SHIFT"]
+            == VALUES["HEADAMP_GRAN_SENS_SHIFT"]
+            == VALUES["HEADAMP_GRAN_FLAGS_SHIFT"])
     assert VALUES["PORTS_TABLE_SLOTS"] * VALUES["PORTS_CH_PER_SLOT"] == VALUES["HEADAMP_CH_SPAN"]
     assert VALUES["ENROLL_GROUPS"] * 8 == VALUES["MAX_CHANNELS"]
 
