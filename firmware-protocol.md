@@ -472,23 +472,52 @@ the known site at 0x0C002EB2 until it reported presence before any absence was b
 
 ## How this was validated
 
-The grammar is not a description here; it is a parser, and it was run.
+The grammar is not a description here; it is a parser, and it was run over the whole corpus
+BEFORE the changes and again after, with the before-run taken from the pre-edit grammar recovered
+out of git. `spec/corpus-check.py` is that check, committed and re-runnable:
 
-- **214 524 whole frames** — not control windows, entire frames including the audio region and
-  the end marker — from **all 72 captures** in the FreeREAC corpus, parsed by the
-  `kaitai-struct-compiler` output of `spec/reac.ksy` with **zero failures**. All four frame
-  widths appear (1492, 1204, 628, 340) and all eight `ctrl_kind` values are exercised.
-- **423 distinct control blocks**, the complete set of distinct `frame[16:50]` windows in the
-  corpus, parsed with zero failures, with every new instance forced.
-- The harness carries a **negative control** in the same run: a truncated non-REAC buffer must
-  be rejected, and a corrupted DT1 wrapper must be rejected. Both are.
-- `spec/reac_xcheck.py` and `spec/facts_xcheck.py` go from 277 to **328 assertions**, and the
-  new ones were **sabotage-verified**: swapping the FIRST bit for the LAST bit in the grammar
-  turns four tests red, shortening the DT1 checksum span by one byte turns the reassembly test
-  red, and changing the ring length from 49 to 50 turns the derived-fact ratchet red.
+```
+make corpus-check    CAPTURES=~/Devel/audio/reac-captures
+make corpus-selftest CAPTURES=~/Devel/audio/reac-captures
+```
 
-One trap the corpus set for the harness, worth passing on. Several of these captures were taken
-with a snaplen — 64, 128, 200 and 400 bytes — and a truncated frame's length can land on
-`52 + 36n` by coincidence. Reading `caplen` without `origlen` therefore produced 3 200 apparent
-grammar failures that were nothing of the kind. The scan compares the two and skips 3 327 846
-truncated records; every remaining frame parses.
+| | captures | whole frames | ok | failed | truncated control blocks | ok | failed | files clean |
+|---|---|---|---|---|---|---|---|---|
+| **baseline**, grammar at 5159f58 | 72 | 214 524 | 214 524 | 0 | 44 400 | 44 400 | 0 | 72 |
+| **after**, this branch | 72 | 214 524 | 214 524 | 0 | 44 400 | 44 400 | 0 | 72 |
+
+Delta in both directions: **no regressions, no improvements, no missing or new files.** Nothing
+the corpus used to parse stopped parsing, and nothing that failed before started passing — there
+was nothing failing to fix.
+
+The checker was sabotage-proven before its clean run was believed, because this project has
+shipped inert gates before:
+
+| sabotage | result |
+|---|---|
+| `--self-test`, every frame corrupted and every control-block window shortened | 214 524 frames and 44 400 blocks ALL rejected — both paths shown capable of failing |
+| end marker `C2 EA` → `C2 EB` | **70 of 72 captures regress**, exit 1 |
+| the DT1 wrapper `00 02 00 fe` → `00 02 00 ff` | **5 captures, 12 frames** regress, exit 1 — precisely the `record_fragment` frames, which proves the new type is really exercised by the corpus |
+| restore | 72 captures clean, exit 0 |
+
+The first version of the self-test did NOT catch the block path: flipping a byte of the type word
+is tolerated by the grammar, since the type switch has no default and the block falls through as
+raw bytes, so 44 400 corrupted blocks reported clean. It now shortens the window instead, and
+requires both paths to fail independently.
+
+Two traps the corpus set, both of which had already produced a wrong answer:
+
+- **A snaplen-truncated record is not a short frame.** Several captures were taken at snaplen
+  64/128/200/400, and a truncated frame's length can land on `52 + 36n` by coincidence, reach the
+  parser and fail the end marker — 3 200 "grammar failures" that were nothing of the kind.
+- **Discarding those records silently is the other half of the same trap.** Seven of the 72
+  captures are truncated in EVERY record, so a whole-frame-only check reads zero frames from them
+  and still calls the corpus clean. A snaplen of 50 or more carries the entire control block, so
+  those records are now parsed as a bare `frame[16:50]` window: seven silent files become live
+  coverage, and 44 400 blocks that were being thrown away join the gate.
+
+Alongside the corpus, `spec/reac_xcheck.py` and `spec/facts_xcheck.py` go from 277 to **328**
+assertions on the checked-in goldens, also sabotage-verified: swapping the FIRST bit for the LAST
+bit reddens four tests, shortening the DT1 checksum span by one byte reddens the reassembly test,
+and changing the ring length from 49 to 50 reddens the derived-fact ratchet. The unit suite and
+the corpus are different bodies of evidence and neither substitutes for the other.
