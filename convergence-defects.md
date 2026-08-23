@@ -17,49 +17,70 @@ holding the file happens to prefer, is how a wrong number becomes a settled one.
 
 ---
 
-## 1. SENS: three live readings of the same byte, spanning 19 dB
+## 1. SENS — RESOLVED 2026-08-23: one dB per step, no twins
 
-**Severity: this reaches an operator.** It is the number a console publishes as preamp gain.
+**Was: three live readings of the same byte, spanning 19 dB.** It is the number a console
+publishes as preamp gain, so it reaches an operator.
 
-A head-amp record's VALUE for `PARAM = 0x02` is a step index, `0x00..0x37`. What that step means
-in dB has three different answers in the tree today, and all three are load-bearing somewhere.
+A head-amp record's VALUE for `PARAM = 0x02` is a step index, `0x00..0x37`. What that step meant
+in dB had three answers in the tree, all load-bearing somewhere:
 
 | where | law | step 0x37 works out at |
 |---|---|---|
 | `spec/reac.ksy`, `head_amp_data.value` | "56 steps of 1 dB", `dB = -10 - value + (pad ? 20 : 0)` | **-65.00 dBu** |
 | `libreac`, `reac_ctrlblk.h` + `SENS_GAIN_CDB[]` | a 56-entry firmware table, breaks at 8 / 24 / 40, per-stage 0.90 / 0.95 / 0.98 dB, total span 48.75 dB | **-58.75 dBu** |
-| `reac-pw` commit `07d1802`, measured on the rig | ~1.235 dB per step, one number rather than a curve as far as that measurement can see | **-77.9 dBu** |
+| `reac-pw` commit `07d1802`, measured on the rig | ~1.235 dB per step, one number rather than a curve | **-77.9 dBu** |
 
-They are not roundings of each other.
+This page named the discriminating experiment and said nobody had run it: a steady electrical
+source swept across all 56 steps, with the breaks at 8 / 24 / 40 probed specifically for the
+duplicate-gain twins libreac predicted — none under a linear law, exactly three under the table.
 
-* The **ksy** states the linear law flatly, in a `doc:` block a third party would reasonably build
-  a client from. `reac-pw`'s `reac_ctrl.h` says the same thing (`1 dB/step`), so two of the three
-  agree — which is exactly the situation where a wrong number looks confirmed.
-* **libreac** refutes linearity with two independent things: a 56-entry table resolved out of the
-  S-1608's own image, reached by both of the firmware's write paths and ending exactly where the
-  `V03.05` version string begins; and a noise-floor measurement on an S-0808 that reproduces to
-  0.03 dB across sessions. Its curve has a structural consequence a linear law cannot express at
-  all: **the map is not injective.** Gain is continuous across the three stage breaks, so steps
-  7/8, 23/24 and 39/40 deliver the same gain and differ only in noise. `reac_headamp_sens_value_cdb()`
-  deliberately returns the quieter twin. A round trip through libreac's law and a round trip
-  through the ksy's law are therefore **different functions**, not two spellings of one.
-* **reac-pw** measured the wire with a real acoustic source, one commanded change at a time, and a
-  return-to-baseline control that landed 0.3 dB from where it started after three L2 cycles. Over
-  the widest span it read 1.235 dB per step — larger than either written law. That commit
-  deliberately did NOT correct the codec, and says why: the conversion runs both ways,
-  `reac_slave.c` derives a virtual preamp gain from it, and openmixer carries `sensDbu` across the
-  wire, so three components agree on today's scale and moving it wants its own change, its own
-  before/after on the rig, and the operator's say-so on whether the published unit moves with it.
+**It has now been run.** S-0808, output 1 cabled to input 1, so the source is an electrical
+loopback of a digital level we generated and therefore know. Phantom and pad commanded off on
+that input and both records confirmed on the wire first, since an output stage was connected to a
+mic input. All 56 steps at three generator levels whose ranges overlap and agree to 0.05 dB where
+they meet.
 
-**Not reconciled here, and deliberately.** `protocol-facts.yaml` therefore carries no SENS curve:
-a schema whose job is to stop drift must not be the place a contested number gets frozen by
-whoever typed the file first. What it does carry is `HEADAMP_SENS_MAX = 0x37`, which all three
-agree on.
+| | measured | flat 1 dB/step | libreac's table |
+|---|---|---|---|
+| span 0x00 -> 0x37 | **54.60 dB** | 55.00 | 48.75 |
+| slope, least squares over 56 steps | **0.988 dB/step**, max residual 0.44 dB | 1.000 | non-uniform |
+| step 7 -> 8 | **+0.92 / +1.12 dB** | 1.00 | 0.00 |
+| step 23 -> 24 | **+1.36 / +1.31 dB** | 1.00 | 0.00 |
+| step 39 -> 40 | **+0.97 / +0.84 dB** | 1.00 | 0.00 |
 
-**What would settle it**, and it is not another microphone: a steady electrical source or a tone
-into the input, swept across all 56 steps, with the stage breaks at 8 / 24 / 40 specifically
-probed for the duplicate-gain twins libreac predicts. A linear law predicts no twins; the table
-predicts three. That is a discriminating experiment, and nobody has run it.
+Each pair was taken as a rapid A/B/A alternation, twice, at two different generator levels, so
+residual drift shows up as a mismatch between the A readings; those controls came out at 0.08 to
+0.34 dB, an order of magnitude under the effect. The generator was also cut and restored (the
+1 kHz component on the measured channel fell to -96.6 dBFS, below its own broadband floor, and
+came back within 0.003 dB), and one step re-read at one-minute intervals repeated to 0.011 dB.
+The pad measured 20.12 and 20.20 dB against a nominal 20, which is the check that this dB axis is
+the box's own. Raw data: reac-pw `docs/measurements/sens-sweep-2026-08-23-*.csv`.
+
+**The linear law wins and libreac was wrong.** The firmware's four coarse stages are real — the
+56-entry table at `0x0c0327a0` is there and its breaks are at 8, 24 and 40 — but *gain being
+continuous across a break* was an inference from that structure, and it is refuted. The map is
+injective; a round trip through it is the identity.
+
+**Why the table's scale came out low**, since the reasoning looked strong: it was scaled by the
+preamp's own NOISE FLOOR. A floor is gain times input-referred noise PLUS whatever the output
+stage and converter add after the gain, and that second term does not scale, so a floor's slope is
+always shallower than the gain's. It reproduces beautifully — 0.03 dB across sessions — and that
+is what made it convincing. It is an excellent probe of repeatability and a biased probe of slope.
+The 6.06 dB floor drop at 23 -> 24 is real and stands: it is a noise-figure step sitting on top of
+an ordinary 1 dB gain step, not instead of one.
+
+**What did NOT get settled, and it should not be quietly assumed.** A loopback measures the SPAN
+exactly, which is what discriminates 48.75 from 55.00, but it cannot separate the absolute dBu of
+either endpoint from the box's own converter reference — it sees only their sum. So `-10 dBu` at
+step 0 is inherited from the three prior readings that already agreed on it, and `-65` is that
+plus the measured span. Pinning either endpoint absolutely needs a calibrated source or the
+S-0808's converter levels from a source other than this loop.
+
+`protocol-facts.yaml` now carries the curve as the `headamp_sens` group — three constants libreac
+exposes and the generated `reac_facts_assert.h` holds it to, and three substrings of the ksy doc
+that `facts_xcheck.py` holds it to. It is no longer a contested number, so the reason it was kept
+out of the schema no longer applies.
 
 ---
 

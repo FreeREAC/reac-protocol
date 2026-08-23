@@ -1196,6 +1196,27 @@ types:
           1 dB, and PAD-RELATIVE: dB = -10 - value + (pad ? 20 : 0), so pad off
           runs -10 dBu at 0x00 down to -65 dBu at 0x37 and pad on shifts the whole
           range +20 dB. The box applies the shift, not the console.
+
+          MEASURED, at last — this doc stated the linear law flatly and a third
+          party would reasonably have built a client from it, but nothing behind
+          it had ever been swept. libreac meanwhile carried a firmware-derived
+          curve spanning 48.75 dB in which three pairs of steps delivered
+          IDENTICAL gain, so the two expressions of this protocol disagreed by
+          6 dB at the top of the travel and by the very shape of the function.
+
+          Settled 2026-08-23 on an S-0808 with output 1 cabled to input 1, so the
+          source is an electrical loopback of a known digital level rather than a
+          microphone: all 56 steps at three overlapping generator levels, span
+          54.60 dB against the 55.00 this law implies, slope 0.988 dB/step, and
+          each of the three predicted duplicate pairs stepping ~1 dB under A/B/A
+          alternation against drift controls ten times smaller. The curve is
+          declared once in protocol-facts.yaml's `headamp_sens` group and this
+          doc is cross-checked against it.
+
+          One caveat a consumer should carry: a loopback measures the SPAN
+          exactly but not the absolute dBu of either endpoint, which needs the
+          box's own converter reference. The -10 at step 0 is inherited, not
+          measured; the -65 is that plus the measured span.
   join_grant_data:
     doc: TAG 0x0100 — the join grant. Observed as 06 00 XX 00 with XX the box's
       join state, climbing 0x01 -> 0x09 over the establishment. The climb was
