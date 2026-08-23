@@ -138,15 +138,16 @@ Named from the firmware in
 read captures and reasoned about what a byte pattern must mean; the correction read the code that
 produces and consumes it.
 
-**What the evidence supports instead.** Every head-amp edit is carried by one standalone op-`0403`
-record; the box is armed by the **complete** per-input scene delivered during establishment. Two
-constraints follow, both observed on real hardware:
+**Two further constraints, both observed on real hardware.** Every head-amp edit is carried by one
+standalone op-`0403` record, and those records write the ACTIVE table — so they must follow the
+commit, never precede it, or the commit erases them. Given correct ordering, two things still decide
+whether an input lights:
 
 - **A channel armed with an all-zero value is never enrolled.** Arming with a real, non-zero value (for
   SENS, a sane default rather than `0x00`) is what makes the box take the channel; an all-zero scene
   leaves it inert. This alone accounted for inputs that never lit.
 - **Addressing must match the box's declared base.** The record's channel number is
-  `MODEL_BASE + (box input − 1)`, and the base is negotiated from the box's own declaration rather than
+  `base + (box input − 1)`, and the base is negotiated from the box's own declaration rather than
   fixed per model — see [`PLACEMENT-EVIDENCE.md`](https://github.com/FreeREAC/reac-pw/blob/main/docs/PLACEMENT-EVIDENCE.md)
   in reac-pw. Addressing a 16-input box from the wrong base pushes its upper half past the firmware's
   channel gate, so those inputs silently ignore every command.
