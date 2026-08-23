@@ -45,11 +45,53 @@ instances:
     doc: |
       The non-audio bytes of any frame — 50 header + 2 end marker. The 52 in
       `52 + n*36`. [EVIDENCED (corpus).]
+  pace_is_the_masters:
+    value: True
+    doc: |
+      The master sets the pace and the slaves follow it unconditionally.
+      There is no
+      per-rate cadence negotiation, no slave-side rate election, and no case
+      in which a box
+      declines a pace. So a frame rate is read off the master's clock, never
+      inferred from
+      a box's model or its declaration.
+      Consequence for our own docs: statements of the form "the upstream
+      cadence at rate R
+      is X" describe what the master chose, not a property the box asserts.
+        [RULED (operator, 2026-08-23). Consistent with the corpus, which
+        shows one pace per
+      segment and no negotiation exchange.
+      ]
+  rate_is_independent_of_model:
+    value: True
+    doc: |
+      A clock rate is NOT a property of a mixer model. Any legal pace may
+      run on any desk,
+      and the two facts must never be derived from one another.
+      This is stated because our corpus makes them look coupled: each desk
+      we own has been
+      run at a single rate, so model and rate are perfectly correlated in
+      the captures. That
+      correlation is an accident of how the rig was used, not a fact about
+      the protocol, and
+      anything reading a per-desk field as a rate class must justify it on
+      its own evidence.
+        [RULED (operator, 2026-08-23) — LAW. Not an inference from the
+        corpus, and it overrides
+      any correlation the corpus appears to show.
+      ]
   bytes_per_channel:
     value: 36
     doc: |
       12 samples x 3 bytes, per channel, at EVERY sample rate. The 36 in `52
-      + n*36`. [EVIDENCED (corpus) — holds across 44.1k, 48k and 96k.]
+      + n*36`. [EVIDENCED (corpus) at 48k and 96k; RATE-INVARIANT BY
+      CONSTRUCTION (12 x 3).
+      44.1k is DERIVED, not observed: measuring pps straight from the pcap
+      timestamps puts
+      NOTHING in the 3675 band, while cleanly separating the 48k and 96k
+      files. The earlier
+      wording claimed corpus evidence across 44.1k and did not have it.
+      ]
   samples_per_pkt:
     value: 12
     doc: |
@@ -543,6 +585,83 @@ instances:
       The identity page — the 6- and 10-byte inventory bodies, and the ASCII
       model name carried across the 0x0401 / 0x0402 fragment pair.
       [EVIDENCED (corpus).]
+  # ---- The identity page (DT1 tag 0x0500) ----
+  identity_addr_lo_bytes:
+    value: 2
+    doc: |
+      `addr_lo`, the low half of the address, opens every 0x0500 record
+      body. The tag carries the high half, so the full DT1 address is four
+      bytes and an emitter that writes only the tag addresses record
+      0x0000 by accident.
+        [EVIDENCED (corpus) — 1005 records, six distinct addr_lo.]
+  identity_addr_bytes:
+    value: 4
+    doc: |
+      The full DT1 address is four bytes — the 2-byte tag plus the 2-byte
+      addr_lo that opens every 0x0500 record body. An emitter that writes
+      only the tag addresses record 0x0000 by accident.
+        [EVIDENCED (corpus + image) — S-1608.BIN carries a 12-byte stride
+        DT1 address table at file 0x53154..0x53994, 176 records of {4-byte
+        address, u32le, u32le byte count}.]
+  identity_addr_firmware_version:
+    value: 0x0000
+    doc: |
+      The system firmware version, 4 bytes, ONE DECIMAL DIGIT PER BYTE,
+      most significant first, displayed by Roland as D.DDD.
+        [EVIDENCED (corpus + vendor package). S-0808 01 00 00 03 = 1.003 vs
+      package s0808_sys_v1003; S-1608 02 02 00 00 = 2.200 vs
+      s1608_sys_ver2200; S-4000S 02 05 00 00 = 2.500 vs s4000_sys_ver2500.
+      S-1608.BIN corroborates itself twice from the inside: boot banner
+      `ECM42 BOOT Ver.2.200` at file 0x200 and the boot-menu version
+      literal `2.200` at 0x9254. Capture
+      captures/m200i-s0808-48k-mirror__m200-BIDIR-coldboot-2026-07-11.pcap
+      frame 3475.
+      ]
+  identity_addr_capability_block:
+    value: 0x0600
+    doc: |
+      8 bytes, constant per model and identical between the two units of
+      each model captured. S-0808 00 00 00 01 00 00 00 00; S-1608
+      00 00 00 02 00 03 00 02; S-4000S 00 00 00 02 00 01 00 02. As four
+      u16be the second field tracks the REAC port count. The rest is
+      UNRESOLVED and is deliberately left as bytes — it is NOT a version in
+      the 0x0000 encoding, since the S-1608's boot version 2.200 would read
+      02 02 00 00 and appears nowhere in it.
+        [EVIDENCED (corpus) — 274 replies, 5 distinct boxes, 3 models.]
+  identity_addr_model_name:
+    value: 0x1000
+    doc: |
+      The model name: 1 byte name_kind (0x01 on every observation) then a
+      FIXED 16-byte NUL-padded ASCII field. 17 bytes of payload do not fit
+      the 36-byte control block, which is the ONLY reason any REAC record
+      is fragmented — this record is the whole population of the 0x0401 /
+      0x0402 pair.
+
+      ONLY THE S-0808 IMPLEMENTS IT. The S-1608 and S-4000S never answer
+      this address, so a console cannot read their model as text and must
+      take it from the firmware version plus the config announce's declared
+      width.
+        [EVIDENCED (corpus + image). 18 fragment pairs in 9 captures, all
+      S-0808, inner checksum closing only across both fragments (data sum
+      358, 0x1a completes it to 0x80 mod 256). The image agrees with the
+      silence: S-1608.BIN's page-0x0500 address table uses
+      third-address-byte 0x00..0x08 only — there is no 0x10 or 0x11 entry.
+      ]
+  identity_name_field_bytes:
+    value: 16
+    doc: |
+      The model-name field is fixed width and NUL-padded — "S-0808" plus ten
+      zeros. A reader that stops at the first NUL is right; one that takes
+      all 16 bytes as the name is wrong. [EVIDENCED (corpus) — 18
+      reassembled records, all identical.]
+  identity_rq1_size_bytes:
+    value: 1
+    doc: |
+      An RQ1 body is addr_lo plus ONE byte, the number of bytes wanted.
+      A reply MAY BE SHORTER than that: the S-0808 is asked for 9 bytes at
+      0x1011 and returns 1. Short is normal, not an error.
+        [EVIDENCED (corpus) — 438 RQ1 records, sizes 4, 8, 17 and 9; 19
+        one-byte replies at 0x1011.]
   # ---- The scene push ----
   scene_bytes:
     value: 8904
@@ -851,6 +970,75 @@ instances:
       records for an S-0808, 48 for an S-1608, 96 for an S-4000S. No desk
       addresses a bank, splits a sweep or repeats one. [EVIDENCED (corpus) —
       31 of 47 captures, three desk generations agreeing on the same box.]
+  headamp_base_from_config_byte7:
+    value: True
+    doc: |
+      A box's head-amp CH base is its OWN property, announced, never
+      granted. The config
+      announce `01 03 00 10` carries it at buf[7], and the master addresses
+      the box at
+      base = buf[7] * 0x10. An 8-input and a 32-input box are BOTH addressed
+      at 0x00, which
+      is what rules out an allocation: nothing in the box consumes a granted
+      base.
+        [RESOLVED (firmware + corpus) — S-1608.BIN (SH-4 LE, base
+        0x0BFE0000): FUN_0c003c8a at
+      0x0c003c8a sets buf[7] = FUN_0c00f6a8() = *0x0c080918. Corroborated on
+      29 captures in
+      reac-captures/analysis/placement_table.csv (S-0808 0x00->0x00, S-1608
+      0x02->0x20,
+      S-4000S 0x00->0x00) across M-200i, M-300 and M-5000.
+      ]
+  headamp_base_multiplier:
+    value: 0x10
+    doc: |
+      base = config-announce buf[7] * 0x10. Sixteen head-amp rows per strap
+      step, which is
+      two 8-slot groups — the same unit the box applies in.
+      Exercised at exactly two points (0 and 2): firmware-grade for the
+      S-1608, corpus-grade
+      for the others.
+        [RESOLVED (firmware + corpus) — same provenance as
+        HEADAMP_BASE_FROM_CONFIG_BYTE7.
+      ]
+  headamp_base_is_chassis_not_grant:
+    value: True
+    doc: |
+      A master cannot move where a head-amp write lands by granting
+      differently. The box's
+      fabric-row-to-preamp map is the group number FUN_0c012162 returns, and
+      every input to
+      it is a GPIO strap or a fitted-board inventory. Retires reac-pw's
+      docs/PLACEMENT-EVIDENCE.md five-run rig experiment: declared width was
+      collinear with
+      the base only because a 16-in chassis always straps 2.
+        [RESOLVED (firmware) — S-1608.BIN: FUN_0c0081f6 at 0x0c0081f6 reads
+        *0x0c080918 and
+      applies FUN_0c007fbc(bank, FUN_0c012162(k)); FUN_0c007fbc at
+      0x0c007fbc indexes the
+      head-amp table at 0x0c0cf85a by group*8 + i; the config record is
+      built by FUN_0c0123c0
+      (0x0c0123c0), called only from FUN_0c0052d4 (0x0c0052d4) with
+      constants, and the group
+      table at +0x78 has exactly three writers — FUN_0c0119ac, FUN_0c011bbc,
+      FUN_0c011e2c —
+      none of which reads a frame.
+      ]
+  headamp_apply_unit_slots:
+    value: 8
+    doc: |
+      The box applies head-amp in groups of eight fabric rows, one 8-port
+      board at a time,
+      passing the within-group index 0..7 to the preamp. Anything reasoning
+      about head-amp
+      reach reasons in groups of 8 from the box's base, never per channel —
+      note this is the
+      APPLY unit and is a different axis from actuation, which is per
+      channel.
+        [RESOLVED (firmware) — S-1608.BIN: FUN_0c007fbc at 0x0c007fbc, slot
+        = group << 3, eight
+      iterations.
+      ]
   # ---- The SENS step -> sensitivity curve ----
   headamp_sens_ref_cdb:
     value: -1000

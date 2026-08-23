@@ -1458,6 +1458,148 @@ types:
         pos: 0
         type: u1
         doc: block[4]. 0x00 a DT1 record, 0x02 the box's upstream return block.
+  identity_data:
+    doc: |
+      TAG 0x0500 — the IDENTITY PAGE. This is where a box says what model it is
+      and what firmware it runs, and it is the record a console needs to put a
+      box in a menu.
+
+      # It is an ADDRESSED page, not a fixed struct
+
+      Every other tag on this container carries a fixed record shape. 0x0500
+      does not. The tag is only the HIGH HALF of a Roland 4-byte DT1 address;
+      `addr_lo` carries the low half, and the payload is whatever lives at that
+      address. So one tag covers six distinct records, and a consumer that
+      reads 0x0500 as one struct gets five of them wrong.
+
+      The exchange is a poll, at ESTABLISHMENT, and both halves are here:
+
+        RQ1 (command 0x11), console -> broadcast
+            addr_lo + ONE byte, the number of bytes wanted.
+        DT1 (command 0x12), box -> console
+            addr_lo + that many bytes of payload.
+
+      WORKED EXCHANGE — m200-BIDIR-coldboot-2026-07-11, frames 3466..3479, at
+      +96.985 s, one burst, immediately before the head-amp flood:
+
+        3466  console  RQ1  05 00 00 00  size 04
+        3467  console  RQ1  05 00 06 00  size 08
+        3468  console  RQ1  05 00 10 00  size 11   (17)
+        3469  console  RQ1  05 00 10 11  size 09
+        3470  console  RQ1  05 00 11 00  size 11   (17)
+        3471  console  RQ1  05 00 11 11  size 09
+        3475  S-0808   DT1  05 00 00 00  01 00 00 03
+        3476  S-0808   DT1  05 00 06 00  00 00 00 01 00 00 00 00
+        3477  S-0808   DT1  05 00 10 00  01 "S-0808" + zero fill   (fragmented)
+        3478                              ... its LAST fragment
+        3479  S-0808   DT1  05 00 10 11  08
+
+      Two things follow that a consumer must not treat as errors. **A box answers
+      only the addresses it implements** — the S-1608 and the S-4000S answer
+      0x0000 and 0x0600 and nothing else, and nothing in the corpus has ever
+      answered 0x1100 or 0x1111. And **a reply may be SHORTER than the size
+      asked for**: the S-0808 is asked for 9 bytes at 0x1011 and returns 1.
+
+      FIRMWARE CORROBORATION for the address set. S-1608.BIN carries a
+      12-byte-stride DT1 address table at file 0x53154..0x53994 (176 records:
+      4-byte address, u32le, u32le byte count). Its 83 page-0x0500 entries use
+      third-address-byte values 0x00..0x08 ONLY — there is no 0x10 or 0x11 —
+      which is exactly why the S-1608 stays silent on the two name addresses the
+      console polls. The image and the wire agree without being asked to.
+
+      # addr_lo 0x0000 — the firmware version, one DECIMAL DIGIT per byte
+
+      RESOLVED, and resolved against Roland's own release packages rather than
+      against ourselves:
+
+        S-0808   01 00 00 03  -> 1.003   package `s0808_sys_v1003`
+        S-1608   02 02 00 00  -> 2.200   package `s1608_sys_ver2200`
+        S-4000S  02 05 00 00  -> 2.500   package `s4000_sys_ver2500`
+
+      Three models, three independent matches, four digits each. The S-1608
+      image corroborates itself twice more from the inside: the boot banner at
+      file 0x200 reads `ECM42 BOOT Ver.2.200`, and the boot menu's version
+      literal at 0x9254 is the ASCII `2.200`.
+
+      **So the boxes in the corpus run the firmware images this project holds.**
+      That was worth ruling out: had a captured box reported a version the image
+      does not carry, every firmware-derived fact in this repo would have needed
+      a version stated beside it. It does not.
+
+      # addr_lo 0x1000 / 0x1100 — the model name
+
+      `name_kind` (1 byte, 0x01 on every observation) then a FIXED 16-byte
+      NUL-padded ASCII field. 17 bytes, so the record does not fit one control
+      block and arrives split — see `record_fragment`, which is the only place
+      this payload is ever seen.
+
+      0x1000 and 0x1100 are two SLOTS, polled as a pair with their 0x0011
+      continuations; only the 0x10 slot has ever answered. What the second slot
+      is for is UNRESOLVED.
+
+      **Only the S-0808 implements a name at all.** The S-1608 and S-4000S never
+      answer 0x1000, in any capture, so a console cannot read their model as
+      text — it has to take the model from the version plus the config
+      announce's declared width. That is a real limit of this page, not a gap in
+      the corpus.
+
+      # addr_lo 0x0600 — eight bytes, per-model constant, UNRESOLVED
+
+      Stable per model and identical across the two units of each model we have
+      captured:
+
+        S-0808   00 00 00 01 00 00 00 00
+        S-1608   00 00 00 02 00 03 00 02
+        S-4000S  00 00 00 02 00 01 00 02
+
+      Read as four u16be the fields are (0,1,0,0), (0,2,3,2) and (0,2,1,2). The
+      second field tracks the REAC port count (S-0808 one, the others two) and
+      the rest is unexplained. It is NOT a version in the 0x0000 encoding: the
+      S-1608's boot version is 2.200, which would be `02 02 00 00`, and that
+      appears nowhere here. The box's own boot menu names four versions — Main,
+      Boot, FPGA and REAC, string table at S-1608.BIN 0x9e32..0x9eaa — so a
+      further version living here is PLAUSIBLE and unproven. Left as bytes on
+      purpose.
+
+      # The negative that matters
+
+      The two S-1608s in the corpus (`0040abc48041`, `0040abc4803b`) report
+      BYTE-IDENTICAL identity pages, and so do the two S-4000Ss
+      (`0040abc40680`, `0040abc408bc`). So a per-box protocol dialect does NOT
+      explain the divergent bank behaviour seen between two S-1608s: on this
+      page they are the same box running the same firmware.
+    seq:
+      - id: addr_lo
+        type: u2be
+        enum: identity_addr
+        doc: |
+          The LOW two bytes of the Roland DT1 address. The full address is
+          `tag << 16 | addr_lo`, so 0x0500 plus this selects the record.
+      - id: payload
+        size-eos: true
+        doc: |
+          On an RQ1 this is a single byte, the requested length — read
+          `request_size`. On a DT1 it is the record's contents, and it may be
+          shorter than the RQ1 that asked for it.
+    instances:
+      is_request:
+        value: _parent.command == dt_command::rq1_request
+      is_reply:
+        value: _parent.command == dt_command::dt1_set
+      request_size:
+        value: payload[0]
+        if: is_request
+        doc: Bytes the console wants from this address. 4, 8, 17 or 9.
+      firmware_version:
+        value: >-
+          payload[0] * 1000 + payload[1] * 100 + payload[2] * 10 + payload[3]
+        if: is_reply and addr_lo == identity_addr::firmware_version and
+          payload.size >= 4
+        doc: |
+          The four payload bytes are four DECIMAL DIGITS, most significant
+          first, and Roland writes the result as D.DDD. 1003 is the S-0808's
+          1.003; 2200 the S-1608's 2.200; 2500 the S-4000S's 2.500. Each is the
+          version of the release package the image came from.
   record_fragment:
     doc: |
       op 0x0401 and op 0x0402 — link 4 with the segment field reading FIRST and
@@ -1474,7 +1616,7 @@ types:
       valid Roland SysEx:
 
         0x0401 body (0x16 = 22 bytes)
-          f0 41 0a 00 00 12  12  01 05 00  10 00 01 53 2d 30 38 30 38 00 00 00 00
+          f0 41 0a 00 00 12  12  05 00  10 00  01  53 2d 30 38 30 38  00 00 00 00
         0x0402 body (0x08 =  8 bytes)
           00 00 00 00 00 00  1a  f7
 
@@ -1483,11 +1625,18 @@ types:
         00 00 12        model id
         12              DT1, a write
         05 00           TAG 0x0500 — the identity page
-        10 00 01        the record's first three data bytes
+        10 00           addr_lo — the model-name record
+        01              name_kind
         53 2d 30 38 30 38   ASCII "S-0808"
-        00 x 13         the rest of a fixed-width name field
+        00 x 10         the rest of the fixed 16-byte name field
+                        (4 zeros in the FIRST fragment, 6 in the LAST)
         1a              inner checksum
         f7              SysEx end
+
+      The payload after `addr_lo` is 17 bytes — `name_kind` plus the 16-byte
+      name — which is exactly the size the console's RQ1 for this address asks
+      for. That is why this record and only this record is split: 17 bytes of
+      payload do not fit the 36-byte control block. See `identity_data`.
 
       The Roland rule is Sum(TAG..CKSUM) mod 128 == 0. The data sums to 358,
       358 mod 128 = 102, and 128 - 102 = 26 = 0x1a — the byte that arrives in
@@ -1612,6 +1761,7 @@ types:
           cases:
             'reg_page::head_amp': head_amp_data
             'reg_page::join_grant': join_grant_data
+            'reg_page::identity': identity_data
       - id: inner_checksum
         type: u1
         doc: Roland DT1 rule - Sum(tag .. inner_checksum) mod 256 == 0x80.
@@ -1626,7 +1776,10 @@ types:
         doc: TAG(2) + data + inner checksum(1).
       data_len:
         value: _parent._parent.rec_len - 0x10
-        doc: 3 for head-amp, 4 for the join grant, 6 or 10 for identity.
+        doc: |
+          3 for head-amp, 4 for the join grant. On identity it is addr_lo(2)
+          plus the payload: 3 on an RQ1 or a one-byte reply, 6 for the
+          firmware version, 10 for the capability block.
   head_amp_data:
     doc: |
       TAG 0x0101 — the console's preamp command, and the ONLY three things a box
@@ -1846,6 +1999,17 @@ enums:
   dt_command:
     0x11: rq1_request
     0x12: dt1_set
+  # identity_addr — the low half of the four-byte DT1 address on page 0x0500.
+  # Named from what each record was MEASURED to carry. `model_name_slot_b` and
+  # the two `_ext` rows have never been answered by any box in the corpus and
+  # are named from the console's poll alone. See type `identity_data`.
+  identity_addr:
+    0x0000: firmware_version
+    0x0600: capability_block
+    0x1000: model_name
+    0x1011: model_name_ext
+    0x1100: model_name_slot_b
+    0x1111: model_name_slot_b_ext
   reg_page:
     0x0000: head_mark
     0x0100: join_grant
