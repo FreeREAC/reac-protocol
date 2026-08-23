@@ -396,20 +396,70 @@ types:
       - id: op
         type: u2
         enum: control_op
+        doc: |
+          The two bytes the wire has always been read as one 16-bit "op". The
+          stagebox firmware builds them as TWO INDEPENDENT FIELDS, and reading
+          them that way collapses seven ops into two:
+
+            block[0]  LINK SELECTOR   see `link`
+            block[1]  SEGMENT FLAGS   bit 0 = FIRST, bit 1 = LAST; see `seg`
+
+          EVIDENCED (image), S-1608 `FUN_0c003398` @0c003398 — the box's own
+          segmented upload, read line by line:
+
+            *buf   = 1                      the link
+            buf[4] = 0                      the opcode
+            BE16(buf+5) = total             only on the first frame
+            if (total < 0x19) buf[1] = 3    it all fits: FIRST|LAST
+            else              buf[1] = 1    FIRST, chunk 0x18
+            ...
+            if (remaining < 0x1b) buf[1] = 2   LAST, chunk = remaining
+            else                  buf[1] = 0   MIDDLE, chunk 0x1a
+
+          So 0x0101 / 0x0100 / 0x0102 / 0x0103 are not four ops. They are ONE
+          transfer on link 1 with the segment field reading FIRST / MIDDLE /
+          LAST / SINGLE, and 0x0401 / 0x0402 / 0x0403 are the same three states
+          on link 4. The receive side agrees: the box's state-2 gate is
+          `buf[0]==1 && (buf[1] & 1) && buf[4]==0` — the FIRST bit — and its
+          state-3 gate is `buf[1] in {0, 2}` — MIDDLE or LAST
+          (`FUN_0c003aae` @0c003aae, `FUN_0c003b88` @0c003b88).
+
+          `op` is kept as the 16-bit field because that is what every capture,
+          every tool and libreac index on; `link`, `seg` and `opcode` below are
+          the same bytes named as the firmware names them.
       - id: op_len
         type: u2
         doc: |
-          Big-endian, and op-specific in meaning — a length for the DT1 container
-          (record_len = op_len - 0x0d), the CHUNK LENGTH for the three scene ops
-          (0x0018 header / 0x001a chunk / 0x000e final), a SUB-PAGE SELECTOR for
-          op 0x0103, and a fixed constant for the rest. It is not a generic frame
-          length.
+          Big-endian, and it is a LENGTH in every case — never a selector. What
+          varies is the BASE it counts from, and that is a real protocol fact
+          rather than an inconsistency in the reading.
 
-          EVIDENCED (image): the master writes it with a big-endian 16-bit store
-          from the same variable it passes to the memcpy that fills the payload,
-          and the box reads it back as the memcpy length. Our earlier reading of
-          0x001a as "a fixed constant of the probe" was a coincidence of the
-          scene's chunk size.
+            link 1, opcode 0 (bulk transfer)   THIS FRAME'S payload bytes only,
+                                               which start at block[7] on a FIRST
+                                               frame and block[5] on any other
+            link 1, any other opcode           from block[4] INCLUSIVE
+            link 4 (the record link)           from block[4] INCLUSIVE
+
+          Every observed value checks out arithmetically against that rule:
+
+            0x0019 = 25 = 1 opcode + 8 x 3-byte chanmap records
+            0x0010 = 16 = opcode + block[5] + block[6] + block[7] + 12 cells
+            0x000d = 13 = opcode + block[5] + block[6] + 10 group bytes
+            0x0001 =  1 = the opcode alone, an empty body
+            0x0018 = 24 = the first scene chunk        (0x1f - 7)
+            0x001a = 26 = a middle scene chunk         (0x1f - 5)
+            0x000e = 14 = the last one, 8880 mod 26
+            0x0013 = 19 = block[4]..block[22], ending exactly on the SysEx 0xF7
+            0x001b = 27 = block[4]..block[30], a record that does NOT fit
+
+          EVIDENCED (image): the two 0x18 / 0x1a caps are `0x1f - 7` and
+          `0x1f - 5` — the builders reserve block[31] for the checksum
+          (`FUN_0c003398` @0c003398, `FUN_0c007646` @0c007646).
+
+          This supersedes the earlier reading of 0x0103's op_len as "a SUB-PAGE
+          SELECTOR". Each sub-page does have a distinct length, so switching on
+          it happens to work, but the discriminator is `opcode` at block[4] and
+          the length is a consequence of the body it introduces.
       - id: payload
         size: 28
         type:
@@ -421,14 +471,60 @@ types:
             'control_op::page_0103': page_0103
             'control_op::dt1_container': container_0403
             'control_op::announce': cfea_payload
-        doc: Unmodelled ops (the ASCII name frame 0x0401, the extra cold-connect
-          0x0402) fall through as raw bytes on purpose — their interiors are not
-          decoded to a level worth pinning.
+            'control_op::dt1_first_fragment': record_fragment
+            'control_op::dt1_last_fragment': record_fragment
+        doc: |
+          The three link-4 ops share one payload shape. 0x0403 is a record that
+          fits in one frame; 0x0401 and 0x0402 are the FIRST and LAST fragments
+          of a record that does not — see `record_fragment`.
     instances:
       block_checksum:
         pos: 31
         type: u1
         doc: Sum(this 32-byte block) mod 256 == 0.
+      link:
+        pos: 0
+        type: u1
+        enum: reac_link
+        doc: |
+          block[0]. Which logical link inside the REAC control plane the frame
+          belongs to. EVIDENCED (image): every builder in both box images writes
+          this byte as a literal before anything else — `*buf = 1` in
+          `FUN_0c003398` @0c003398 and `FUN_0c002c70` @0c002c70 (S-1608),
+          `*buf = 2` in `FUN_0c0128b8` @0c0128b8 (S-4000S only).
+      seg:
+        pos: 1
+        type: u1
+        doc: block[1]. Two flag bits; read `seg_kind`.
+      seg_is_first:
+        value: '(seg & 1) != 0'
+        doc: bit 0. The frame opens a transfer and carries its declared total.
+      seg_is_last:
+        value: '(seg & 2) != 0'
+        doc: bit 1. The frame closes a transfer.
+      seg_kind:
+        value: 'seg & 3'
+        enum: seg_state
+        doc: |
+          The two bits together. 3 (both set) is a complete message in one
+          frame, which is what every chanmap, heartbeat, declaration and
+          single-frame record is.
+      opcode:
+        pos: 4
+        type: u1
+        doc: |
+          block[4]. THE OPCODE — on link 1, the field that says what the message
+          is; see `link1_opcode`. The grammar reaches it a second time as
+          `page_0103.subtype`, because for a long time it was read as a reserved
+          byte on a scene frame and as a subtype selector on an 0x0103.
+
+          On link 4 this byte is 0x00 on every frame in the corpus and is the
+          first byte of the record wrapper `00 02 00 fe`.
+      opcode_link1:
+        value: opcode
+        enum: link1_opcode
+        doc: The same byte with the link-1 opcode names attached. Meaningless
+          when `link` is not `control`.
   cfea_payload:
     doc: |
       The cf ea master announce (op 0xffff, op_len 0x0100). Advertises the
@@ -1069,6 +1165,70 @@ types:
         pos: 0
         type: u1
         doc: block[4]. 0x00 a DT1 record, 0x02 the box's upstream return block.
+  record_fragment:
+    doc: |
+      op 0x0401 and op 0x0402 — link 4 with the segment field reading FIRST and
+      LAST. They were carried for a long time as two separate undecoded ops, "the
+      ASCII model-name frame" and "the extra cold-connect frame some models
+      send". They are ONE Roland DT1 record, split across two frames, and the
+      split is the ordinary link-4 segmentation.
+
+      # The proof, which is arithmetic and needs no firmware to check
+
+      Both frames have the link-4 shape: the wrapper `00 02 00 fe` at block[4:8],
+      a length echo at block[8], and exactly that many bytes after it. Take the
+      two fragment bodies in FIRST-then-LAST order and the result is a complete,
+      valid Roland SysEx:
+
+        0x0401 body (0x16 = 22 bytes)
+          f0 41 0a 00 00 12  12  01 05 00  10 00 01 53 2d 30 38 30 38 00 00 00 00
+        0x0402 body (0x08 =  8 bytes)
+          00 00 00 00 00 00  1a  f7
+
+        F0 41           SysEx start, Roland
+        0a              device id
+        00 00 12        model id
+        12              DT1, a write
+        05 00           TAG 0x0500 — the identity page
+        10 00 01        the record's first three data bytes
+        53 2d 30 38 30 38   ASCII "S-0808"
+        00 x 13         the rest of a fixed-width name field
+        1a              inner checksum
+        f7              SysEx end
+
+      The Roland rule is Sum(TAG..CKSUM) mod 128 == 0. The data sums to 358,
+      358 mod 128 = 102, and 128 - 102 = 26 = 0x1a — the byte that arrives in
+      the SECOND fragment. A checksum that closes only across both frames is not
+      a coincidence; it is what proves the two are one record.
+
+      # What that changes
+
+      The name frame is not "a frame that happens to hold ASCII". It is a TAG
+      0x0500 identity record, the same tag the single-frame 0x0403 identity
+      frames carry at op_len 0x0016 and 0x001a, and it is longer than 26 bytes
+      of body, which is the only reason it is split at all.
+
+      A consumer must therefore reassemble link 4 the same way it reassembles
+      link 1, and a consumer that reads 0x0401 alone gets a SysEx with no
+      terminator and no checksum — which is exactly how it has been described
+      until now.
+
+      CORROBORATED: 18 frames of each op, in 9 captures, always as a pair, and
+      only from the S-0808 family. FIRMWARE: the segmentation rule is
+      `FUN_0c003398` @0c003398 (S-1608); no link-4 reassembler has been located
+      in either box image, so the box's own handling of a split record is
+      UNRESOLVED.
+    seq:
+      - id: wrapper
+        contents: [0x00, 0x02, 0x00, 0xfe]
+      - id: len_echo
+        type: u1
+        doc: Bytes of record following, and always op_len - 5.
+      - id: fragment
+        size: len_echo
+        doc: This frame's slice of the record. Concatenate FIRST then LAST.
+      - id: padding
+        size-eos: true
   box_return_block:
     doc: |
       op 0x0403 subtype 0x02 — a CONSTANT block the box repeats on its upstream
@@ -1300,13 +1460,31 @@ enums:
     0x0000: filler
     0xcdea: control
     0xcfea: announce
+  reac_link:
+    1: control
+    2: aux_s4000s
+    4: record
+    255: announce_link
+  seg_state:
+    0: middle
+    1: first
+    2: last
+    3: single
+  link1_opcode:
+    0x00: bulk_transfer
+    0x01: chanmap
+    0x10: group_map
+    0x80: declaration_80
+    0x81: heartbeat_reply
+    0x82: declaration_82
+    0x84: declaration_84
   control_op:
     0x0100: scene_chunk
     0x0101: scene_header
     0x0102: scene_final
     0x0103: page_0103
-    0x0401: name_frame
-    0x0402: extra_cold_connect
+    0x0401: dt1_first_fragment
+    0x0402: dt1_last_fragment
     0x0403: dt1_container
     0xffff: announce
   page_kind:
