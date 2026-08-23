@@ -1344,8 +1344,12 @@ groups:
       # The binding is also a CORRECTNESS fix, not bookkeeping. RULED by the operator
       # 2026-08-23: "it must come from the announce on the wire." libreac's
       # `reac_headamp_base(int in_ch)` (src/reac_ports.c:31) derives the base from the box's
-      # INPUT COUNT — a second declaration of a fact the box itself states — and a caller with
-      # no announce must answer NOT KNOWN rather than return a width-derived guess. The width
+      # INPUT COUNT — a second declaration of a fact the box itself states — and it is DELETED
+      # rather than replaced: the base is a REQUIRED property of an established box, set from
+      # the announce when it is parsed. A box that has not announced does not follow the grammar
+      # and is not operative, so "no announce" is not a box in an incomplete state, it is the
+      # absence of a box. Modelling it as a nullable base would put a branch in every caller
+      # that can never be taken. The width
       # reading agrees with the announce on every box we own only because a 16-input chassis
       # always straps 2, so it is wrong in the one way nothing downstream can detect, which is
       # how it survived. A model that breaks that collinearity breaks it, and that is precisely
