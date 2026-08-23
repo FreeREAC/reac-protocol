@@ -328,7 +328,9 @@ hardware we do not have), the slot categories above `0x2f`, and the `0x80` repor
 - The 96 kHz frame model `{96000, 40, 12}` at 8000 pps. Channel-halving is refuted.
 - The scene body's three validated tags, and that they are a gate rather than a description.
 - That head-amp records must follow the commit, never precede it.
-- The three head-amp granularities: SENS and flags per channel, phantom per four, readback
-  per eight.
+- The head-amp granularities: SENS, flags AND phantom all per channel; the per-eight axis is
+  refresh banking, not actuation. "Phantom per four" was carried here as settled and was
+  wrong — it fell to `phantom-test.pcap` and the corpus on 2026-08-23. A settled entry can be
+  the mistake; this list is not self-verifying.
 - The scene chunk is not a probe. The "period-10 rotation with a phase step of +6" was a
   26-byte window over a 10-byte record stride.
