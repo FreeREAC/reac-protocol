@@ -195,11 +195,14 @@ The downstream frame is **rate-invariant** — always 40 ch × 12 samples × 3 B
 of audio. The sample rate is carried entirely in the **packet rate**, never in the
 frame: `pps = rate / 12`, 12 samples per frame.
 
-| rate | pps (downstream) | slot period | audio bandwidth | status |
+| rate | pps (downstream) | slot period | on the wire | status |
 |---|---|---|---|---|
 | 44.1 kHz | 3675 | 272.1 µs | 44.6 Mbit/s | [?] not yet exercised on our rig |
 | 48 kHz | 4000 | 250.0 µs | 48.5 Mbit/s | [V] measured ~4000 pps |
 | 96 kHz | 8000 | 125.0 µs | 97.0 Mbit/s | [V] settled — double-pps |
+
+The bandwidth column is the whole Ethernet slot, `pps × (1492 + 24) × 8` — see the link
+budget at the end. The audio payload alone is 40 ch × 24 bit × rate: 46.1 Mbit/s at 48 kHz.
 
 What changes with rate is **only the packet rate** — and therefore the inter-frame
 interval (the *slot period*, `1e9 / pps` ns). The frame layout, channel count (40),
