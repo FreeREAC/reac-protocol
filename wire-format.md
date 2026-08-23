@@ -444,21 +444,35 @@ TAG contributes a constant `0x02` — but that shortcut is a special case, not t
 > correct **outer** sum wrapped around a **garbage inner** one, and the box rejects a frame that looks
 > perfect on the wire. Set the Roland DT1 (inner) checksum **first**, then the REAC block (outer) one.
 
-### CH carries a PER-MODEL BASE [V]
+### CH carries a BASE keyed on the box's DECLARED WIDTH [V]
 
 ```
-CH = model_base + (channel - 1)
+CH = base + (box_input - 1)
 
-S-0808  (8ch)  base  0  ->  0x00..0x07
-S-1608 (16ch)  base 32  ->  0x20..0x2f     <- not 0x00..0x0f
-S-4000 (32ch)  base  0  ->  0x00..0x1f
+ 8 inputs  (S-0808)   base  0  ->  0x00..0x07
+16 inputs  (S-1608)   base 32  ->  0x20..0x2f     <- not 0x00..0x0f
+32 inputs  (S-4000S)  base  0  ->  0x00..0x1f
 ```
+
+**No byte on the wire carries this.** It is negotiated session state: the box declares its
+width in the cold-connect escalation and the master picks the base. So a parser cannot read
+it out of a frame, and `spec/reac.ksy` deliberately does not encode it — it parses the
+carriers as typed fields and stops there. libreac's `reac_headamp_base()` returns the
+measured table above and **refuses any width it has not seen**, which is the same refusal
+from the other side. Neither may guess.
+
+**[?] What keys it is not fully separated.** A 42-establishment study across three consoles
+and four units killed every testable candidate law and left three carriers — declared width,
+the config-announce selector, and `unit_offset` — perfectly collinear on every row. Width is
+the one named here because the software-stagebox result below isolates it from *identity*;
+it does not isolate it from the other two. A box declaring a width whose selector or
+`unit_offset` breaks the collinearity is what would settle it.
 
 **Anchored on hardware, prediction-first:** with an S-1608 alone on the segment, all three params
 were exercised on **ch1**; `CH=0x20` was predicted before the test and **all 26 operator edges landed
 on `0x20` and nothing else**. So `0x20` *is* ch1, not merely the bottom of an occupied range.
 
-The base is **intrinsic to the model**, established three ways:
+The value is **stable per width**, established three ways:
 
 1. **Two different physical S-1608 units** base at 32 and emit byte-identical TAG `05 00` records.
 2. **Three different consoles** (M-200 / M-300 / M-5000) address the S-1608 at 32.
