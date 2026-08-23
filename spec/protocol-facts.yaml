@@ -811,19 +811,51 @@ groups:
         evidence: EVIDENCED (image + corpus).
 
   - id: head_amp
-    title: Head-amp — the record, and its three granularities
+    title: Head-amp — the record, its wire encoding and its actuation
     doc: |
       A head-amp record is a Roland DT1 inside op-0403: TAG 0x0101, then
       {CH, PARAM, VALUE}. Two things about it are routinely got wrong.
 
-      IT IS THREE GRANULARITIES UNDER ONE NAME. SENS and the flag bits are PER
-      CHANNEL. Phantom is PER GROUP OF FOUR (ch >> 2). The readback nibble is
-      PER EIGHT (ch >> 3). So only a record whose channel is a multiple of four
-      carries the phantom group byte — a record to 0x24 moves group 9, one to
-      0x27 moves nothing — and sweeping phantom per channel writes three records
-      in four into the void. The readback nibble and the phantom command do not
-      address the same thing and must stay named apart in any API generated from
-      this.
+      TWO AXES, NOT THREE GRANULARITIES. This group used to say "three
+      granularities under one name" and list per-channel, per-four and
+      per-eight side by side. Those are not three points on one scale: two of
+      them are WIRE ENCODING (which record carries a field) and one is HARDWARE
+      ACTUATION (how many channels one write switches). Reading them as one
+      list makes a consumer wrong about whichever it picks.
+
+      AXIS 1 — WIRE ENCODING, what a record carries.
+
+        DT1 head-amp record {CH, PARAM, VALUE}, op-0403 TAG 0x0101
+          PARAM 0x00 phantom, 0x01 pad, 0x02 sens — one channel per record,
+          all three. NO per-four gate exists on this path anywhere in the
+          image; see the DISPUTED note on HEADAMP_GRAN_PHANTOM_SHIFT.
+
+        SLOT MAP record {slot, cell+flags, sens}, op-0103 subtype 0x01
+          FUN_0c002d42 writes the sens byte and the three flag bits (bits 3,
+          2, 1) for EVERY slot, unconditionally. Only the HIGH NIBBLE is
+          per-four: the `(slot & 3) == 0` branch hands `flags >> 4` to
+          FUN_0c00f9aa and FUN_0c004164, the two 12-entry INVENTORY arrays.
+          So the per-four field in this record format is the INVENTORY CELL,
+          not a head-amp parameter.
+
+      AXIS 2 — HARDWARE ACTUATION, what one write switches. PER CHANNEL, for
+      all three parameters. FUN_0c007fbc(bank, group) takes group 0..9, sets
+      its cursor to `group << 3`, and loops EIGHT times; inside the loop, each
+      iteration passes its own within-bank index (0..7) and that slot's own
+      value to FUN_0c00ac1e (phantom), FUN_0c00ac96 (pad) and FUN_0c007e6a ->
+      FUN_0c007e30 (sens). Each channel gets its own value and its own write.
+
+      SO THE EIGHT IS A BANK, NOT AN ACTUATOR. The writers take (bank, 0..7),
+      which is two banks of eight = the S-1608's sixteen analog inputs, and
+      `group` selects which eight-slot window of the 80-slot active table feeds
+      them. Eight is the preamp hardware's bank width and the refresh loop's
+      batch size. Nothing is switched eight channels at a time.
+
+      A NOTE ON A CORRECTION MADE TO THIS FILE'S OWN CORRECTION: the firmware
+      lane's first report said phantom "reaches hardware in groups of EIGHT".
+      That read the loop bound as the actuator width and is wrong in the same
+      shape as the per-four claim it was correcting. The loop is eight long;
+      the write inside it is one channel wide.
 
       A RECORD WRITES THE ACTIVE TABLE, AND THE COMMIT OVERWRITES IT. There is
       no head-amp staging table. So records must FOLLOW the commit, never
@@ -882,13 +914,71 @@ groups:
         evidence: EVIDENCED (executed trace).
       - name: HEADAMP_GRAN_PHANTOM_SHIFT
         value: 2
-        why: Phantom is per group of FOUR — ch >> 2.
-        evidence: EVIDENCED (executed trace).
+        why: |
+          DISPUTED 2026-08-23, VALUE UNCHANGED PENDING ONE EXPERIMENT. Read as
+          "phantom is per group of FOUR — ch >> 2", and a consumer that trusts
+          it sweeps phantom on multiples of four only.
+
+          THE IMAGE DOES NOT CONTAIN THIS GATE. There is exactly one
+          channel-indexed `(x & 3) == 0` test in S-1608.BIN — FUN_0c002d42, the
+          SLOT-MAP ingest — and what it gates is `flags >> 4`, the inventory
+          cell nibble, handed to the 12-entry inventory arrays at 0x0c0f62fa
+          and 0x0c0cf80e. It does not gate a head-amp parameter, and it is not
+          on the DT1 path at all. Every other `& 3` in the image is pointer
+          alignment. Meanwhile the hardware write is per channel (see
+          HEADAMP_ACTUATION_SHIFT), so there is no per-four actuator for a
+          per-four record to feed.
+
+          The most likely history is that this number and the state diagram's
+          retracted "phantom packed 4 ch/group, group = slot >> 2" are the same
+          misreading of FUN_0c002d42, and that "a record to 0x24 moves group 9"
+          describes the inventory cell moving, not phantom.
+
+          NOT CHANGED HERE, because the grade below is an executed trace and a
+          static read must not silently overwrite an observation. THE
+          DISCRIMINATING EXPERIMENT, which needs no rig: send DT1 phantom
+          records to channels 0x24 and 0x25 in turn and read the box's own
+          re-broadcast back. If 0x25 moves, this row is 0 and phantom is per
+          channel on the wire too.
+        evidence: DISPUTED — EVIDENCED (executed trace) against EVIDENCED
+          (image, S-1608 FUN_0c002d42 + FUN_0c007fbc). Unresolved.
+      - name: HEADAMP_ACTUATION_SHIFT
+        value: 0
+        why: |
+          HARDWARE ACTUATION IS PER CHANNEL, for phantom, pad and sens alike.
+          FUN_0c007fbc's loop passes a per-channel index and that slot's own
+          value to each of the three writers on every one of its eight
+          iterations. This is the number that says what one write switches, and
+          it is the axis the three old "granularity" rows never had.
+        evidence: EVIDENCED (image, S-1608 FUN_0c007fbc -> FUN_0c00ac1e /
+          FUN_0c00ac96 / FUN_0c007e6a).
+      - name: HEADAMP_BANK_CHANNELS
+        value: 8
+        why: |
+          The preamp bank width, and the batch size of the apply loop — NOT an
+          actuation granularity. FUN_0c007fbc(bank, group) walks `group << 3`
+          for eight iterations and its writers take (bank, 0..7), so two banks
+          of eight cover the S-1608's sixteen analog inputs. `group` runs 0..9
+          over the 80-slot active table.
+        evidence: EVIDENCED (image, S-1608 FUN_0c007fbc).
       - name: HEADAMP_GRAN_READBACK_SHIFT
         value: 3
-        why: The readback nibble is per EIGHT — ch >> 3. A different axis from
-          phantom, deliberately named apart.
-        evidence: EVIDENCED (executed trace).
+        why: |
+          The readback nibble is per EIGHT — ch >> 3. It coincides
+          ARITHMETICALLY with the apply loop's bank index, which is also a
+          `>> 3` over the same 80 slots, so "readback per eight" and "the
+          hardware bank" are plausibly one fact rather than two.
+
+          NOT ASSERTED AS ONE, because the image does not close it: there is no
+          `ch >> 3` anywhere in the head-amp region of S-1608.BIN, and
+          FUN_0c007fbc has NO caller in the function-only export — it is reached
+          through a data-section pointer, so what drives the banking cannot be
+          traced. The coincidence is real and the identification is not proven.
+          THE EXPERIMENT: the same data-section pointer re-export that would
+          close the enrolled-bit writer would show FUN_0c007fbc's caller and
+          settle whether the readback reports these banks.
+        evidence: EVIDENCED (executed trace) for the shift; the identification
+          with HEADAMP_BANK_CHANNELS is UNRESOLVED (image, caller not exported).
       - name: HEADAMP_SWEEP_RECORDS_PER_CH
         libreac: REAC_HEADAMP_NPARAMS
         value: 3

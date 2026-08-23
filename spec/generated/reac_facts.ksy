@@ -504,7 +504,7 @@ instances:
     doc: |
       Value at +0x08 on every capture. What it selects is UNRESOLVED.
       [EVIDENCED (image + corpus).]
-  # ---- Head-amp — the record, and its three granularities ----
+  # ---- Head-amp — the record, its wire encoding and its actuation ----
   headamp_tag:
     value: 0x0101
     doc: |
@@ -551,12 +551,70 @@ instances:
   headamp_gran_phantom_shift:
     value: 2
     doc: |
-      Phantom is per group of FOUR — ch >> 2. [EVIDENCED (executed trace).]
+      DISPUTED 2026-08-23, VALUE UNCHANGED PENDING ONE EXPERIMENT. Read as
+      "phantom is per group of FOUR — ch >> 2", and a consumer that trusts
+      it sweeps phantom on multiples of four only.
+
+      THE IMAGE DOES NOT CONTAIN THIS GATE. There is exactly one
+      channel-indexed `(x & 3) == 0` test in S-1608.BIN — FUN_0c002d42, the
+      SLOT-MAP ingest — and what it gates is `flags >> 4`, the inventory
+      cell nibble, handed to the 12-entry inventory arrays at 0x0c0f62fa
+      and 0x0c0cf80e. It does not gate a head-amp parameter, and it is not
+      on the DT1 path at all. Every other `& 3` in the image is pointer
+      alignment. Meanwhile the hardware write is per channel (see
+      HEADAMP_ACTUATION_SHIFT), so there is no per-four actuator for a
+      per-four record to feed.
+
+      The most likely history is that this number and the state diagram's
+      retracted "phantom packed 4 ch/group, group = slot >> 2" are the same
+      misreading of FUN_0c002d42, and that "a record to 0x24 moves group 9"
+      describes the inventory cell moving, not phantom.
+
+      NOT CHANGED HERE, because the grade below is an executed trace and a
+      static read must not silently overwrite an observation. THE
+      DISCRIMINATING EXPERIMENT, which needs no rig: send DT1 phantom
+      records to channels 0x24 and 0x25 in turn and read the box's own
+      re-broadcast back. If 0x25 moves, this row is 0 and phantom is per
+      channel on the wire too.
+        [DISPUTED — EVIDENCED (executed trace) against EVIDENCED (image,
+        S-1608 FUN_0c002d42 + FUN_0c007fbc). Unresolved.]
+  headamp_actuation_shift:
+    value: 0
+    doc: |
+      HARDWARE ACTUATION IS PER CHANNEL, for phantom, pad and sens alike.
+      FUN_0c007fbc's loop passes a per-channel index and that slot's own
+      value to each of the three writers on every one of its eight
+      iterations. This is the number that says what one write switches, and
+      it is the axis the three old "granularity" rows never had.
+        [EVIDENCED (image, S-1608 FUN_0c007fbc -> FUN_0c00ac1e /
+        FUN_0c00ac96 / FUN_0c007e6a).]
+  headamp_bank_channels:
+    value: 8
+    doc: |
+      The preamp bank width, and the batch size of the apply loop — NOT an
+      actuation granularity. FUN_0c007fbc(bank, group) walks `group << 3`
+      for eight iterations and its writers take (bank, 0..7), so two banks
+      of eight cover the S-1608's sixteen analog inputs. `group` runs 0..9
+      over the 80-slot active table.
+        [EVIDENCED (image, S-1608 FUN_0c007fbc).]
   headamp_gran_readback_shift:
     value: 3
     doc: |
-      The readback nibble is per EIGHT — ch >> 3. A different axis from
-      phantom, deliberately named apart. [EVIDENCED (executed trace).]
+      The readback nibble is per EIGHT — ch >> 3. It coincides
+      ARITHMETICALLY with the apply loop's bank index, which is also a
+      `>> 3` over the same 80 slots, so "readback per eight" and "the
+      hardware bank" are plausibly one fact rather than two.
+
+      NOT ASSERTED AS ONE, because the image does not close it: there is no
+      `ch >> 3` anywhere in the head-amp region of S-1608.BIN, and
+      FUN_0c007fbc has NO caller in the function-only export — it is reached
+      through a data-section pointer, so what drives the banking cannot be
+      traced. The coincidence is real and the identification is not proven.
+      THE EXPERIMENT: the same data-section pointer re-export that would
+      close the enrolled-bit writer would show FUN_0c007fbc's caller and
+      settle whether the readback reports these banks.
+        [EVIDENCED (executed trace) for the shift; the identification with
+        HEADAMP_BANK_CHANNELS is UNRESOLVED (image, caller not exported).]
   headamp_sweep_records_per_ch:
     value: 3
     doc: |
