@@ -106,8 +106,19 @@ removed.
 
 - The staging/active pair is real and is in the box's code. `FUN_0c003c8a` copies 80 records of 10
   bytes from a staging base to a live base, then copies 6 bytes of master id, pushes twelve
-  inventory cells and emits the `01 03 00 10` report. It is the only unconditional promoter of
+  cells and emits the `01 03 00 10` report. It is the only unconditional promoter of
   head-amp state in the box.
+
+  **[?] Which twelve.** Three different structures in this protocol are twelve wide over the
+  same 48-channel space, and they are not interchangeable: the config-announce **inventory**
+  (twelve cells of four, what the box declares it has), the chanmap **group-anchor** map
+  (twelve entries the box derives at `slot >> 2`, describing the master's own fabric), and the
+  **phantom groups** (twelve, indexed `ch >> 2`, the granularity phantom is actually applied
+  at). The commit's twelve-iteration push has been read out of the image but not tied to one
+  of the three, and the shared width makes the three easy to conflate. UNVERIFIED. What
+  settles it: commit with a body whose twelve cells differ from the box's declared inventory,
+  then read back both the inventory and the phantom state — whichever follows the body is what
+  the loop writes.
 - The bracket is real. `FUN_0c003aae` gates on the header, `FUN_0c003b88` reassembles continuations
   and finishes on the `01 02` phase, and finishing is what enters the commit.
 - op-`0100` is not a probe. It is the continuation phase of an 8904-byte scene transfer, and every
