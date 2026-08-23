@@ -336,6 +336,183 @@ groups:
         why: The op a cfea announce always carries.
         evidence: EVIDENCED (corpus).
 
+  - id: control_header
+    title: The control block's header, as the firmware builds it
+    doc: |
+      The two bytes at block[0:2] have always been read as one 16-bit op. The
+      stagebox firmware writes them as two independent fields, and the receive
+      side gates on them separately.
+
+      EVIDENCED (image), S-1608 `FUN_0c003398` @0c003398 — the box's own
+      segmented upload, which writes block[0] = 1, block[4] = 0, then sets
+      block[1] to 3 when the whole body fits in one frame, to 1 for the first of
+      many, to 0 for a middle frame and to 2 for the last. The receiver agrees:
+      `FUN_0c003aae` @0c003aae gates on `buf[1] & 1` and `FUN_0c003b88`
+      @0c003b88 on `buf[1] in {0, 2}`.
+
+      So there are not seven scene-and-record ops. There is a LINK selector, a
+      two-bit SEGMENT field, a length, and an opcode.
+    facts:
+      - name: HDR_LINK_OFF
+        value: 0
+        why: block[0] — the link selector.
+        evidence: EVIDENCED (image) — every builder writes it first.
+      - name: HDR_SEG_OFF
+        value: 1
+        why: block[1] — the segment flags.
+        evidence: EVIDENCED (image).
+      - name: HDR_LEN_OFF
+        value: 2
+        why: block[2:4] — the big-endian length.
+        evidence: EVIDENCED (image).
+      - name: HDR_OPCODE_OFF
+        value: 4
+        why: block[4] — the opcode, and the base the length counts from on
+          every family except a link-1 bulk transfer.
+        evidence: EVIDENCED (image) — FUN_0c002c70 @0c002c70 writes 25 for
+          eight three-byte records at block[5:29], and 25 = 1 + 8*3.
+      - name: SEG_FIRST_BIT
+        value: 0x01
+        fmt: hex2
+        why: block[1] bit 0 — the frame opens a transfer and carries its total.
+        evidence: EVIDENCED (image).
+      - name: SEG_LAST_BIT
+        value: 0x02
+        fmt: hex2
+        why: block[1] bit 1 — the frame closes a transfer.
+        evidence: EVIDENCED (image).
+      - name: SEG_SINGLE
+        value: 0x03
+        fmt: hex2
+        why: Both bits — a complete message in one frame, which is what every
+          chanmap, heartbeat, declaration and single-frame record is.
+        evidence: EVIDENCED (image + corpus).
+        derived: SEG_FIRST_BIT + SEG_LAST_BIT
+      - name: LINK_CONTROL
+        value: 0x01
+        fmt: hex2
+        why: The stagebox control link — the scene transfer, the chanmap, the
+          heartbeat and the declarations.
+        evidence: EVIDENCED (image + corpus).
+      - name: LINK_AUX_S4000S
+        value: 0x02
+        fmt: hex2
+        why: A second link the S-4000S image builds for and the S-1608 image
+          has no code for at all.
+        evidence: EVIDENCED (image) — FUN_0c0128b8 @0c0128b8 (S-4000S).
+          NEVER OBSERVED on the wire.
+      - name: LINK_RECORD
+        value: 0x04
+        fmt: hex2
+        why: The record link — the Roland DT1 container and its two fragments.
+        evidence: EVIDENCED (corpus).
+      - name: SEG_FIRST_PAYLOAD_OFF
+        value: 7
+        why: A link-1 bulk FIRST frame puts its declared total at block[5:7] and
+          its payload at block[7].
+        evidence: EVIDENCED (image + corpus).
+      - name: SEG_CONT_PAYLOAD_OFF
+        value: 5
+        why: Every other bulk frame puts its payload at block[5].
+        evidence: EVIDENCED (image + corpus).
+      - name: SEG_FIRST_MAX
+        value: 0x18
+        fmt: dec_hex
+        why: 24 — the largest first-frame chunk, and exactly 31 - 7. The builder
+          reserves block[31] for the checksum.
+        evidence: EVIDENCED (image) — FUN_0c003398 @0c003398.
+        derived: (CTRL_CKSUM_OFF_IN_BLOCK) - SEG_FIRST_PAYLOAD_OFF
+      - name: SEG_CONT_MAX
+        value: 0x1a
+        fmt: dec_hex
+        why: 26 — the largest continuation chunk, and exactly 31 - 5.
+        evidence: EVIDENCED (image).
+        derived: (CTRL_CKSUM_OFF_IN_BLOCK) - SEG_CONT_PAYLOAD_OFF
+
+  - id: chanmap_record
+    title: The chanmap's three-byte record and the table it writes
+    doc: |
+      Each record is `{slot, flags, value}` and it is the same shape in both
+      directions: the box's transmitter is the inverse of its receiver, cell for
+      cell. EVIDENCED (image), `FUN_0c002bb2` @0c002bb2 (build) and
+      `FUN_0c002d42` @0c002d42 (apply), S-1608; `FUN_0c014488` and `FUN_0c014674`
+      in the S-4000S carry the identical arithmetic.
+
+      The third byte is not padding. It lands in the same table cell the box's
+      own gain path reads.
+    facts:
+      - name: CHANMAP_REC_BYTES
+        value: 3
+        why: slot, flags, value.
+        evidence: EVIDENCED (image + corpus).
+      - name: CHANMAP_RECS_PER_FRAME
+        value: 8
+        why: One window of the ring per frame.
+        evidence: EVIDENCED (image + corpus).
+      - name: CHANMAP_RING_LEN
+        value: 49
+        why: 48 slots plus the one non-channel record id, which the box's cursor
+          emits as index 0x30 before wrapping to 0.
+        evidence: EVIDENCED (image + corpus).
+        derived: SLOT_SPACE + 1
+      - name: SLOT_SPACE
+        value: 0x30
+        fmt: dec_hex
+        why: 48 — the protocol slot space, the present-bit array length and the
+          fully-enrolled sum. Identical in the S-1608 and S-4000S images, so it
+          is a protocol constant and not a per-model one.
+        evidence: EVIDENCED (image, both boxes).
+      - name: SLOT_RECORD_STRIDE
+        value: 10
+        why: The per-slot table's stride, in the chanmap apply, in the scene
+          commit and in the scene store alike.
+        evidence: EVIDENCED (image, both boxes).
+      - name: SLOT_TABLE_RECORDS
+        value: 0x50
+        fmt: dec_hex
+        why: 80 — the table is 80 records long though only the first 48 are
+          addressable from the wire.
+        evidence: EVIDENCED (image, both boxes).
+      - name: SLOT_CELL_VALUE
+        value: 2
+        why: Table offset the record's VALUE byte writes — the cell the gain
+          path reads.
+        evidence: EVIDENCED (image) — FUN_0c007fbc @0c007fbc feeds it to
+          FUN_0c007e6a @0c007e6a.
+      - name: SLOT_CELL_FLAG_BIT3
+        value: 4
+        why: Table offset written from flags bit 3.
+        evidence: EVIDENCED (image).
+      - name: SLOT_CELL_FLAG_BIT1
+        value: 6
+        why: Table offset written from flags bit 1 — the one the group apply
+          shadows and never actuates.
+        evidence: EVIDENCED (image).
+      - name: SLOT_CELL_FLAG_BIT2
+        value: 8
+        why: Table offset written from flags bit 2.
+        evidence: EVIDENCED (image).
+      - name: CHANMAP_CELL_MASK
+        value: 0xf0
+        fmt: hex2
+        why: The mask the builder ANDs with `cell << 4`, so the cell code is a
+          full four bits. Read out of the image at DAT_0c002d7c.
+        evidence: EVIDENCED (image).
+      - name: CHANMAP_ID_IDENTITY
+        value: 0xfe
+        fmt: hex2
+        why: The non-channel record whose FLAGS byte reaches the box's one-word
+          identity cell and its change detector. Read out of the image at
+          DAT_0c002d7e and DAT_0c002e6e.
+        evidence: EVIDENCED (image + corpus) — 3804 in the corpus.
+      - name: CHANMAP_ID_FILLER
+        value: 0xff
+        fmt: hex2
+        why: The all-zero record the builder emits past the sentinel. Read out
+          of the image at DAT_0c002d80.
+        evidence: EVIDENCED (image). NEVER OBSERVED — the cursor wraps at 0x30,
+          so the branch is unreachable on that path.
+
   - id: page_0103
     title: op-0103 sub-pages and subtypes
     doc: |
