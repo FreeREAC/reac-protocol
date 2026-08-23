@@ -470,10 +470,30 @@ read. **The discriminating experiment needs no rig:** send DT1 phantom records t
 to `0x25` in turn and read the box's own re-broadcast back. If `0x25` moves, phantom is per
 channel on the wire too. **Until that runs, do not generate a per-four phantom sweep.**
 
-The readback nibble's `ch >> 3` coincides arithmetically with the apply loop's bank index
-over the same 80 slots, so it may be that bank reported back rather than a third axis. Not
-asserted here: `FUN_0c007fbc` has no caller in the function-only export, so what drives the
-banking cannot be traced from this image.
+#### Two granularities, and "bank" is a third axis of its own [V]
+
+**The readback nibble is not a third granularity.** `FUN_0c007fbc`'s caller was recovered on
+2026-08-23 — a function Ghidra never disassembled, with a clean prologue just past the
+previous function's `rts`, absent from the 1395-entry map and reached by a plain `bsr`. With
+it in hand the loop provably shifts the group by 3 and iterates exactly 8, so group `g`
+covers `[g*8, g*8+8)` and **`g == ch >> 3`**, which is the readback nibble's own index. So
+head-amp has exactly **two** granularities:
+
+| granularity | what it is | function |
+|---|---|---|
+| **per channel** | actuation — phantom, pad and SENS each written individually | `FUN_0c007fbc` → `FUN_0c00ac1e` / `FUN_0c00ac96` / `FUN_0c007e6a` |
+| **per eight** | refresh banking, and the readback nibble — one axis, not two | `FUN_0c007fbc` and its caller |
+
+**And "bank" is a separate axis from "group".** Our docs have used the words loosely and at
+least one has them inverted (`FUN_0c012162(k)` returns a **group** 0–9 while its argument `k`
+is a **bank**), so take the definition from here rather than from neighbouring prose:
+
+* **GROUP** — 0..9, and `group == ch >> 3`. Selects **which eight channels' data**: an
+  eight-slot window of the 80-slot active table.
+* **BANK** — selects **which eight physical preamps** receive it. **Not** a subdivision of
+  channel space, and it does not index the active table.
+
+`FUN_0c007fbc` takes both because they are independent.
 
 The constants and their evidence grades are in
 [`spec/protocol-facts.yaml`](spec/protocol-facts.yaml) (`head_amp` group), which is the one
