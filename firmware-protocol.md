@@ -394,6 +394,9 @@ full cycle is 49 frames.
 | The chanmap's per-anchor push is "phantom, 4 ch/group" | What is pushed is the record's HIGH NIBBLE, an inventory-cell code, not a flag bit | `FUN_0c002d42` @0c002d42 |
 | The master images contain no REAC control plane | The M-400 image carries `CMasterReacManager`, a `REAC.c` compilation unit, and master arbitration text | see below |
 | M-400 is little-endian at base 0x08B60000 | `SuperH:BE:32:SH-2` at 0x8C000000, and the pointer at 0x8c0cc45c only resolves big-endian | `M-400_run.log` |
+| The 0x000d group map is five input-group bytes front-packed and five output-group bytes back-packed | The one firmware that parses it reads ten bytes as TWO PACKED FIELDS — low six bits once per pair of groups, top two bits once per byte with 2 and 3 folded to −1 | S-4000S, the arm gated on `[4]==0x10` |
+| `FUN_0c0045de` is the link-lost poll | Its whole body is `return *0x0c080608;` — a getter for a latch that other code raises | `FUN_0c0045de` @0c0045de |
+| `FUN_0c003a64` zeroes the six-byte identity | It fills it with **0xFF** (`DAT_0c003b82` = 0x00ff, read out of the image). An all-zero identity and an all-0xFF one are different wire facts | `FUN_0c003a64` @0c003a64 |
 
 ## The master side
 
@@ -448,3 +451,27 @@ Every absence claim in this document was made only after the same search found a
 control. The scan that located the undocumented dispatchers first used a wrong instruction mask
 and returned zero hits — indistinguishable from "there is nothing there" — and was re-run against
 the known site at 0x0C002EB2 until it reported presence before any absence was believed.
+
+
+## How this was validated
+
+The grammar is not a description here; it is a parser, and it was run.
+
+- **214 524 whole frames** — not control windows, entire frames including the audio region and
+  the end marker — from **all 72 captures** in the FreeREAC corpus, parsed by the
+  `kaitai-struct-compiler` output of `spec/reac.ksy` with **zero failures**. All four frame
+  widths appear (1492, 1204, 628, 340) and all eight `ctrl_kind` values are exercised.
+- **423 distinct control blocks**, the complete set of distinct `frame[16:50]` windows in the
+  corpus, parsed with zero failures, with every new instance forced.
+- The harness carries a **negative control** in the same run: a truncated non-REAC buffer must
+  be rejected, and a corrupted DT1 wrapper must be rejected. Both are.
+- `spec/reac_xcheck.py` and `spec/facts_xcheck.py` go from 277 to **328 assertions**, and the
+  new ones were **sabotage-verified**: swapping the FIRST bit for the LAST bit in the grammar
+  turns four tests red, shortening the DT1 checksum span by one byte turns the reassembly test
+  red, and changing the ring length from 49 to 50 turns the derived-fact ratchet red.
+
+One trap the corpus set for the harness, worth passing on. Several of these captures were taken
+with a snaplen — 64, 128, 200 and 400 bytes — and a truncated frame's length can land on
+`52 + 36n` by coincidence. Reading `caplen` without `origlen` therefore produced 3 200 apparent
+grammar failures that were nothing of the kind. The scan compares the two and skips 3 327 846
+truncated records; every remaining frame parses.
