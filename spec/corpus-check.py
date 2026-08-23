@@ -303,7 +303,14 @@ def main():
                     help="directory holding the .pcap corpus (searched recursively)")
     ap.add_argument("--ksy", default=str(DEFAULT_KSY),
                     help="grammar to test; point it at an older copy to baseline")
-    ap.add_argument("--per-file", type=int, default=4000,
+    # NO CAP. The cap existed because the corpus was 47.9 GB and reading all of
+    # it through this parser was not affordable; it read the HEAD of every
+    # capture, which is the establish handshake, and never reached the steady
+    # state or the scene push behind it. The corpus is now distilled to 666 MB
+    # and an uncapped run takes about a minute, so the reason for the cap is
+    # gone. Keep it at 0: a cap silently turns "the corpus parses" into "the
+    # first 4000 frames parse".
+    ap.add_argument("--per-file", type=int, default=0,
                     help="cap frames read per capture (0 = every frame)")
     ap.add_argument("--baseline", default=str(DEFAULT_BASELINE))
     ap.add_argument("--write-baseline", metavar="PATH",
