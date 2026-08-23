@@ -122,6 +122,40 @@ def build_parser(ksy_path, outdir):
     return mod
 
 
+LEGACY_NAMES = {0: "none", 1: "filler", 2: "scene_transfer", 3: "master_hb",
+                4: "master_announce", 5: "grant", 6: "head_amp", 7: "box_hb",
+                8: "unknown_ctrl", 9: "config_announce", 10: "group_map",
+                11: "record_fragment", 12: "link2"}
+
+
+def legacy_ctrl_kind(b):
+    """reac_ctrl_parse() as it stood before 2026-08-23, over frame[16:50].
+
+    Keyed on the 16-bit op and on TWO LENGTHS, which is the defect: everything
+    on the session link that was not the slot map or the link ack fell into
+    scene_transfer. Kept here as the left-hand side of the partition proof."""
+    t0, t1 = b[0], b[1]
+    op = (b[2] << 8) | b[3]
+    rec_len = (b[4] << 8) | b[5]
+    if (t0, t1) == (0x00, 0x00):
+        return 1
+    if (t0, t1) == (0xcf, 0xea):
+        return 4
+    if (t0, t1) != (0xcd, 0xea):
+        return 8
+    if op == 0x0403:
+        if b[16] == 0x12 and b[17] == 0x12 and b[18] == 0x01 and b[19] == 0x01:
+            return 6
+        return 5
+    if op == 0x0103 and rec_len == 0x0019:
+        return 3
+    if op == 0x0103 and rec_len == 0x0001:
+        return 7
+    if op >> 8 == 0x01:
+        return 2
+    return 8
+
+
 def exercise(frame, reac, kaitai):
     """Parse one frame and TOUCH the lazy instances.
 
@@ -194,7 +228,7 @@ def exercise_block(window, reac, kaitai):
     return t
 
 
-def scan_file(path, reac, kaitai, per_file, corrupt):
+def scan_file(path, reac, kaitai, per_file, corrupt, moves=None):
     seen = truncated = off_law = ok = 0
     blocks = blocks_ok = 0
     errors = collections.Counter()
@@ -216,8 +250,10 @@ def scan_file(path, reac, kaitai, per_file, corrupt):
                     window = window[:30]
                 blocks += 1
                 try:
-                    exercise_block(window, reac, kaitai)
+                    tb = exercise_block(window, reac, kaitai)
                     blocks_ok += 1
+                    if moves is not None and not corrupt:
+                        moves[(legacy_ctrl_kind(window), int(tb.ctrl_kind))] += 1
                 except Exception as exc:
                     errors["block %s: %s" % (type(exc).__name__, str(exc)[:70])] += 1
             continue
@@ -235,9 +271,12 @@ def scan_file(path, reac, kaitai, per_file, corrupt):
             data[-1] ^= 0xFF
             data = bytes(data)
         try:
-            exercise(data, reac, kaitai)
+            f = exercise(data, reac, kaitai)
             ok += 1
             lengths[n] += 1
+            if moves is not None:
+                w = data[16:50]
+                moves[(legacy_ctrl_kind(w), int(f.control.ctrl_kind))] += 1
         except Exception as exc:
             errors["%s: %s" % (type(exc).__name__, str(exc)[:80])] += 1
         if per_file and seen >= per_file and (not truncated or blocks >= per_file):
@@ -273,10 +312,18 @@ def main():
                     help="corrupt every frame; the run MUST go red")
     ap.add_argument("--quiet", action="store_true",
                     help="only print the summary and any regression")
+    ap.add_argument("--classify-delta", action="store_true",
+                    help="tabulate ctrl_kind under the pre-2026-08-23 rule "
+                         "against the current one, and require the difference "
+                         "to be a PARTITION of the old buckets")
     args = ap.parse_args()
 
+    # *.pcap* and not *.pcap: tcpdump -C splits a capture into .pcap00,
+    # .pcap01 ... and eleven of this corpus's files are split that way. A glob
+    # of "*.pcap" silently covered 72 of 83 files, and the eleven it dropped
+    # were the longest sessions in the set.
     caps = sorted(glob.glob(os.path.join(os.path.expanduser(args.captures),
-                                         "**", "*.pcap"), recursive=True))
+                                         "**", "*.pcap*"), recursive=True))
     if not caps:
         sys.exit("no .pcap under %s -- an empty corpus proves nothing" % args.captures)
 
@@ -284,11 +331,12 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         reac = build_parser(pathlib.Path(args.ksy), pathlib.Path(tmp))
         results = {}
+        moves = collections.Counter() if args.classify_delta else None
         for path in caps:
             name = os.path.relpath(path, os.path.expanduser(args.captures))
             try:
                 results[name] = scan_file(path, reac, kaitaistruct,
-                                          args.per_file, args.self_test)
+                                          args.per_file, args.self_test, moves)
             except Exception as exc:
                 results[name] = {"frames": 0, "ok": 0, "failed": 0,
                                  "blocks": 0, "blocks_ok": 0, "blocks_failed": 0,
@@ -327,6 +375,35 @@ def main():
     # A clean result is only meaningful if the scan actually read something.
     if total_frames + total_blocks == 0:
         sys.exit("the scan read ZERO frames -- a zero failure count is meaningless")
+
+    if args.classify_delta:
+        print("\nctrl_kind under the OLD rule -> under the CURRENT rule:")
+        split, stayed, sideways = collections.Counter(), 0, []
+        for (was, now), n in sorted(moves.items()):
+            tag = "" if was == now else "   MOVED"
+            print("   %-16s -> %-16s %10d%s"
+                  % (LEGACY_NAMES[was], LEGACY_NAMES[now], n, tag))
+            if was == now:
+                stayed += n
+            else:
+                split[was] += n
+                if was not in (2, 8):
+                    sideways.append((was, now, n))
+        # A reclassification must SPLIT old buckets, never move between them.
+        for was, now, n in sideways:
+            print("SIDEWAYS   %s -> %s (%d) came out of a bucket that is not "
+                  "being split" % (LEGACY_NAMES[was], LEGACY_NAMES[now], n))
+        if sideways:
+            print("\nthe change is not a partition of the old classification")
+            return 1
+        if not split:
+            print("\nNOTHING MOVED -- the two rules are identical here, so this "
+                  "comparison observed nothing")
+            return 1
+        print("\npartition holds: %d frames unchanged, %d split out of "
+              "scene_transfer/unknown_ctrl, nothing moved sideways"
+              % (stayed, sum(split.values())))
+        return 0
 
     if args.self_test:
         # Both paths must be shown capable of failing, independently. A
