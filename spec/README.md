@@ -35,6 +35,86 @@ proves the C-family target still *generates* (a grammar that only compiles to on
 language is usually a grammar with a mistake in it), but that output is never
 committed, never linked and never shipped.
 
+## One source for the facts both sides spell
+
+`reac.ksy` and libreac each wrote out the frame geometry, the scene sizes, the validated
+tag offsets, the checksum rules, the op codes and the head-amp granularities
+independently, and nothing noticed a constant changed in one and not the other.
+[`protocol-facts.yaml`](protocol-facts.yaml) holds them once — 90 rows, each with what
+the number is and how it was evidenced — and [`gen-facts.py`](gen-facts.py) writes three
+artefacts from it into [`generated/`](generated/):
+
+| file | for |
+|---|---|
+| `reac_facts.h` | libreac, in place of the hand-written `#define` block in `reac_ctrlblk.h` |
+| `reac_facts.ksy` | a standalone Kaitai type, `meta: imports: [reac_facts]` |
+| `reac_facts_assert.h` | the lane that has not adopted the header yet: `_Static_assert`s binding libreac's own macros to the schema, compiled against libreac's headers |
+
+Every generated file says it is generated on its first lines. The generator reads nothing
+but the schema — no clock, no environment, no path outside the repo — because a generator
+that varies between two runs over one input regresses the file it maintains on every
+regeneration. `make facts-idempotent` generates twice into a scratch tree and diffs.
+
+Kaitai cannot close this on its own: it has no plain-C backend and it emits parsers rather
+than serialisers. So the convergence is not "compile the ksy into libreac" — it is this
+file plus the cross-parse below.
+
+### The ratchet
+
+[`facts_xcheck.py`](facts_xcheck.py) runs inside `make check` and asserts `reac.ksy` still
+carries every value. It resolves a PATH into the parsed grammar rather than matching prose,
+so a field that moves is caught even when the comment beside it still reads correctly. The
+scene tag offsets get a stronger check: the grammar never writes `0x368` down, it describes
+a sequence of fields that happens to put SYSP there — so the test WALKS `scene_body`'s own
+field sizes and requires the walk to land on the offset libreac indexes with, and to add up
+to 8904. Sabotage-verified: a chunk resized 26 -> 25, a six-byte reserved run grown to
+seven, and an enum member renamed each go red on exactly the rows they should.
+
+## Build it with libreac, read it back with the ksy
+
+```sh
+make -C spec check-ctrl-oracle LIBREAC=../../libreac
+```
+
+This is the half that catches a MISUNDERSTANDING rather than a typo. Two sides can spell 26
+identically and still disagree about what the 26 bytes are, where they start, or which of
+them the box validates; the only thing that catches that is making one side emit and the
+other read.
+
+[`c_ctrl_dump.c`](c_ctrl_dump.c) links the compiled libreac and builds;
+[`xcheck_ctrl_oracle.py`](xcheck_ctrl_oracle.py) parses with the ksy-generated parser and
+compares. What runs:
+
+- **the scene round trip** — libreac builds all 343 transfer steps from a body, the parser
+  reads every frame, and the body is REASSEMBLED from what the parser found and compared
+  byte for byte with the input. Four bodies: the two recovered desk bodies committed in
+  `fixtures/`, the tag-only body libreac's own `reac_ctrl_scene_build()` makes, and a body
+  GENERATED from the named field layout (`--make-scene PATH`). A chunk at the wrong offset,
+  a header declaring the wrong total or a final carrying the wrong tail all come back as a
+  byte diff with an offset on it;
+- **head-amp records** — every other channel of the 48-slot space, all three parameters,
+  read back CH / PARAM / VALUE / tag / both checksums. Plus the ORDERING law: the same
+  record with the nested checksums stamped in the wrong order, which the grammar parses
+  happily — that is the danger — and libreac's verifier must reject;
+- **the reverse**, over every control block in `fixtures/control.json` and the 56-frame
+  grant sweep: the parser classifies and decodes, libreac's verifiers judge, and the two
+  must agree on every block and every head-amp triple;
+- **the constants**, as a translation unit of `_Static_assert`s compiled against libreac's
+  own headers.
+
+Two properties it keeps, both of them scars. It fires a **positive control** — a flipped
+byte both sides must notice — before it is allowed to print a zero, because a probe that
+reports silence has to prove it can hear first. And **INCONCLUSIVE is a verdict**: thin
+coverage never reports PASS, and a missing input (no generated body, no corpus) degrades
+the verdict rather than vanishing.
+
+It never touches the libreac checkout: libreac is snapshotted with `git archive` and built
+in a temp directory, so a lane mid-migration there is neither read half-written nor built
+over.
+
+Where the two sides genuinely disagree — and they do — is written down in
+[`../convergence-defects.md`](../convergence-defects.md) rather than reconciled silently.
+
 ## Running the cross-check
 
 ```sh
