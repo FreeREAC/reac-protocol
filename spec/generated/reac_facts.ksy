@@ -585,6 +585,83 @@ instances:
       The identity page — the 6- and 10-byte inventory bodies, and the ASCII
       model name carried across the 0x0401 / 0x0402 fragment pair.
       [EVIDENCED (corpus).]
+  # ---- The identity page (DT1 tag 0x0500) ----
+  identity_addr_lo_bytes:
+    value: 2
+    doc: |
+      `addr_lo`, the low half of the address, opens every 0x0500 record
+      body. The tag carries the high half, so the full DT1 address is four
+      bytes and an emitter that writes only the tag addresses record
+      0x0000 by accident.
+        [EVIDENCED (corpus) — 1005 records, six distinct addr_lo.]
+  identity_addr_bytes:
+    value: 4
+    doc: |
+      The full DT1 address is four bytes — the 2-byte tag plus the 2-byte
+      addr_lo that opens every 0x0500 record body. An emitter that writes
+      only the tag addresses record 0x0000 by accident.
+        [EVIDENCED (corpus + image) — S-1608.BIN carries a 12-byte stride
+        DT1 address table at file 0x53154..0x53994, 176 records of {4-byte
+        address, u32le, u32le byte count}.]
+  identity_addr_firmware_version:
+    value: 0x0000
+    doc: |
+      The system firmware version, 4 bytes, ONE DECIMAL DIGIT PER BYTE,
+      most significant first, displayed by Roland as D.DDD.
+        [EVIDENCED (corpus + vendor package). S-0808 01 00 00 03 = 1.003 vs
+      package s0808_sys_v1003; S-1608 02 02 00 00 = 2.200 vs
+      s1608_sys_ver2200; S-4000S 02 05 00 00 = 2.500 vs s4000_sys_ver2500.
+      S-1608.BIN corroborates itself twice from the inside: boot banner
+      `ECM42 BOOT Ver.2.200` at file 0x200 and the boot-menu version
+      literal `2.200` at 0x9254. Capture
+      captures/m200i-s0808-48k-mirror__m200-BIDIR-coldboot-2026-07-11.pcap
+      frame 3475.
+      ]
+  identity_addr_capability_block:
+    value: 0x0600
+    doc: |
+      8 bytes, constant per model and identical between the two units of
+      each model captured. S-0808 00 00 00 01 00 00 00 00; S-1608
+      00 00 00 02 00 03 00 02; S-4000S 00 00 00 02 00 01 00 02. As four
+      u16be the second field tracks the REAC port count. The rest is
+      UNRESOLVED and is deliberately left as bytes — it is NOT a version in
+      the 0x0000 encoding, since the S-1608's boot version 2.200 would read
+      02 02 00 00 and appears nowhere in it.
+        [EVIDENCED (corpus) — 274 replies, 5 distinct boxes, 3 models.]
+  identity_addr_model_name:
+    value: 0x1000
+    doc: |
+      The model name: 1 byte name_kind (0x01 on every observation) then a
+      FIXED 16-byte NUL-padded ASCII field. 17 bytes of payload do not fit
+      the 36-byte control block, which is the ONLY reason any REAC record
+      is fragmented — this record is the whole population of the 0x0401 /
+      0x0402 pair.
+
+      ONLY THE S-0808 IMPLEMENTS IT. The S-1608 and S-4000S never answer
+      this address, so a console cannot read their model as text and must
+      take it from the firmware version plus the config announce's declared
+      width.
+        [EVIDENCED (corpus + image). 18 fragment pairs in 9 captures, all
+      S-0808, inner checksum closing only across both fragments (data sum
+      358, 0x1a completes it to 0x80 mod 256). The image agrees with the
+      silence: S-1608.BIN's page-0x0500 address table uses
+      third-address-byte 0x00..0x08 only — there is no 0x10 or 0x11 entry.
+      ]
+  identity_name_field_bytes:
+    value: 16
+    doc: |
+      The model-name field is fixed width and NUL-padded — "S-0808" plus ten
+      zeros. A reader that stops at the first NUL is right; one that takes
+      all 16 bytes as the name is wrong. [EVIDENCED (corpus) — 18
+      reassembled records, all identical.]
+  identity_rq1_size_bytes:
+    value: 1
+    doc: |
+      An RQ1 body is addr_lo plus ONE byte, the number of bytes wanted.
+      A reply MAY BE SHORTER than that: the S-0808 is asked for 9 bytes at
+      0x1011 and returns 1. Short is normal, not an error.
+        [EVIDENCED (corpus) — 438 RQ1 records, sizes 4, 8, 17 and 9; 19
+        one-byte replies at 0x1011.]
   # ---- The scene push ----
   scene_bytes:
     value: 8904
