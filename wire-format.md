@@ -46,7 +46,7 @@ box's own input count — see *Upstream audio layout* below.)
 | 12 | 2 | EtherType | const `0x88 0x19` |
 | 14 | 2 | counter | u16 LE, +1 per frame, wraps at 2¹⁶; `counter = b[14] | b[15]<<8` |
 | 16 | 2 | type | byte-pair frame type (registry below) |
-| 18 | 32 | data | control block, dispatched on `type`: op code, length, sub-page, then the op's own body; `data[31]` is the block checksum. Modelled field-by-field in [`spec/reac.ksy`](spec/reac.ksy) — not opaque |
+| 18 | 32 | data | control block, dispatched on `type`: class, fragment flags, record length, subtype, then the record's own body; `data[31]` is the block checksum. Modelled field-by-field in [`spec/reac.ksy`](spec/reac.ksy) — not opaque |
 | 50 | 1440 | audio | 40 ch × 12 samp × 3 B, carried in **every** frame type incl. FILLER |
 | 1490 | 2 | end | const `0xC2 0xEA` end marker |
 
@@ -88,7 +88,7 @@ external concern (switch / VLAN topology), not a protocol field.
 | type | name | notes |
 |---|---|---|
 | `0x00 0x00` | FILLER | carries audio; receivers skip the checksum on this type |
-| `0xcd 0xea` | CONTROL | sub-typed by the first 5 `data[]` bytes |
+| `0xcd 0xea` | CONTROL | class, fragment flags, record length and subtype in the first 5 `data[]` bytes |
 | `0xcf 0xea` | MASTER_ANNOUNCE | ~1/s; carries master MAC + in/out channel counts |
 | `0xce 0xea` | SPLIT_ANNOUNCE | the passive-split path |
 | `0xc2 0xea` | ENDING | the split/teardown path (distinct from the `0xC2 0xEA` end-marker role at byte 1490) |
@@ -105,20 +105,60 @@ them. They remain the last unmapped frame types — capturing them needs a real 
 device in the chain. `MASTER_ANNOUNCE` (`0xcf 0xea`) is master-only and is likewise
 never sourced by a slave.
 
-### CONTROL sub-types — `data[0..4]` prefix [S]
+### The CONTROL record header — `data[0..4]` [V]
 
-| prefix | name |
-|---|---|
-| `01 00 00 1a 00` | CONTROL_PACKET_TYPE_ONE |
-| `01 02 00 0e 00` | CONTROL_PACKET_TYPE_TWO |
-| `01 03 00 19 01` | CONTROL_PACKET_TYPE_THREE |
-| `01 01 00 18 00` | CONTROL_PACKET_TYPE_FOUR |
-| `01 03 00 10 82` | SLAVE_ANNOUNCE1 |
-| `04 03 00 14 00` | SLAVE_ANNOUNCE2 |
-| `04 03 00 13 00` | SLAVE_ANNOUNCE3 |
-| `01 03 00 01 81` | SLAVE_ANNOUNCE4 |
+**These five bytes are four fields, not a signature.** Read them separately or a
+consumer ends up matching model-specific strings without knowing it.
 
-The remaining `data[5..31]` carry the sub-type payload plus checksum.
+| offset | field | meaning |
+|---|---|---|
+| `data[0]` | class | `0x01` session, `0x04` parameter |
+| `data[1]` | fragment | bit 0 FIRST, bit 1 LAST |
+| `data[2..3]` | `rec_len` | u16 **big-endian** — the record's byte count, counted from `data[4]` **inclusive** |
+| `data[4]` | subtype | what the record is; **bit 7 set means the box is replying** |
+
+The fragment field is why four "opcodes" exist for one class: `3` is a whole record
+in one frame, `1` opens a multi-frame record, `0` continues it and `2` closes it. So
+`01 00`, `01 01`, `01 02` and `01 03` are one class in four fragment states.
+
+Class `0x01` subtypes:
+
+| subtype | direction | record |
+|---|---|---|
+| `0x00` | master → box | scene transfer fragment |
+| `0x01` | master → box | slot map — eight `{slot, cell+flags, sens}` records a frame |
+| `0x10` | master → box | enroll group map, once before the grant burst |
+| `0x81` | box → master | link-check ack |
+| `0x80` `0x82` `0x83` `0x84` | box → master | **state-4 commit report** |
+
+Class `0x04` is the DT1 container; see [Source control](#source-control-head-amp--op-0x04-0x03).
+
+`data[5..31]` carry the record body and the block checksum.
+
+#### What this replaces, and why it matters [V]
+
+This section used to be a table of eight five-byte prefixes with names inherited from
+the reacdriver project — `CONTROL_PACKET_TYPE_ONE..FOUR` and `SLAVE_ANNOUNCE1..4`.
+Every one of those strings runs a class, a flag field, a **length** and a subtype
+together, and both consequences are real:
+
+* **The names were wrong.** `01 03 00 10 82` is not a slave announce. It is the box's
+  **state-4 commit report** — the stagebox firmware builds it after the master's
+  scene transfer completes and after it has promoted the staged slot table into the
+  active one, and it carries the box's twelve-cell I/O inventory. `01 03 00 01 81` is
+  the box's link-check ack. A record meaning "I have committed your scene" was being
+  read as one meaning "hello, I exist".
+* **Matching them is model-specific by accident.** An S-0808 and an S-4000S send the
+  same commit report with subtype `0x84`, so `01 03 00 10 84` matched nothing while
+  the identical S-1608 record matched. The subtype is picked at run time between two
+  model-specific constants on a link-state test. **Match bit 7, never the literal.**
+  A slot-map window shorter than eight entries would fail the same way, because
+  `00 19` in the old prefix was a length.
+
+The commit report's twelve inventory cells (`0x01` output, `0x02` analog input,
+`0x03` absent, four channels each) read out as the real box on every model: S-0808
+`02 02 01 01 03…` = 8 in / 8 out, S-1608 `02 02 02 02 01 01 03…` = 16 / 8, S-4000S
+`02 02 02 02 02 02 02 02 01 01 03 03` = 32 / 8.
 
 ## The `data[32]` block — checksum (fully specified) [V]
 
@@ -315,12 +355,12 @@ are on the wire: a real S-0808 / S-1608 receives them, and a software stagebox (
 at 16 ch receives the identical bytes at base `0x20` while `reac_ctrl_build_headamp` reproduces them
 byte-for-byte — so the record is validated **parsed-in and built-out**, not just observed.
 
-**`0x04 0x03` is a record container, not a single message.** `op_len` gives the record's data
+**`0x04 0x03` is a record container, not a single message.** `rec_len` gives the record's data
 length; `data[16..17]` is a **TAG** selecting the record type. Earlier work named the whole opcode
 after the one record it had seen (the connect-grant); that is too narrow — see the registry below.
 
 ```
-data[]:  0..1 op(04 03)   2..3 op_len   4..7 REAC wrapper(00 02 00 fe)   8 len_echo(0e)
+data[]:  0..1 op(04 03)   2..3 rec_len  4..7 REAC wrapper(00 02 00 fe)   8 len_echo(0e)
          9 f0   10 41   11 0a   12..14 model-id(00 00 12)   15 DT1 cmd(12)
         16..17 TAG   18..(18+n-1) DATA   (18+n) CKSUM_inner   (19+n) 0xf7   ...   31 CKSUM_block
 ```
@@ -334,7 +374,7 @@ riding inside the REAC container. Decoded:
 | data | bytes | field |
 |---|---|---|
 | 4..7 | `00 02 00 fe` | REAC console wrapper, **outside** the SysEx (part of the dispatch signature) |
-| 8 | `0e` | SysEx-payload length echo (`= op_len − 5`) |
+| 8 | `0e` | SysEx-payload length echo (`= rec_len − 5`) |
 | 9 | `f0` | MIDI SysEx start |
 | 10 | `41` | Roland Corporation manufacturer ID |
 | 11 | `0a` | Roland device (unit) ID |
@@ -362,7 +402,7 @@ with wrapper `02 00 fe 00` and **no** `f0 41` envelope. A genuine control record
 > mislabels the model-ID low byte and hides the DT1 command that distinguishes a write (`DT1`) from a
 > request (`RQ1`).
 
-| `op_len` | n (data bytes) | TAG | record | status |
+| `rec_len` | n (data bytes) | TAG | record | status |
 |---|---|---|---|---|
 | `0x0013` | 3 | `01 01` | **head-amp source control** | **[V]** decoded below |
 | `0x0013` | 3 | `05 00` | — | **[?]** 4 distinct values, state-push only |
@@ -384,26 +424,111 @@ data[21]     = CKSUM_inner
 data[22]     = 0xf7         terminator
 ```
 
-### One name, three granularities [V]
+### Wire encoding and hardware actuation are two axes [V]
 
-The record looks uniform and is not. Three different things travel under `PARAM`, and each
-addresses a different sized thing:
+This section used to be a single table of "three granularities" — per channel, per four,
+per eight. **They are not three points on one scale.** Two are about which record carries a
+field; one is about how many channels a single write switches. Anyone reading them as one
+list gets one of the two wrong, which is exactly what happened.
 
-| PARAM | granularity | index the box derives |
+**Axis 1 — wire encoding: what a record carries.**
+
+| carrier | field | per |
 |---|---|---|
-| `02` SENS | **per channel** | `ch` |
-| `01` pad / the flag bits | **per channel** | `ch` |
-| `00` phantom +48V | **per group of FOUR** | `ch >> 2` |
-| *(readback nibble)* | **per group of EIGHT** | `ch >> 3` |
+| DT1 record `{CH, PARAM, VALUE}` | `00` phantom, `01` pad, `02` SENS | **channel** — one channel per record, all three |
+| slot map `{slot, cell+flags, sens}` | sens byte, flag bits 3/2/1 | **channel** — written for every slot |
+| slot map | high nibble = **inventory cell** | **four** — only where `(slot & 3) == 0` |
 
-So **only a record whose channel is a multiple of four carries phantom**. A record to `0x24`
-moves group 9; a record to `0x25`, `0x26` or `0x27` moves nothing. Sweeping phantom per
-channel writes three records in four into the void — the bytes are right, the checksums are
-right, the box acknowledges, and nothing happens. A console's own full push does send a
-phantom record per channel; that is the console being uniform, not the box being per-channel.
+The per-four field in the slot map is the *inventory cell*, not a head-amp parameter. The
+box's ingest `FUN_0c002d42` writes the sens byte and the three flag bits unconditionally and
+gates only `flags >> 4`.
 
-The readback nibble (`ch >> 3`) is a **different axis** from phantom (`ch >> 2`). Any API
-generated from this must keep the two named apart; collapsing them is a silent aliasing bug.
+**Axis 2 — hardware actuation: what one write switches.** **Per channel**, for phantom, pad
+and SENS alike. `FUN_0c007fbc(bank, group)` sets its cursor to `group << 3` and loops eight
+times; each iteration passes its own within-bank index and that slot's own value to
+`FUN_0c00ac1e` (phantom), `FUN_0c00ac96` (pad) and `FUN_0c007e6a` (SENS).
+
+**The eight is a bank, not an actuator.** The writers take `(bank, 0..7)` — two banks of
+eight, which is an S-1608's sixteen analog inputs — and `group` selects which eight-slot
+window of the 80-slot active table feeds them. It is the preamp's bank width and the refresh
+loop's batch size. Nothing is switched eight channels at a time.
+
+#### "Phantom is per four" is SETTLED — it is per channel [V]
+
+Measured 2026-08-23. `HEADAMP_GRAN_PHANTOM_SHIFT` was 2 and is now **0**: phantom rides one
+record per channel, exactly like pad and SENS. The claim it replaces — that only a record
+whose channel is a multiple of four carries phantom, a record to `0x24` moving group 9 and
+one to `0x27` moving nothing — was graded from an executed trace, which is why no amount of
+static reading was allowed to overturn it. It took the wire.
+
+**The capture.** `reacpw-s1608-48k-clean__phantom-ch24-on-off-2026-08-23.pcap` — taken as
+`phantom-test.pcap`, now in `~/Devel/audio/reac-captures-raw/` and still owing the corpus a
+MANIFEST row and a distillation pass. Live rig, interface `enp131s0`, ethertype `0x8819`
+only, snaplen 200, twelve seconds: idle, phantom TRUE on CH `0x24`, four seconds, phantom
+FALSE on `0x24`, nothing else touched. Exactly two head-amp records crossed the wire and
+both name CH `0x24` alone — `0x25`, `0x26` and `0x27` never appear. Every frame is truncated
+by the snaplen, so that is checked rather than assumed: the control block is `[18:50]` and
+the record inside it `[34:40]`, both within 200 bytes, and all 38 control blocks pass the
+block checksum while both head-amp records pass the nested record checksum.
+
+**The discriminating experiment this section used to propose does not exist.** It said: write
+`0x24`, write `0x25`, read the box's own re-broadcast back. There is no re-broadcast. In
+those twelve seconds the S-1608 sent 47122 frames with zero dropped — its 16-bit frame
+counter steps by one across all 47121 intervals — and every one is either an audio frame,
+whose 16-slot descriptor area is a constant `00 7a` per slot and unmoved by either toggle, or
+one of twelve bare link-1 opcode-`0x81` heartbeats whose 32-byte block never changes a byte.
+Nor does the box answer a real desk: in `m200-ch7-ON-OFF-ON-20260721-215743.pcap` it meets an
+M-200i toggling phantom six times with nothing but heartbeats. **Head-amp is write-only on
+this wire.** A consumer keeps its own model; there is nothing to query and compare against.
+
+**So it was settled on the axis the constant actually governs** — what a sender emits, since
+a consumer that trusts a 2 sweeps phantom on multiples of four only. Our own master writing
+one record for `0x24` shows what our encoder does and nothing about Roland's law, so the
+corpus supplied the desks: across 3651 phantom records from three desk generations — M-200i
+`00:40:ab:c9:cc:03`, M-300 `00:40:ab:c9:d8:5b`, M-5000 `00:40:ab:ca:15:4c` — **2304 address a
+channel that is not a multiple of four**. A full S-1608 sweep names `0x20..0x2f`, all sixteen;
+an S-0808 names `0x00..0x07`; an S-4000S names `0x00..0x1f`. The decisive single case is
+`m200-ch7-ON-OFF-ON`: a real M-200i toggling one channel's phantom on and off three times,
+six records, every one CH `0x26`. `0x26 & 3 == 2`, so a desk obeying "per four" would have
+had to write `0x24` and could not have expressed that toggle at all.
+
+The image read was right the whole time. `S-1608.BIN` holds exactly one channel-indexed
+`(x & 3) == 0` test, it is `FUN_0c002d42`'s inventory-cell gate, and it is not on the DT1
+path; every other `& 3` in the image is pointer alignment. The per-four number that is real
+is `PORTS_CH_PER_SLOT`, the inventory cell, and the likeliest history is that a trace of the
+*cell* moving was read as phantom moving — the same misreading as the retracted "phantom
+packed 4 ch/group" note.
+
+**Still not measured: hardware actuation.** No capture can show whether energising `0x24`
+also energises `0x25..0x27` inside the box, because the box reports nothing. That axis is
+`HEADAMP_ACTUATION_SHIFT`, it reads 0 from the image, and confirming it needs a physical
+48 V measurement on box inputs 6, 7 and 8 while only input 5 is written — never a soft
+indicator.
+
+#### Two granularities, and "bank" is a third axis of its own [V]
+
+**The readback nibble is not a third granularity.** `FUN_0c007fbc`'s caller was recovered on
+2026-08-23 — a function Ghidra never disassembled, with a clean prologue just past the
+previous function's `rts`, absent from the 1395-entry map and reached by a plain `bsr`. With
+it in hand the loop provably shifts the group by 3 and iterates exactly 8, so group `g`
+covers `[g*8, g*8+8)` and **`g == ch >> 3`**, which is the readback nibble's own index. So
+head-amp has exactly **two** granularities:
+
+| granularity | what it is | function |
+|---|---|---|
+| **per channel** | actuation — phantom, pad and SENS each written individually | `FUN_0c007fbc` → `FUN_0c00ac1e` / `FUN_0c00ac96` / `FUN_0c007e6a` |
+| **per eight** | refresh banking, and the readback nibble — one axis, not two | `FUN_0c007fbc` and its caller |
+
+**And "bank" is a separate axis from "group".** Our docs have used the words loosely and at
+least one has them inverted (`FUN_0c012162(k)` returns a **group** 0–9 while its argument `k`
+is a **bank**), so take the definition from here rather than from neighbouring prose:
+
+* **GROUP** — 0..9, and `group == ch >> 3`. Selects **which eight channels' data**: an
+  eight-slot window of the 80-slot active table.
+* **BANK** — selects **which eight physical preamps** receive it. **Not** a subdivision of
+  channel space, and it does not index the active table.
+
+`FUN_0c007fbc` takes both because they are independent.
 
 The constants and their evidence grades are in
 [`spec/protocol-facts.yaml`](spec/protocol-facts.yaml) (`head_amp` group), which is the one
@@ -727,6 +852,16 @@ replying inside a `MASTER_ANNOUNCE` with a split-announce response: `data[6]=0x0
 identifier the split later echoes in its `data[2]`; "0x04 and up seems to be fine").
 
 ### Slave handshake (partial in the driver)
+
+**The names in this list are the reacdriver project's own and four of them are
+wrong** — see [The CONTROL record header](#the-control-record-header--data04-v).
+`CONTROL_PACKET_TYPE_ONE/THREE` are a scene-transfer continuation fragment and the
+master's slot map; `SLAVE_ANNOUNCE1` is the box's state-4 commit report and
+`SLAVE_ANNOUNCE4` its link-check ack, so step 3's "5 CONTROL frames each prefixed
+with SLAVE_ANNOUNCE1..4" is not five announces but four different records, one of
+which the stagebox firmware only emits after it has committed the master's scene.
+The list is kept as written because it documents that driver's state machine, not
+ours.
 
 1. `NOT_INITIATED` → waits for `CONTROL_PACKET_TYPE_ONE` with `data[29]==0xc0`,
    `data[30]==0xa8`, then another with `data[5]==0x01`, `data[6]==0x01` and

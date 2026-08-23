@@ -45,6 +45,13 @@ Communications*.
   protocol disagree, written down rather than reconciled quietly, each with its resolution
   or the measurement that would settle it. SENS, the one openly contested number, is
   resolved: one decibel per step over all 56, measured by electrical loopback.
+- **[firmware-protocol.md](firmware-protocol.md)** — the protocol as the DEVICE FIRMWARE
+  states it, rather than as the wire shows it: the class names the images still carry, the
+  message inventory read out of the receive dispatch (including the arms nobody has ever
+  sent us), the box state machine with its failure edges, the struct layouts and every
+  indexing shift as a granularity fact. Each row carries a firmware function and address,
+  and each is marked CORROBORATED against the capture corpus or FIRMWARE-ONLY. Its last
+  section is the one to read first: what the firmware CONTRADICTS in the documents above.
 - **[capturing.md](capturing.md)** — how to capture and decode REAC yourself: the
   raw socket / tcpdump filter, frame validation, de-interleave, rate sanity-checks,
   and the traps (VLAN tags, level correctness).

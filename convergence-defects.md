@@ -116,20 +116,24 @@ the surviving one honest.
 
 ## 3. A gap, not a disagreement: libreac has no head-amp granularity at all
 
-`reac.ksy` states, from the box's own executed code, that "head-amp" is **three granularities**:
+**This defect was mostly wrong, and how it was wrong is the useful part.** It read:
 
     SENS and the flag bits   PER CHANNEL          ch
     phantom                  PER GROUP OF FOUR    ch >> 2
     the readback nibble      PER EIGHT            ch >> 3
 
-libreac expresses none of them. It has `REAC_HEADAMP_NPARAMS = 3` and a 48-channel ceiling, and
-nothing that says a phantom record to `0x27` moves nothing while one to `0x24` moves group 9. A
-consumer built on libreac alone will sweep phantom per channel and write three records in four
-into the void — with correct bytes, correct checksums, and an acknowledging box.
+and concluded that libreac, which expresses none of them and sweeps phantom per channel, "writes
+three records in four into the void — with correct bytes, correct checksums, and an acknowledging
+box". Measured 2026-08-23: libreac's behaviour is the correct one. Phantom is per channel
+(`HEADAMP_GRAN_PHANTOM_SHIFT` is now 0 — see wire-format.md), and the per-eight readback turned
+out to be the same axis as the refresh bank rather than a third granularity. What was left of the
+gap is one real thing, the 48-channel ceiling, and it is covered by `HEADAMP_CH_SPAN`.
 
-The schema now carries `HEADAMP_GRAN_*_SHIFT` for all three, so this closes as soon as the header
-is adopted. Until then it is a gap in the C side that the grammar has already documented, which is
-the mirror image of the SENS defect above.
+The lesson worth keeping is the shape of the error: the schema had a number libreac lacked, so the
+C side was filed as the deficient one and the plan was to make it conform. Had that landed before
+the measurement, a correct implementation would have been broken to match a wrong constant. **A
+convergence defect names a divergence, not which side is right** — decide that from evidence, not
+from which side is more specific.
 
 ---
 
