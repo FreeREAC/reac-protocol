@@ -46,7 +46,7 @@ box's own input count — see *Upstream audio layout* below.)
 | 12 | 2 | EtherType | const `0x88 0x19` |
 | 14 | 2 | counter | u16 LE, +1 per frame, wraps at 2¹⁶; `counter = b[14] | b[15]<<8` |
 | 16 | 2 | type | byte-pair frame type (registry below) |
-| 18 | 32 | data | opaque control/handshake metadata; `data[31]` is a checksum; layout depends on type |
+| 18 | 32 | data | control block, dispatched on `type`: op code, length, sub-page, then the op's own body; `data[31]` is the block checksum. Modelled field-by-field in [`spec/reac.ksy`](spec/reac.ksy) — not opaque |
 | 50 | 1440 | audio | 40 ch × 12 samp × 3 B, carried in **every** frame type incl. FILLER |
 | 1490 | 2 | end | const `0xC2 0xEA` end marker |
 
