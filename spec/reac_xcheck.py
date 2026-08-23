@@ -415,9 +415,18 @@ def test_the_three_consoles_differ_in_exactly_two_bytes():
 # the op-0403 DT1 record container
 # --------------------------------------------------------------------------
 
+def dt1(t):
+    """The DT1 record inside an op-0403 container.
+
+    op-0403 is discriminated at block[4]: 0x00 is a DT1 record, 0x02 is the box's
+    constant upstream return block. The record therefore sits one level in."""
+    assert t.block.payload.subtype == 0x00, 'not a DT1 subtype'
+    return t.block.payload.body
+
+
 @pytest.mark.parametrize("name,blk", [(n, b) for n, b in BLOCKS if "cc00" in n])
 def test_dt1_container_shape(name, blk):
-    r = parse_block(blk["hex"]).block.payload
+    r = dt1(parse_block(blk["hex"]))
     assert r.len_echo == parse_block(blk["hex"]).op_len_raw - 5
     assert r.device_id == 0x0a
     assert bytes(r.model_id) == b"\x00\x00\x12"
@@ -428,7 +437,7 @@ def test_dt1_container_shape(name, blk):
 @pytest.mark.parametrize("name,blk", [(n, b) for n, b in BLOCKS if "cc00" in n])
 def test_dt1_inner_checksum_is_0x80(name, blk):
     raw = bytes.fromhex(blk["hex"])
-    r = parse_block(blk["hex"]).block.payload
+    r = dt1(parse_block(blk["hex"]))
     record = raw[18:18 + r.record_len]   # TAG .. CKSUM, frame[34:34+record_len]
     assert oracle_record_cksum_ok(record), f"{name}: record does not sum to 0x80"
 
@@ -442,7 +451,7 @@ def test_grant_sweep_head_amp_records_match_the_oracle_cell_table():
         assert t.ctrl_kind == oracle_ctrl_kind(bytes.fromhex(hexstr))
         if t.ctrl_kind != KIND_HEADAMP:
             continue
-        d = t.block.payload.data
+        d = dt1(t).data
         cells.append([d.ch, d.param.value, d.value])
     assert len(cells) == 48
     assert cells == GRANT_CELLS
@@ -453,7 +462,7 @@ def test_grant_sweep_every_record_and_block_checksums():
         raw = bytes.fromhex(hexstr)
         t = parse_block(hexstr)
         assert oracle_block_cksum_ok(t.raw_block)
-        r = t.block.payload
+        r = dt1(t)
         assert oracle_record_cksum_ok(raw[18:18 + r.record_len])
 
 
