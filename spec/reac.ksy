@@ -1351,11 +1351,19 @@ types:
       phantom to 0x24 and to 0x25 and read the box's re-broadcast back. Do not
       generate a per-four sweep from this doc until that runs.
 
-      The readback nibble's `ch >> 3` coincides arithmetically with the apply
-      loop's bank index over the same 80 slots, so it may be that same bank
-      reported back rather than a third axis. Not asserted: FUN_0c007fbc has no
-      caller in the function-only export, so what drives the banking cannot be
-      traced from this image.
+      TWO GRANULARITIES, NOT THREE. The readback nibble is not a third axis:
+      FUN_0c007fbc's caller was recovered on 2026-08-23 (a function Ghidra never
+      disassembled — clean prologue past the previous function's rts, absent
+      from the 1395-entry map, reached by a plain bsr), and it confirms the loop
+      shifts by 3 and iterates exactly 8, so group g covers [g*8, g*8+8) and
+      `g == ch >> 3` — the readback nibble's own index. So the list is: PER
+      CHANNEL (actuation) and PER EIGHT (refresh and readback banking).
+
+      BANK IS A SEPARATE AXIS FROM GROUP, and our docs have used the two words
+      loosely. GROUP is 0..9 and equals `ch >> 3`; it selects which eight
+      channels' DATA, an eight-slot window of the 80-slot active table. BANK
+      selects which eight PHYSICAL PREAMPS receive it, and is not a subdivision
+      of channel space. FUN_0c007fbc takes both because they are independent.
 
       # A record writes the ACTIVE table, and the commit overwrites it
 
@@ -1408,7 +1416,8 @@ types:
           6 dB at the top of the travel and by the very shape of the function.
 
           AND THE FIRMWARE HOLDS THE CURVE AS A TABLE. S-1608.BIN at 0x0c0327a0
-          and S-0808.BIN at file offset 0x45ec8 carry the same 56 two-byte
+          and S-0808.BIN at file offset 0x45ec8 (a raw byte match only — there
+          is no S-0808 decompilation) carry the same 56 two-byte
           entries, read by FUN_0c007e30, which clamps the step to 0x37 — so
           0x37 is the top of the travel by construction, not by observation.
           The two bytes are a two-bit coarse analog range and a serial fine

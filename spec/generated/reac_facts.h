@@ -316,10 +316,25 @@
  * them, and the commit does not call it. The two twelve-wide things the
  * commit does touch are both INVENTORY — one inbound, one outbound.
  *
- * Cross-checked on a second image: S-4000.BIN, load base 0x0C000000, has
- * the identical shape — the 0x50-slot copy, the six-byte master id, the
- * `i * 0x28` twelve-group loop over its own staging table 0x0c0cd66a, and
- * the same report.
+ * Cross-checked on a second image: S-4000.BIN has the identical shape — the
+ * 0x50-slot copy, the six-byte master id, the `i * 0x28` twelve-group loop
+ * over its own staging table 0x0c0cd66a, and the same report.
+ *
+ * ON THE S-4000 ADDRESSES, because a base error would silently invalidate
+ * these citations while leaving the conclusion right. They are quoted in the
+ * address space of `devices/S-4000S/decompile/S-4000_alldecomp.c`, which is
+ * 0x0C000000, and that space was CHECKED rather than assumed: all 832
+ * PTR_FUN literal values in that image resolve exactly to addresses of
+ * functions listed in the same decompilation. At a base of 0x0BFF0000 only
+ * 20 of 832 resolve. Real code also begins at file offset 0x10 and the
+ * listing's functions span file offsets 0x890..0x41e68, so there is no
+ * unmapped 0x10000 prefix that would reconcile the two. File offsets, which
+ * survive any re-basing: the commit at 0x13834, its literals at 0x1382c,
+ * 0x13750, 0x13752.
+ *
+ * The RAM pointers these literals hold (0x0c0cd66a and the rest) are values
+ * baked into the image and are correct as runtime addresses whatever base
+ * the code is read at.
  */
 /* Slots copied staging -> active by the commit, unconditionally. Eighty,
  * not forty-eight — the box's addressable channel space is 48 (the slot
@@ -633,17 +648,30 @@
  *     not a head-amp parameter.
  *
  * AXIS 2 — HARDWARE ACTUATION, what one write switches. PER CHANNEL, for
- * all three parameters. FUN_0c007fbc(bank, group) takes group 0..9, sets
- * its cursor to `group << 3`, and loops EIGHT times; inside the loop, each
- * iteration passes its own within-bank index (0..7) and that slot's own
- * value to FUN_0c00ac1e (phantom), FUN_0c00ac96 (pad) and FUN_0c007e6a ->
+ * all three parameters. FUN_0c007fbc(bank, group) sets its cursor to
+ * `group << 3` and loops EIGHT times; inside the loop, each iteration
+ * passes its own within-bank index (0..7) and that slot's own value to
+ * FUN_0c00ac1e (phantom), FUN_0c00ac96 (pad) and FUN_0c007e6a ->
  * FUN_0c007e30 (sens). Each channel gets its own value and its own write.
  *
- * SO THE EIGHT IS A BANK, NOT AN ACTUATOR. The writers take (bank, 0..7),
- * which is two banks of eight = the S-1608's sixteen analog inputs, and
- * `group` selects which eight-slot window of the 80-slot active table feeds
- * them. Eight is the preamp hardware's bank width and the refresh loop's
- * batch size. Nothing is switched eight channels at a time.
+ * SO THERE ARE EXACTLY TWO GRANULARITIES, NOT THREE: per channel and per
+ * eight. Per channel is the ACTUATION. Per eight is the REFRESH BANKING —
+ * and the readback nibble is the same eight, not a third axis. See
+ * HEADAMP_BANK_CHANNELS, which is now the single row for both.
+ *
+ * BANK AND GROUP ARE DIFFERENT AXES AND OUR DOCS HAVE MIXED THEM UP.
+ * Pinned here, once:
+ *
+ *   GROUP 0..9, and `group == ch >> 3`. It selects WHICH EIGHT CHANNELS'
+ *          DATA — an eight-slot window of the 80-slot active table.
+ *   BANK selects WHICH EIGHT PHYSICAL PREAMPS receive it. It is NOT a
+ *          subdivision of channel space and it does not index the active
+ *          table.
+ *
+ * They are independent, which is why FUN_0c007fbc takes both. At least one
+ * doc has them inverted — FUN_0c012162(k) returns a GROUP 0..9 while its
+ * argument k is a BANK — so anything reading either word should check it
+ * against this definition rather than against neighbouring prose.
  *
  * A NOTE ON A CORRECTION MADE TO THIS FILE'S OWN CORRECTION: the firmware
  * lane's first report said phantom "reaches hardware in groups of EIGHT".
@@ -676,9 +704,10 @@
  * 56 rows with no spares. What each step is WORTH in dB is the headamp_sens
  * group below; this row is only the count. [EVIDENCED (image) — a 56-entry
  * table at 0x0c0327a0 in the S-1608 image, reached by both write paths,
- * ending exactly where the "V03.05" version string begins. The count is what
- * that table proves; reading a gain curve off its stage structure did not
- * survive the rig.]
+ * ending exactly where the "V03.05" version string begins — in the S-1608
+ * image; the S-0808 copy is a byte match only. The count is what that table
+ * proves; reading a gain curve off its stage structure did not survive the
+ * rig.]
  */
 #define REAC_HEADAMP_SENS_MAX           0x37
 
@@ -713,12 +742,20 @@
  * misreading of FUN_0c002d42, and that "a record to 0x24 moves group 9"
  * describes the inventory cell moving, not phantom.
  *
- * NOT CHANGED HERE, because the grade below is an executed trace and a
- * static read must not silently overwrite an observation. THE
- * DISCRIMINATING EXPERIMENT, which needs no rig: send DT1 phantom
- * records to channels 0x24 and 0x25 in turn and read the box's own
- * re-broadcast back. If 0x25 moves, this row is 0 and phantom is per
- * channel on the wire too.
+ * THE STATIC CASE STRENGTHENED ON 2026-08-23 and the row still does not
+ * flip. Three things now point the same way: actuation is per channel
+ * (HEADAMP_ACTUATION_SHIFT); the only channel-indexed `& 3` test in the
+ * image is the inventory-cell gate; and the per-eight axis turned out to
+ * be BANKING rather than actuation, so nothing on the hardware side is
+ * grouped at all. That is a much better static picture than an hour ago
+ * and it is still not an observation.
+ *
+ * NOT CHANGED HERE, because the grade below is an executed trace and
+ * inference must not overwrite one however good it gets. THE ONE
+ * REMAINING DISCRIMINATOR, which needs no rig: send DT1 phantom records
+ * to channels 0x24 and 0x25 in turn and read the box's own re-broadcast
+ * back. If 0x25 moves, this row is 0 and phantom is per channel on the
+ * wire too.
  *   [DISPUTED — EVIDENCED (executed trace) against EVIDENCED (image, S-1608
  *   FUN_0c002d42 + FUN_0c007fbc). Unresolved.]
  */
@@ -734,32 +771,41 @@
  */
 #define REAC_HEADAMP_ACTUATION_SHIFT    0
 
-/* The preamp bank width, and the batch size of the apply loop — NOT an
- * actuation granularity. FUN_0c007fbc(bank, group) walks `group << 3`
- * for eight iterations and its writers take (bank, 0..7), so two banks
- * of eight cover the S-1608's sixteen analog inputs. `group` runs 0..9
- * over the 80-slot active table.
- *   [EVIDENCED (image, S-1608 FUN_0c007fbc).]
+/* THE PER-EIGHT GRANULARITY, and there is only one of them. This row
+ * folds together what used to be two — "the hardware bank" and "the
+ * readback nibble is per eight" — because they are arithmetically the
+ * same thing and were being read as two independent pieces of evidence.
+ *
+ * FUN_0c007fbc sets its cursor to `group << 3` and loops exactly eight
+ * times, so group g covers [g*8, g*8+8) and therefore `g == ch >> 3` —
+ * which is the readback nibble's own index. One axis, two spellings:
+ * this width 8 and HEADAMP_BANK_SHIFT's 3.
+ *
+ * It is a REFRESH AND READBACK banking, not an actuation width: the
+ * writers take (bank, 0..7) and each of the eight iterations writes one
+ * channel. Two banks of eight cover an S-1608's sixteen analog inputs.
+ *   [EVIDENCED (image) — S-1608 FUN_0c007fbc for the loop and the per-channel
+ *   writes; its caller, recovered 2026-08-23 from a function Ghidra never
+ *   disassembled (clean prologue past the previous function's rts, absent
+ *   from the 1395-entry map, reached by a plain bsr), for `group == ch >> 3`.
+ *   Supersedes the earlier UNRESOLVED note that the caller could not be
+ *   traced.]
  */
 #define REAC_HEADAMP_BANK_CHANNELS      8
 
-/* The readback nibble is per EIGHT — ch >> 3. It coincides
- * ARITHMETICALLY with the apply loop's bank index, which is also a
- * `>> 3` over the same 80 slots, so "readback per eight" and "the
- * hardware bank" are plausibly one fact rather than two.
+/* `ch >> 3` gives the bank/group index. THE SAME FACT AS
+ * HEADAMP_BANK_CHANNELS above, spelled as a shift instead of a width —
+ * consult one or the other, never both as corroboration.
  *
- * NOT ASSERTED AS ONE, because the image does not close it: there is no
- * `ch >> 3` anywhere in the head-amp region of S-1608.BIN, and
- * FUN_0c007fbc has NO caller in the function-only export — it is reached
- * through a data-section pointer, so what drives the banking cannot be
- * traced. The coincidence is real and the identification is not proven.
- * THE EXPERIMENT: the same data-section pointer re-export that would
- * close the enrolled-bit writer would show FUN_0c007fbc's caller and
- * settle whether the readback reports these banks.
- *   [EVIDENCED (executed trace) for the shift; the identification with
- *   HEADAMP_BANK_CHANNELS is UNRESOLVED (image, caller not exported).]
+ * It was called HEADAMP_GRAN_READBACK_SHIFT and sat beside the bank row
+ * as if the readback were a third, independent granularity. It is not:
+ * the apply loop's group index and the readback nibble are the same
+ * `ch >> 3` over the same 80 slots.
+ *   [EVIDENCED (executed trace for the readback nibble; image for the apply
+ *   loop's identical index — S-1608 FUN_0c007fbc and its caller). The two
+ *   agree, which is why they are one row.]
  */
-#define REAC_HEADAMP_GRAN_READBACK_SHIFT 3
+#define REAC_HEADAMP_BANK_SHIFT         3
 
 /* Every real desk sweep is ONE contiguous pass over the box's full declared
  * width, every channel getting all three parameters — 24 records for an
@@ -790,9 +836,18 @@
  * THE FIRMWARE HOLDS THE CURVE AS A TABLE, and here it is. S-1608.BIN at
  * 0x0c0327a0, 56 entries of two bytes, read by FUN_0c007e30 which clamps
  * the step to 0x37 and hands the pair to the preamp writer FUN_0c00af2a.
- * The same 112 bytes are in S-0808.BIN at file offset 0x45ec8. The table
- * ends where the image's ASCII version banner begins, which is how we know
- * its extent is exactly 56 and not a run of padding.
+ * In the S-1608 image the table ends exactly where the ASCII version banner
+ * "V03.05" begins, which is how we know its extent is 56 and not a run of
+ * padding.
+ *
+ * The same 112 bytes appear in S-0808.BIN at file offset 0x45ec8. THAT IS A
+ * RAW BYTE MATCH AND NOTHING MORE: there is no S-0808 decompilation, the
+ * image is not a code image loadable at the S-1608's base, and its own
+ * pointers are a different width and order (big-endian 0x0003xxxx). The
+ * banner control above does NOT apply there — S-0808 has zero padding after
+ * the table, not a banner. Nothing in this group is sourced from S-0808
+ * disassembly; the byte match corroborates the table's content across two
+ * models and the reading of it comes from the S-1608 alone.
  *
  *   step stage fine step stage fine step stage fine step stage fine
  *   0x00 3 0x00 0x0e 2 0x0c 0x1c 1 0x08 0x2a 0 0x04
@@ -899,7 +954,8 @@
 /* Entries in the firmware's SENS table, steps 0x00..0x37. The writer
  * FUN_0c007e30 clamps anything above 0x37 to 0x37, so 0x37 is the top of the
  * travel and not merely the last one observed. [EVIDENCED (image, S-1608
- * 0x0c0327a0 and S-0808 file 0x45ec8).]
+ * 0x0c0327a0 = file 0x527a0; the same 112 bytes at S-0808 file 0x45ec8 as a
+ * raw byte match, not a disassembly — there is no S-0808 decompilation).]
  */
 #define REAC_HEADAMP_SENS_STEPS         56
 
