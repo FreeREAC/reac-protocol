@@ -252,12 +252,18 @@ nothing.
 
 ## The box state machine
 
-`FUN_0c0037ee` @0c0037ee is not a tick handler. It is the body of an RTOS task the firmware names
-**`IP658 Main Task`**, which dispatches on a role selector `FUN_0c00f6b4` @0c00f6b4 (resolved from
-the pool slot at 0x0c00543c) — role 0, role 1 and a third arm — and then loops
-`switch(state); dly_tsk(1);` forever. **One step per millisecond.** Timeouts are counted by a
-second task, `IP658 Timer Task`, which decrements once per 10 ms, so a countdown of 100 is one
-second, 600 is six and 1000 is ten.
+`FUN_0c0037ee` @0c0037ee is not a tick handler. It has no caller anywhere in the export — it is
+the body of an RTOS task, reached from a region Ghidra never disassembled and read by hand out of
+the image. The firmware names its tasks: `IP658 Main Task` and `IP658 Timer Task` are in the ITRON
+object table. The task entry dispatches on a role selector and then loops
+`switch(state); dly_tsk(1);` forever — **one step per millisecond** — and the timer task
+decrements once per 10 ms, so a countdown of 100 is one second, 600 is six and 1000 is ten.
+
+The role selector is `FUN_0c00f6b4` @0c00f6b4, and that much is checkable in the export: the pool
+slot at 0x0c00543c resolves to it, and `FUN_0c0051c4` @0c0051c4 consults it to decide whether to
+persist the identity at all. **Which role runs which FSM is HAND-DECODED**, not read from the
+export, and two passes over the same task table disagreed on the entry addresses — so take the
+role split below as the machine's shape and not as a citable address.
 
 The three roles are the same three the class registry names — `CReacMsgParser` with
 `CMasterReacMsgParser` and `CSlave1ReacMsgParser` beside it — and the same three the M-400
@@ -405,11 +411,22 @@ is wrong. Three of the four master exports are ~97% unrecovered — M-480, M-300
 exported 281, 262 and 272 functions where M-400 exported 8 561 — which is why the searches came
 back empty.
 
-M-400 carries it. Its RTTI decodes cleanly to `CReacManager` with `CMasterReacManager`
-(typeinfo 0x8c45ae94, vtable 0x8c45adfc), `CSlaveReacManager` and `CSplitReacManager` — the
-**three roles**, one manager class each, matching the box images' three-way parser split. Per-port
-task classes confirm **two REAC ports, A and B**: `CReacATxTask` / `CReacBTxTask`,
-`CReacARxTask` / `CReacBRxTask`. There is a compilation unit literally named `REAC.c`, and
+M-400 carries it, and the committed `M-400_run.log` is enough to see so: it names
+`18CMasterReacManager` at 0x8c45aedc, together with `8CReacMsg`, `11CReacRecMsg`,
+`11CReacPrgMsg`, `13CReacTDataMsg`, `16CReacTDataRecMsg`, `17CReacTDataKikiMsg`,
+`18CReacTDataPrgTxMsg`, `19CReacTDataMsgSender`, `22CReacTDataTxTaskCommon` and a
+`CFIFO<CReacTDataMsgSender::STDRQ1Info, 32>` transmit queue. The same `CReac*` family lives in
+both box images, so master and box share one codebase, and the boxes carry a parser named FOR
+master messages.
+
+Beyond that name list the reading rests on the uncommitted section binary, and is marked so here:
+the typeinfo and vtable addresses, the root `CReacManager` with `CSlaveReacManager` and
+`CSplitReacManager` beside `CMasterReacManager` — the **three roles**, matching the box images'
+three-way parser split — and the per-port task classes that give **two REAC ports, A and B**
+(`CReacATxTask` / `CReacBTxTask`, `CReacARxTask` / `CReacBRxTask`). None of those strings appear
+in `M-400_run.log`; only `CMasterReacManager` does.
+
+There is a compilation unit literally named `REAC.c`, and
 `FUN_8c0cbc98` prints `REAC %c's master is running on %skHz.` followed by
 `Do you want to set the sampling frequency to %skHz?.` — a console detecting a foreign master on
 a port and offering to match its rate.
