@@ -82,7 +82,7 @@ _Static_assert(REAC_HEADAMP_GRAN_SENS_SHIFT == 0,
                "REAC_HEADAMP_GRAN_SENS_SHIFT has drifted from protocol-facts.yaml HEADAMP_GRAN_SENS_SHIFT");
 _Static_assert(REAC_HEADAMP_GRAN_FLAGS_SHIFT == 0,
                "REAC_HEADAMP_GRAN_FLAGS_SHIFT has drifted from protocol-facts.yaml HEADAMP_GRAN_FLAGS_SHIFT");
-_Static_assert(REAC_HEADAMP_GRAN_PHANTOM_SHIFT == 2,
+_Static_assert(REAC_HEADAMP_GRAN_PHANTOM_SHIFT == 0,
                "REAC_HEADAMP_GRAN_PHANTOM_SHIFT has drifted from protocol-facts.yaml HEADAMP_GRAN_PHANTOM_SHIFT");
 _Static_assert(REAC_HEADAMP_NPARAMS == 3,
                "REAC_HEADAMP_NPARAMS has drifted from protocol-facts.yaml HEADAMP_SWEEP_RECORDS_PER_CH");

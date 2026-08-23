@@ -1022,7 +1022,10 @@ groups:
         DT1 head-amp record {CH, PARAM, VALUE}, op-0403 TAG 0x0101
           PARAM 0x00 phantom, 0x01 pad, 0x02 sens — one channel per record,
           all three. NO per-four gate exists on this path anywhere in the
-          image; see the DISPUTED note on HEADAMP_GRAN_PHANTOM_SHIFT.
+          image, and the wire agrees: measured 2026-08-23, three desk
+          generations address phantom on channels that are not multiples of
+          four, and a single-channel toggle names only its own channel. See
+          HEADAMP_GRAN_PHANTOM_SHIFT, which that measurement moved from 2 to 0.
 
         SLOT MAP record {slot, cell+flags, sens}, op-0103 subtype 0x01
           FUN_0c002d42 writes the sens byte and the three flag bits (bits 3,
@@ -1123,44 +1126,97 @@ groups:
         why: The flag bits are per channel — ch >> 0.
         evidence: EVIDENCED (executed trace).
       - name: HEADAMP_GRAN_PHANTOM_SHIFT
-        value: 2
+        value: 0
         libreac: REAC_HEADAMP_GRAN_PHANTOM_SHIFT
         why: |
-          DISPUTED 2026-08-23, VALUE UNCHANGED PENDING ONE EXPERIMENT. Read as
-          "phantom is per group of FOUR — ch >> 2", and a consumer that trusts
-          it sweeps phantom on multiples of four only.
+          PHANTOM IS PER CHANNEL — ch >> 0, exactly like pad and sens. This row
+          read 2 and was DISPUTED; it was measured on 2026-08-23 and the 2 is
+          withdrawn.
 
-          THE IMAGE DOES NOT CONTAIN THIS GATE. There is exactly one
-          channel-indexed `(x & 3) == 0` test in S-1608.BIN — FUN_0c002d42, the
-          SLOT-MAP ingest — and what it gates is `flags >> 4`, the inventory
-          cell nibble, handed to the 12-entry inventory arrays at 0x0c0f62fa
-          and 0x0c0cf80e. It does not gate a head-amp parameter, and it is not
-          on the DT1 path at all. Every other `& 3` in the image is pointer
-          alignment. Meanwhile the hardware write is per channel (see
-          HEADAMP_ACTUATION_SHIFT), so there is no per-four actuator for a
-          per-four record to feed.
+          THE MEASUREMENT. Taken on the live rig 2026-08-23 as phantom-test.pcap
+          and filed as
+          reacpw-s1608-48k-clean__phantom-ch24-on-off-2026-08-23.pcap in
+          ~/Devel/audio/reac-captures-raw/ (it still needs a MANIFEST row and a
+          distillation pass before it joins the committed corpus):
+          interface enp131s0 (the S-1608 segment), ethertype 0x8819 only,
+          snaplen 200, twelve seconds — idle, then phantom set TRUE on head-amp
+          CH 0x24, four seconds, then phantom set FALSE on 0x24, nothing else
+          touched. 0x24 is box port 5 and the first of the group of four
+          0x24..0x27 that the retracted reading claimed one record covers.
+          Exactly TWO head-amp records crossed the wire in those twelve seconds
+          and both name CH 0x24 ALONE. 0x25, 0x26 and 0x27 never appear. Every
+          frame was truncated by the snaplen, so that is a claim to check rather
+          than assume: the control block is [18:50] and the record inside it
+          [34:40], both inside the 200 bytes, and all 38 control blocks in the
+          capture pass the block checksum while both head-amp records pass the
+          nested record checksum. Truncation removed audio and nothing the
+          verdict rests on.
 
-          The most likely history is that this number and the state diagram's
-          retracted "phantom packed 4 ch/group, group = slot >> 2" are the same
-          misreading of FUN_0c002d42, and that "a record to 0x24 moves group 9"
-          describes the inventory cell moving, not phantom.
+          THE DISCRIMINATOR THIS ROW USED TO ASK FOR DOES NOT EXIST, which is
+          what had kept it stuck. The old note said: write 0x24, write 0x25, and
+          read the box's own RE-BROADCAST back. THERE IS NO RE-BROADCAST. The
+          S-1608 sent 47122 frames in that capture with ZERO dropped — its
+          16-bit frame counter steps by one across all 47121 intervals — and
+          every one of them is either an audio frame, whose 16-slot descriptor
+          area is a constant `00 7a` per slot and did not move a byte at either
+          toggle, or one of twelve bare link-1 opcode-0x81 heartbeats whose
+          32-byte block is byte-identical every time. The box volunteers no
+          head-amp state whatsoever. Neither does it to a real desk: in
+          m200-ch7-ON-OFF-ON-20260721-215743.pcap this same box answers an
+          M-200i toggling phantom six times with nothing but its heartbeat. A
+          consumer must therefore treat head-amp as WRITE-ONLY on this wire and
+          keep its own model; there is nothing to query and compare against.
 
-          THE STATIC CASE STRENGTHENED ON 2026-08-23 and the row still does not
-          flip. Three things now point the same way: actuation is per channel
-          (HEADAMP_ACTUATION_SHIFT); the only channel-indexed `& 3` test in the
-          image is the inventory-cell gate; and the per-eight axis turned out to
-          be BANKING rather than actuation, so nothing on the hardware side is
-          grouped at all. That is a much better static picture than an hour ago
-          and it is still not an observation.
+          SO THE ROW IS SETTLED ON THE AXIS IT ACTUALLY GOVERNS — what a SENDER
+          puts on the wire, since a consumer that trusts a 2 emits phantom on
+          multiples of four only. Our own master emitting one record for 0x24
+          shows what OUR encoder does and nothing about Roland's law, so the
+          corpus supplied the desks. Across 3651 phantom records from three desk
+          generations — M-200i 00:40:ab:c9:cc:03, M-300 00:40:ab:c9:d8:5b,
+          M-5000 00:40:ab:ca:15:4c — 2304 address a channel that is NOT a
+          multiple of four. A full S-1608 sweep names 0x20..0x2f, all sixteen;
+          an S-0808 names 0x00..0x07; an S-4000S names 0x00..0x1f. The decisive
+          single case is m200-ch7-ON-OFF-ON: a real M-200i toggling ONE
+          channel's phantom on and off three times, six records, every one of
+          them CH 0x26. 0x26 & 3 == 2, so a desk obeying "per four" would have
+          had to write 0x24 and could not have expressed that toggle at all.
 
-          NOT CHANGED HERE, because the grade below is an executed trace and
-          inference must not overwrite one however good it gets. THE ONE
-          REMAINING DISCRIMINATOR, which needs no rig: send DT1 phantom records
-          to channels 0x24 and 0x25 in turn and read the box's own re-broadcast
-          back. If 0x25 moves, this row is 0 and phantom is per channel on the
-          wire too.
-        evidence: DISPUTED — EVIDENCED (executed trace) against EVIDENCED
-          (image, S-1608 FUN_0c002d42 + FUN_0c007fbc). Unresolved.
+          THE READING THAT LOSES, AND WHY IT WAS BELIEVED. It was "phantom is
+          per group of FOUR, ch >> 2", graded EVIDENCED (executed trace). That
+          grade is why the static case was never allowed to flip this row, no
+          matter how strong it got: inference does not overturn an observation.
+          It is overturned here by MORE observations — more desks, more records,
+          and a purpose-built single-channel toggle on a channel that is not a
+          group leader. The static read turns out to have been right the whole
+          time: there is no per-four gate on the DT1 path anywhere in
+          S-1608.BIN. The single channel-indexed `(x & 3) == 0` test in that
+          image is FUN_0c002d42's, it gates `flags >> 4` into the two 12-entry
+          INVENTORY arrays, and it sits on the SLOT-MAP path, not the head-amp
+          path. The per-four number that is real belongs to PORTS_CH_PER_SLOT,
+          the inventory cell, and the likeliest history is that a trace of the
+          CELL moving was read as phantom moving. The capture is consistent with
+          that: the master's slot map reported slot 0x24 after the ON and again
+          after the OFF, flags 0x28 and sens 0x00 both times, and across all 48
+          channel slots it recorded zero state changes in the whole twelve
+          seconds. A phantom write does not touch the slot map.
+
+          WHAT IS STILL NOT MEASURED, so nobody reads more into this than it
+          says: HARDWARE ACTUATION. No capture can show whether energising 0x24
+          also energises 0x25..0x27 inside the box, because the box reports
+          nothing back. That axis is HEADAMP_ACTUATION_SHIFT; it reads 0 from
+          the image, and confirming it needs a physical 48 V measurement on box
+          inputs 6, 7 and 8 while only input 5 is written — never a soft
+          indicator.
+        evidence: EVIDENCED (executed trace) —
+          reacpw-s1608-48k-clean__phantom-ch24-on-off-2026-08-23.pcap (taken as
+          phantom-test.pcap), enp131s0, snaplen 200 (one record for CH 0x24
+          alone per toggle; the
+          box re-broadcasts nothing, 0 dropped frames), together with 2304
+          non-group-leader phantom records from three desk generations in the
+          corpus and m200-ch7-ON-OFF-ON-20260721-215743.pcap as the decisive
+          single-channel case. OVERTURNS the earlier executed trace that read 2,
+          and vindicates the image read (S-1608 FUN_0c002d42 gates the inventory
+          cell, not phantom).
       - name: HEADAMP_ACTUATION_SHIFT
         value: 0
         why: |
