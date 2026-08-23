@@ -1212,6 +1212,40 @@ types:
       - id: rest
         size-eos: true
     instances:
+      group_bytes:
+        pos: 3
+        size: 10
+        doc: |
+          The same ten bytes as `input_groups` + `output_groups`, as ONE array —
+          which is how the only firmware that parses this page reads them.
+
+          EVIDENCED (image), S-4000S, the FSM arm gated on
+          `buf[0]==1 && buf[1]==3 && buf[4]==0x10` with `BE16(buf[2:4]) == 0x0d`
+          (S-4000_alldecomp.c around line 18066). It applies `buf[5]` and
+          `buf[6]`, and then reads these ten bytes TWICE, as two packed fields:
+
+            for i in 0..11:  setter(i, buf[(i >> 1) + 7] & 0x3f)
+            for i in 0..9:   v = buf[i + 7] >> 6
+                             if (v != 0 and v != 1) v = -1
+                             setter(i, v, 1)
+
+          So the low six bits are read once per PAIR of groups — one byte covers
+          eight channels and lands in two four-channel group slots, `>> 1` being
+          the granularity — while the top two bits are read once per byte across
+          all ten, with 2 and 3 folded to -1.
+
+          On the width-8 fixture that yields low-6 = [1,1,0,0,0,0,0,0,0,0,0,0]
+          and top-2 = [1,0,0,0,0,0,-1,-1,-1,-1], which is the S-0808's two input
+          groups of four marked in the first field and its one input group of
+          eight marked in the second.
+
+          The wire description above — 0x41 front-packed, 0xc3 back-packed — is a
+          true statement about the bytes and this is what produces it, but the
+          firmware never splits them into two arrays, and what the two code
+          spaces MEAN is UNRESOLVED. Nothing in the S-1608 image parses this page
+          at all: it has no `[4]==0x10` gate and no `& 0x3f` anywhere near the
+          protocol code, which fits the observation that most S-1608 captures
+          carry no 0x000d frame and the box is placed anyway.
       enrolled_in_channels:
         value: >-
           (input_groups[0] == 0x41 ? 8 : 0) + (input_groups[1] == 0x41 ? 8 : 0) +
