@@ -394,9 +394,9 @@
    "ok": 2624
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__ctl2.pcap": {
-   "blocks": 6620869,
+   "blocks": 633166,
    "blocks_failed": 0,
-   "blocks_ok": 6620869,
+   "blocks_ok": 633166,
    "failed": 0,
    "frames": 6000,
    "ok": 6000
