@@ -196,20 +196,20 @@ def check_scene_roundtrip(R, KS, BIO, dump, body: bytes, label: str, rep: Report
                    R.Reac.ControlOp.scene_header)
             declared_total = pay.scene_total_len
             rep.eq(f"{label} step 0: op_len is the head length",
-                   blk.block.op_len, 24)
+                   blk.block.rec_len, 24)
             rebuilt += pay.body_head
         elif step < 342:
             rep.eq(f"{label} step {step}: op", blk.block.op,
                    R.Reac.ControlOp.scene_chunk)
-            rep.eq(f"{label} step {step}: op_len", blk.block.op_len, 26)
+            rep.eq(f"{label} step {step}: op_len", blk.block.rec_len, 26)
             rep.eq(f"{label} step {step}: subtype byte is zero",
                    pay.chunk_reserved, 0)
             rebuilt += pay.chunk
         else:
             rep.eq(f"{label} step {step}: op", blk.block.op,
                    R.Reac.ControlOp.scene_final)
-            rep.eq(f"{label} step {step}: op_len", blk.block.op_len, 14)
-            rebuilt += pay.chunk[:blk.block.op_len]
+            rep.eq(f"{label} step {step}: op_len", blk.block.rec_len, 14)
+            rebuilt += pay.chunk[:blk.block.rec_len]
 
     rep.eq(f"{label}: header declares the body length",
            declared_total, len(body))
@@ -314,7 +314,7 @@ def check_corpus(R, KS, BIO, dump, rep: Report):
             rep.eq(f"{name}: libreac accepts the nested record",
                    j["record_ok"], 0)
             rep.eq(f"{name}: record checksum sums to 0x80",
-                   sum(raw[18:18 + blk.block.op_len - 0x0d]) % 256, 0x80)
+                   sum(raw[18:18 + blk.block.rec_len - 0x0d]) % 256, 0x80)
             rep.eq(f"{name}: ch is inside the head-amp space",
                    rec.data.ch < 0x30, True)
             rep.bump("corpus_headamp")

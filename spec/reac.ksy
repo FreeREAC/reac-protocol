@@ -168,7 +168,7 @@ doc: |
 
     peer silent past the master's hold      -> the session is over
     +3.4 s  box UNICAST upstream, its own eth_src   (`upstream` frame)
-            box CONFIG ANNOUNCE, op 01 03 0x0010    (`config_announce_page`)
+            box CONFIG ANNOUNCE, op 01 03 0x0010    (`commit_report_page`)
     +0.8 s  box JOIN burst, op 04 03 tags 0014/0016/001a  (`dt1_record`)
             box HEARTBEAT, op 01 03 0x0001
     +5.0 s  granted; the box's return carries audio
@@ -177,7 +177,7 @@ doc: |
   are two flavours, and `eth_src` alone cannot tell them apart:
 
   - COLD — a DIFFERENT eth_src. A new peer with its own declared geometry (see
-    the port table in `config_announce_page`), so everything derived from the old
+    the port table in `commit_report_page`), so everything derived from the old
     one is void: width, fabric placement, and the receiver's channel count.
   - WARM — the SAME eth_src returning. The geometry stands, but it is still a NEW
     SESSION: the frame counter at offset 14 restarts wherever the box's does, so
@@ -230,7 +230,7 @@ doc: |
   documented rather than parsed, and it names the frame each transition is
   carried by so the sequence is at least discoverable from the spec. Also not
   modelled: the per-model fabric slot BASE (see
-  `config_announce_page`), or anything that is negotiated session state rather
+  `commit_report_page`), or anything that is negotiated session state rather
   than a field on the wire.
 seq:
   - id: eth_dst
@@ -314,7 +314,7 @@ types:
             'frame_type::filler': filler_block
             'frame_type::control': control_block
             'frame_type::announce': control_block
-        doc: cd ea and cf ea share the op/op_len/payload shape; only the op
+        doc: cd ea and cf ea share the op/rec_len/payload shape; only the op
           differs (cf ea is always op 0xffff). FILLER has no op at all.
     instances:
       raw_block:
@@ -334,7 +334,33 @@ types:
       op_len_raw:
         pos: 4
         type: u2
-        doc: frame[20:22].
+        doc: |
+          frame[20:22] — the record length, big-endian. Named for libreac's
+          consumer, which `ctrl_kind` mirrors, and NOT for what the field is;
+          `control_block.rec_len` is the same bytes under their real name.
+          Keeping the old name here is deliberate: this instance exists only to
+          reproduce a consumer's decisions, including the one below that keys a
+          classification on a LENGTH.
+      link_raw:
+        pos: 2
+        type: u1
+        enum: reac_link
+        doc: |
+          frame[18] — block[0], the LINK / RECORD CLASS, readable whatever the
+          type word says. Classification keys on this and never on the 16-bit
+          `op`, so a class the grammar has not met still classifies as far as
+          its class goes instead of falling into `unknown_ctrl`.
+      seg_raw:
+        pos: 3
+        type: u1
+        doc: frame[19] — block[1], the segment flags. Bit 0 FIRST, bit 1 LAST.
+      opcode_raw:
+        pos: 6
+        type: u1
+        doc: |
+          frame[22] — block[4], the SUBTYPE, which is the record's only real
+          discriminator. Reached here as well as through the payload types
+          because classification must not depend on the payload switch.
       dt1_model_lo:
         pos: 16
         type: u1
@@ -353,25 +379,60 @@ types:
           type_word == frame_type::filler ? ctrl_kind::filler :
           type_word == frame_type::announce ? ctrl_kind::master_announce :
           type_word != frame_type::control ? ctrl_kind::unknown_ctrl :
-          op_raw == 0x0403 ? (dt1_model_lo == 0x12 and dt1_command == 0x12
-            and dt1_tag == 0x0101 ? ctrl_kind::head_amp : ctrl_kind::grant) :
-          op_raw == 0x0103 and op_len_raw == 0x0019 ? ctrl_kind::master_hb :
-          op_raw == 0x0103 and op_len_raw == 0x0001 ? ctrl_kind::box_hb :
-          (op_raw >> 8) == 0x01 ? ctrl_kind::scene_transfer :
+          link_raw == reac_link::aux_s4000s ? ctrl_kind::link2 :
+          link_raw == reac_link::record ? (
+            (seg_raw & 3) != 3 ? ctrl_kind::record_fragment :
+            (dt1_model_lo == 0x12 and dt1_command == 0x12
+              and dt1_tag == 0x0101) ? ctrl_kind::head_amp :
+            ctrl_kind::grant) :
+          link_raw != reac_link::control ? ctrl_kind::unknown_ctrl :
+          opcode_raw == 0x00 ? ctrl_kind::scene_transfer :
+          opcode_raw == 0x01 ? ctrl_kind::master_hb :
+          opcode_raw == 0x81 ? ctrl_kind::box_hb :
+          opcode_raw == 0x10 ? ctrl_kind::group_map :
+          (opcode_raw == 0x80 or opcode_raw == 0x82 or opcode_raw == 0x83
+            or opcode_raw == 0x84) ? ctrl_kind::config_announce :
           ctrl_kind::unknown_ctrl
         enum: ctrl_kind
         doc: |
-          Frame classification, mirroring libreac's consumer reac_ctrl_parse()
-          DECISION FOR DECISION so the cross-check compares like with like,
-          including its two deliberate quirks:
-            - op 0x0403 with any tag other than a DT1-command 0x0101 classifies
-              as `grant`, not as its own kind (the cold-connect inventory tags
-              0x0302 / 0x0500 / 0x0000 all land here);
-            - op 0x0103 sub-pages other than chanmap (0x0019) and box heartbeat
-              (0x0001) — that is, config-announce 0x0010 and the enroll group map
-              0x000d — fall through to `scene_transfer`, because the consumer only
-              tests
-              the high op byte. Read `page_kind` for the real sub-page.
+          Frame classification, NESTED THE WAY THE RECORD IS BUILT: link, then
+          segment, then subtype. libreac's consumer `reac_ctrl_parse()` was
+          rewritten against the same four-field header, so the cross-check still
+          compares like with like — but it is no longer a mirror of two quirks,
+          because the quirks are gone from both sides at once.
+
+          WHAT THIS REPLACES, and what it was costing. The old expression keyed
+          on the 16-bit `op` and on two LENGTHS:
+
+            op == 0x0103 and rec_len == 0x0019  ->  master_hb
+            op == 0x0103 and rec_len == 0x0001  ->  box_hb
+            (op >> 8) == 0x01                   ->  scene_transfer
+
+          so every other session record — the commit report and the enroll group
+          map — fell into `scene_transfer`, and a slot-map window with fewer than
+          eight entries would have done the same. Two lengths were carrying a
+          discriminator's job. Keying on `opcode_raw` instead is not a
+          refinement of that; it is the field the box's own reader gates on
+          (`FUN_0c002e94` @0c002e94 tests block[0], block[1] and block[4], never
+          a length).
+
+          MEASURED, so the change is a partition and not a reshuffle: over the
+          corpus every frame that moved came out of `scene_transfer` and landed
+          in `scene_transfer`, `config_announce` or `group_map`, the three
+          summing to the old bucket exactly; and every `unknown_ctrl` that moved
+          became `record_fragment`. Nothing moved in any other direction. That
+          is asserted in `spec/reac_xcheck.py` against both expressions, and
+          libreac's own corpus run reports the same shape.
+
+          The link-4 arm keeps the one deliberate coarseness: a single-fragment
+          record whose tag is not a DT1-command 0x0101 classifies as `grant`
+          rather than getting a kind per tag, so the cold-connect tags 0x0302 /
+          0x0500 / 0x0000 all land there. Read `dt1_tag` for the real record.
+
+          `link2` is FIRMWARE-ONLY: the S-4000S image builds for link 0x02 and
+          no capture carries one. It is a named kind rather than `unknown_ctrl`
+          so that the day one appears, it is not silently a mystery.
+
           `none` is never produced here: a non-REAC frame fails the ethertype
           contents check before classification.
   filler_block:
@@ -391,75 +452,93 @@ types:
   control_block:
     doc: |
       The 32 checksummed bytes at frame[18:50], for both the cd ea control
-      records and the cf ea master announce: op(2) op_len(2) payload(28).
+      records and the cf ea master announce: op(2) rec_len(2) payload(28).
     seq:
       - id: op
         type: u2
         enum: control_op
         doc: |
-          The two bytes the wire has always been read as one 16-bit "op". The
-          stagebox firmware builds them as TWO INDEPENDENT FIELDS, and reading
-          them that way collapses seven ops into two:
+          The two bytes the wire has always been read as one 16-bit "op". Both
+          the firmware and the corpus say they are TWO INDEPENDENT FIELDS:
 
-            block[0]  LINK SELECTOR   see `link`
-            block[1]  SEGMENT FLAGS   bit 0 = FIRST, bit 1 = LAST; see `seg`
+            block[0]  LINK / RECORD CLASS   see `link`
+            block[1]  SEGMENT FLAGS         bit 0 = FIRST, bit 1 = LAST
 
           EVIDENCED (image), S-1608 `FUN_0c003398` @0c003398 — the box's own
           segmented upload, read line by line:
 
             *buf   = 1                      the link
-            buf[4] = 0                      the opcode
+            buf[4] = 0                      the subtype
             BE16(buf+5) = total             only on the first frame
             if (total < 0x19) buf[1] = 3    it all fits: FIRST|LAST
-            else              buf[1] = 1    FIRST, chunk 0x18
+            else              buf[1] = 1    FIRST, chunk 0x18, payload at buf+7
             ...
             if (remaining < 0x1b) buf[1] = 2   LAST, chunk = remaining
-            else                  buf[1] = 0   MIDDLE, chunk 0x1a
+            else                  buf[1] = 0   MIDDLE, chunk 0x1a, payload buf+5
 
           So 0x0101 / 0x0100 / 0x0102 / 0x0103 are not four ops. They are ONE
-          transfer on link 1 with the segment field reading FIRST / MIDDLE /
-          LAST / SINGLE, and 0x0401 / 0x0402 / 0x0403 are the same three states
-          on link 4. The receive side agrees: the box's state-2 gate is
+          class with the segment field reading FIRST / MIDDLE / LAST / SINGLE,
+          and 0x0401 / 0x0402 / 0x0403 are the same three states on link 4. The
+          receive side agrees: the box's state-2 gate is
           `buf[0]==1 && (buf[1] & 1) && buf[4]==0` — the FIRST bit — and its
           state-3 gate is `buf[1] in {0, 2}` — MIDDLE or LAST
           (`FUN_0c003aae` @0c003aae, `FUN_0c003b88` @0c003b88).
 
-          `op` is kept as the 16-bit field because that is what every capture,
-          every tool and libreac index on; `link`, `seg` and `opcode` below are
-          the same bytes named as the firmware names them.
-      - id: op_len
+          WHAT THIS RETIRES. The wireshark dissector inherited from reacdriver
+          matched the first five bytes as a STRING and named the eight it had
+          seen — CONTROL_ONE..FOUR, SLAVE_ANNOUNCE1..4. Those strings run a
+          class, a flag field, a LENGTH and a subtype together, so they are
+          model-specific by accident: `0103001084` fell through the table as
+          unknown while the byte-identical S-1608 record was labelled.
+
+          `op` is kept as the 16-bit field because that is what every capture
+          and every tool indexes on; `link`, `seg` and `opcode` below are the
+          same bytes named as the firmware writes them.
+      - id: rec_len
         type: u2
         doc: |
-          Big-endian, and it is a LENGTH in every case — never a selector. What
-          varies is the BASE it counts from, and that is a real protocol fact
-          rather than an inconsistency in the reading.
+          THE RECORD LENGTH, big-endian. It is a LENGTH in every case — never a
+          selector. What varies is the OFFSET IT COUNTS FROM, and that variation
+          is a real protocol fact rather than an inconsistency in the reading.
 
-            link 1, opcode 0 (bulk transfer)   THIS FRAME'S payload bytes only,
-                                               which start at block[7] on a FIRST
-                                               frame and block[5] on any other
-            link 1, any other opcode           from block[4] INCLUSIVE
-            link 4 (the record link)           from block[4] INCLUSIVE
+            every class and subtype EXCEPT one   from block[4] INCLUSIVE
+            session class, subtype 0x00          THIS FRAME'S PAYLOAD ONLY,
+            (the bulk transfer)                  which begins at block[7] on a
+                                                 FIRST fragment and block[5] on
+                                                 any other
 
-          Every observed value checks out arithmetically against that rule:
+          Every observed value checks out against that rule:
 
-            0x0019 = 25 = 1 opcode + 8 x 3-byte chanmap records
-            0x0010 = 16 = opcode + block[5] + block[6] + block[7] + 12 cells
-            0x000d = 13 = opcode + block[5] + block[6] + 10 group bytes
-            0x0001 =  1 = the opcode alone, an empty body
-            0x0018 = 24 = the first scene chunk        (0x1f - 7)
-            0x001a = 26 = a middle scene chunk         (0x1f - 5)
-            0x000e = 14 = the last one, 8880 mod 26
-            0x0013 = 19 = block[4]..block[22], ending exactly on the SysEx 0xF7
-            0x001b = 27 = block[4]..block[30], a record that does NOT fit
+            0x0019 = 25 = 1 subtype + 8 x 3-byte slot records   block[4..28]
+            0x0010 = 16 = subtype + block[5] + [6] + [7] + 12   block[4..19]
+            0x000d = 13 = subtype + block[5] + [6] + 10 bytes   block[4..16]
+            0x0001 =  1 = the subtype alone, an empty body      block[4]
+            0x0013 = 19 = ends exactly on the SysEx 0xF7        block[4..22]
+            0x0018 = 24 = an opening scene chunk, at block[7]   (0x1f - 7)
+            0x001a = 26 = a middle scene chunk, at block[5]     (0x1f - 5)
+            0x000e = 14 = the closing chunk, 8880 mod 26
 
-          EVIDENCED (image): the two 0x18 / 0x1a caps are `0x1f - 7` and
-          `0x1f - 5` — the builders reserve block[31] for the checksum
-          (`FUN_0c003398` @0c003398, `FUN_0c007646` @0c007646).
+          THE BULK EXCEPTION IS NOT A MATTER OF OPINION, and it is worth the
+          space because a sister branch read the base as 4 universally. The
+          scene body is 8904 bytes and arrives as 0x18 + 341 x 0x1a + 0x0e =
+          24 + 8866 + 14. Under a base of 4 the payloads would instead be 21
+          (block[4],[5],[6] precede the payload at block[7]) and 25, and
+          8904 - 21 - 14 = 8869 is not a multiple of 25. The transfer cannot be
+          reassembled under that reading at all, which is why the box's own
+          sender passes the chunk size to the length store AND to the memcpy
+          that fills block+7 or block+5 (`FUN_0c003398` @0c003398). The two
+          0x18 / 0x1a caps are `0x1f - 7` and `0x1f - 5`: the builder reserves
+          block[31] for the checksum. `spec/reac_xcheck.py` asserts the
+          reassembly arithmetic both ways so this cannot drift back.
 
-          This supersedes the earlier reading of 0x0103's op_len as "a SUB-PAGE
+          EVIDENCED (image): `FUN_0c002f7a` @0c002f7a is a two-byte store, high
+          byte first, which is what makes this big-endian; it is called by
+          `FUN_0c002c70` @0c002c70 (slot map, 0x19), `FUN_0c003c8a` @0c003c8a
+          (commit report, 0x10) and `FUN_0c003fe2` @0c003fe2 (link ack, 0x01).
+
+          This supersedes the earlier reading of 0x0103's length as "a SUB-PAGE
           SELECTOR". Each sub-page does have a distinct length, so switching on
-          it happens to work, but the discriminator is `opcode` at block[4] and
-          the length is a consequence of the body it introduces.
+          it happens to work, but the discriminator is `opcode` at block[4].
       - id: payload
         size: 28
         type:
@@ -525,9 +604,14 @@ types:
         enum: link1_opcode
         doc: The same byte with the link-1 opcode names attached. Meaningless
           when `link` is not `control`.
+      record_class:
+        value: link.to_i
+        doc: The sister branch's name for `link` — 0x01 session, 0x04
+          parameter. One byte, one meaning; kept as an alias so a reader
+          coming from either vocabulary lands on the same field.
   cfea_payload:
     doc: |
-      The cf ea master announce (op 0xffff, op_len 0x0100). Advertises the
+      The cf ea master announce (op 0xffff, rec_len 0x0100). Advertises the
       console, the fabric size and the linked box. Three real consoles differ on
       the wire in exactly two bytes — the source MAC and `console_field` — with
       every other downstream template shared.
@@ -548,7 +632,7 @@ types:
           The linked box's INPUT width — 0x08 idle, and once a box links it
           tracks that box (0x10 for a 16-input S-1608, 0x08 for an S-0808). Fed
           from the box's own config-announce. A PLACEMENT CARRIER, see
-          config_announce_page.
+          commit_report_page.
       - id: console_field
         type: u1
         doc: Console generation - 0x00 V-Mixer (M-200 / M-300), 0x01 OHRCA
@@ -563,7 +647,7 @@ types:
   scene_chunk_payload:
     doc: |
       op 0x0100 — a CONTINUATION CHUNK of the master's scene transfer, 26 bytes
-      of `scene_body` (see that type). op_len carries the chunk length, 0x001a.
+      of `scene_body` (see that type). rec_len carries the chunk length, 0x001a.
 
       EVIDENCED (image, M-200i + M-480, byte-identical routine): the master
       writes block[1] = 0 for a continuation, stores the chunk length big-endian
@@ -626,7 +710,7 @@ types:
   scene_final_payload:
     doc: |
       op 0x0102 — the LAST chunk, and the phase the box's commit is gated on.
-      op_len is 0x000e = 14 = 8880 mod 26, so it is a length like any other
+      rec_len is 0x000e = 14 = 8880 mod 26, so it is a length like any other
       chunk's, not a fixed block.
 
       EVIDENCED (image): the master sets block[1] = 2 when the remaining count
@@ -639,9 +723,10 @@ types:
         type: u1
       - id: chunk
         size-eos: true
-        doc: block[5:5+op_len] — the tail of the body, 14 bytes, then padding to
-          the block end. Sized to end-of-stream rather than to op_len so a short
-          or padded final frame still parses; read op_len for the true count.
+        doc: block[5:5+rec_len] — the tail of the body, 14 bytes, then padding
+          to the block end. Sized to end-of-stream rather than to rec_len so a
+          short or padded final frame still parses; read rec_len for the true
+          count.
   scene_body:
     doc: |
       THE SCENE — the 8904-byte body the three ops above carry, reassembled as
@@ -779,7 +864,7 @@ types:
           here and its commit loop copies 80 records at a stride of 10.
 
           The first 48 records are the same 48-slot declaration space the box
-          declares back in `config_announce_page`: the commit walks twelve cells
+          declares back in `commit_report_page`: the commit walks twelve cells
           at a stride of 0x28 — four records each — and pushes record[4i].cell
           into its cell table. So the desk declares its inventory to the box in
           exactly the vocabulary the box declares its own. An M-200i sends eight
@@ -842,7 +927,7 @@ types:
             feeds drives the phantom groups, and phantom is per group of four,
             which is exactly this stride;
           - an INVENTORY CELL in the same vocabulary as
-            `config_announce_page.cells` — INFERRED, from the values coinciding
+            `commit_report_page.cells` — INFERRED, from the values coinciding
             (0x02 analog input, 0x03 absent) and the twelve-by-four grouping
             coinciding.
 
@@ -910,52 +995,86 @@ types:
         size: 4
   page_0103:
     doc: |
-      op 0x0103 is a multiplexer, and it has TWO discriminators.
+      op 0x0103 is class 1 carried whole in one frame — both fragment bits set.
+      Its ONE discriminator is `payload[0]`, block[4], the byte a scene frame
+      requires to be zero:
 
-      `op_len` selects the sub-page: 0x0019 chanmap, 0x0010 box config-announce /
-      commit report, 0x000d enroll group map, 0x0001 box heartbeat.
+        0x00  a scene fragment
+        0x01  the master's SLOT MAP, eight 3-byte records a frame
+        0x10  the master's enroll group map
+        0x81  the box's link-check ack
+        0x80 0x82 0x83 0x84  the box's state-4 COMMIT REPORT
 
-      `payload[0]` — that is block[4], the byte a scene frame requires to be zero
-      — is a SUBTYPE SELECTOR, not a reserved byte. EVIDENCED (executed trace),
-      corroborated in the image by the box's own report builder writing it from a
-      literal-pool byte:
+      Bit 7 marks a box reply. That is why `01 03 00 10` and a head-amp block
+      share a high byte without being the same message.
 
-        0x00  scene
-        0x01  head-amp: 1 + 3k bytes of {ch, flags, sens}, eight records a frame
-        0x82  the commit's report
+      THIS DOC USED TO SAY op 0x0103 HAD TWO DISCRIMINATORS, the second being
+      `rec_len`. It does not. rec_len is `rec_len`, a plain record byte count on
+      every op (see `control_block.rec_len`), and 0x0019 / 0x0010 / 0x000d /
+      0x0001 are the four subtypes' current sizes, not selectors.
 
-      That is why `01 03 00 10` and a head-amp block share an opcode without being
-      the same message. `subtype` below exposes it. The report builder also has a
-      0x80 arm; what selects it is UNEXPLAINED.
+      It also called subtype 0x01 "head-amp". The box's reader FUN_0c002e94
+      gates it on block[0]==1, block[1]==3, block[4]==1 and hands each 3-byte
+      record to FUN_0c002d42, the SLOT ingest. Each record is
+      {slot, cell+flags, sens} — so it is the channel map AND it carries
+      head-amp sensitivity, and the old two names were each half of it.
 
-      The enroll group map (0x000d) is only ever a REPLY — its builder is
-      pool-referenced from exactly one word, inside the master's state-3 wait — so
-      it follows a 0x83 or 0x84 announce and never a 0x80 or 0x82. Its ten bytes
-      take three values only: 0x00, 0x41, 0xc3. EVIDENCED (image).
+      THE 0x80 ARM IS NO LONGER UNEXPLAINED. S-1608 FUN_0c003c8a picks between
+      two literal-pool bytes on a link-state test: 0x82 from DAT_0c00401c when
+      FUN_0c00f9f2 returns 1, 0x80 from DAT_0c00401e otherwise, and the same
+      branch decides whether payload[3] carries the board-configuration code or
+      a zero. S-4000 has the identical shape with its own pair, 0x84
+      (DAT_0c013750) and 0x83 (DAT_0c013752). So the literal is per-model and
+      per-link-state, and matching it is a bug: an S-0808 and an S-4000S both
+      send 0x84 where an S-1608 sends 0x82. Match `is_reply`.
+
+      The enroll group map (0x10) is only ever a REPLY — its builder is
+      pool-referenced from exactly one word, inside the master's state-3 wait —
+      so it follows a 0x83 or 0x84 announce and never a 0x80 or 0x82. Its ten
+      bytes take three values only: 0x00, 0x41, 0xc3. EVIDENCED (image).
     seq:
       - id: page
         size-eos: true
         type:
-          switch-on: _parent.op_len
+          switch-on: subtype
           cases:
-            0x0019: chanmap_page
-            0x0010: config_announce_page
-            0x000d: enroll_group_map
+            0x01: chanmap_page
+            0x10: enroll_group_map
+            0x80: commit_report_page
+            0x82: commit_report_page
+            0x83: commit_report_page
+            0x84: commit_report_page
+        doc: |
+          SWITCHED ON THE SUBTYPE, which is what the box's own reader does.
+          This used to switch on `rec_len`, and it parsed the corpus only
+          because each subtype happens to have one size today — a slot-map
+          window with fewer than eight entries would have fallen through
+          silently. The four commit-report arms are the two model-specific
+          literal pairs, not four meanings; see `selector`.
     instances:
       subtype:
         pos: 0
         type: u1
         doc: |
-          block[4], the first byte of this payload. 0x00 scene, 0x01 head-amp,
-          0x82 the commit report. A SUBTYPE SELECTOR, not a reserved byte.
+          block[4], the first byte of this payload, and the record's ONLY
+          discriminator. 0x00 scene, 0x01 the master's slot map, 0x10 the
+          enroll group map, 0x81 the box's link-check ack, 0x80/0x82/0x83/0x84
+          the box's state-4 commit report. Bit 7 set means the record is
+          travelling BOX -> MASTER.
+      is_reply:
+        value: '(subtype & 0x80) != 0'
+        doc: The direction bit. Match this rather than a literal — a consumer
+          that matches 0x82 sees an S-1608 and misses an S-0808.
       page_kind:
         value: >-
-          _parent.op_len == 0x0019 ? page_kind::chanmap :
-          _parent.op_len == 0x0010 ? page_kind::config_announce :
-          _parent.op_len == 0x000d ? page_kind::enroll_group_map :
-          _parent.op_len == 0x0001 ? page_kind::box_heartbeat :
+          subtype == 0x01 ? page_kind::chanmap :
+          (subtype & 0xf0) == 0x80 and subtype != 0x81 ? page_kind::commit_report :
+          subtype == 0x10 ? page_kind::enroll_group_map :
+          subtype == 0x81 ? page_kind::box_heartbeat :
           page_kind::unknown_page
         enum: page_kind
+        doc: Derived from the subtype. It used to be derived from `rec_len`,
+          which is a length and cannot classify anything.
   chanmap_page:
     doc: |
       op-0103 0x0019: a rotating 8-entry window over a 49-position ring — the 48
@@ -1038,18 +1157,31 @@ types:
         type: u1
         doc: |
           Fabric channel 0x00..0x2f, or one of two record ids that are not
-          channels: 0xfe (`DAT_0c002d7e`) and 0xff (`DAT_0c002d80`), both read
-          out of the image.
-      - id: flags
+          channels: 0xfe (`DAT_0c002d7e`, `DAT_0c002e6e`) and 0xff
+          (`DAT_0c002d80`), both read out of the image rather than inferred.
+      - id: cell_and_flags
         type: u1
         doc: |
-          High nibble = the inventory cell code; bits 3, 2 and 1 = three
-          per-slot flags; bit 0 is never written by the box's builder. On the
-          wire this reads 0x28 on slots below 0x28 and 0x38 above, which is
-          cell 2 or 3 with bit 3 set and nothing else.
-      - id: value
+          HIGH NIBBLE the inventory cell for the group this slot anchors, LOW
+          NIBBLE three per-slot booleans. 0x28 for slots below 0x28 and 0x38 for
+          0x28..0x2f is the corpus's constant, and it decomposes as cell 2
+          (analog input) or 3 (absent) with bit 3 set on every slot.
+
+          It was called `bank` here, which named the observed byte rather than
+          its fields. The box's ingest FUN_0c002d42 splits it: the high nibble
+          reaches the group map only where (slot & 3) == 0, and bits 3, 2 and 1
+          go to the slot's active-table fields +4, +8 and +6 respectively.
+          WHICH BOOLEAN IS WHICH IS NOT IN THE IMAGE — the firmware routes them
+          to GPIO pin banks without naming them, exactly as for head_amp_data's
+          param.
+      - id: sens
         type: u1
-        doc: The per-slot value, written to table + 2 — the SENS cell.
+        doc: |
+          The slot's SENS step. It was called `pad`, which was a guess. The
+          ingest writes this byte into active-table field +2, and field +2 is
+          what the head-amp apply FUN_0c007fbc hands to FUN_0c007e6a, the SENS
+          gain-table lookup. Same axis and same units as head_amp_data.value
+          for param `sens`. EVIDENCED (image).
     instances:
       is_group_anchor:
         value: 'slot < 0x30 and (slot & 3) == 0'
@@ -1064,20 +1196,20 @@ types:
           Head-amp group index this entry anchors, 0..11, meaningful only where
           is_group_anchor. Derived from the firmware's push, not from the wire.
       cell_type:
-        value: 'flags >> 4'
+        value: 'cell_and_flags >> 4'
         enum: inventory_cell
         doc: |
-          The flags byte's high nibble, the code stored into the group map:
+          The high nibble of `cell_and_flags`, the code stored into the group map:
           2 analog_input for groups 0..9, 3 absent for groups 10..11, on every
           console and every box model observed.
       flag_slot_4:
-        value: '(flags >> 3) & 1'
+        value: '(cell_and_flags >> 3) & 1'
         doc: bit 3 -> table + 4. Set on every real slot in every capture.
       flag_slot_8:
-        value: '(flags >> 2) & 1'
+        value: '(cell_and_flags >> 2) & 1'
         doc: bit 2 -> table + 8. Zero in every capture.
       flag_slot_6:
-        value: '(flags >> 1) & 1'
+        value: '(cell_and_flags >> 1) & 1'
         doc: |
           bit 1 -> table + 6. Zero in every capture. Of the three, this is the
           one the S-1608's group apply carries into its shadow and never passes
@@ -1110,11 +1242,26 @@ types:
           wraps at 0x30 so the branch is unreachable on that path — Ghidra says
           so independently, removing it as dead code — and no capture in the
           corpus contains one.
-  config_announce_page:
+  commit_report_page:
     doc: |
-      op-0103 0x0010: the box's SETUP DECLARATION at cold connect — what the
-      master enrols it from. This is the frame the fabric-slot placement decision
-      is made against, so every field below is a PLACEMENT CARRIER.
+      op-0103 subtype 0x8x: the box's STATE-4 COMMIT REPORT. It is what the
+      master enrols the box from, so every field below is still a PLACEMENT
+      CARRIER — but the name and the timing were both wrong here until
+      2026-08-23 and the correction matters.
+
+      IT IS NOT A COLD-CONNECT ANNOUNCE. The box runs a scene FSM (S-1608
+      FUN_0c0037ee): state 2 takes the master's opening scene fragment, state 3
+      reassembles the continuations, and state 4 — FUN_0c003c8a — promotes the
+      staged slot table into the active one and THEN builds this record. So it
+      is emitted once, at the END of the master's scene transfer, not at the
+      start of the session. The corpus agrees: in
+      m200-s1608-handshake-ctrl-2026-07-11 the master's scene fragments run
+      9.31 s to 12.69 s and the box sends this at 14.46 s, frame 1090,
+      immediately before the head-amp sweep at 14.47 s. One per establishment.
+
+      WHY THIS MATTERED. reacdriver called the same record SLAVE_ANNOUNCE1 and
+      our wireshark dissector inherited the name, so a record that means "I have
+      committed your scene" read as a record that means "hello, I exist".
 
       PLACEMENT IS DELIBERATELY NOT IN THIS GRAMMAR. The per-model slot base
       (an S-1608 is addressed at 0x20 while an S-0808 and an S-4000S are both at
@@ -1124,25 +1271,56 @@ types:
       f(enrolment order), f(box MAC), f(cell map), f(enroll map), f(chanmap) —
       and left three carriers that the corpus cannot separate because they are
       perfectly collinear across every row: the declared input WIDTH, the
-      `selector` byte, and `unit_offset` (for which `base == unit_offset * 0x10`
+      `selector` byte, and `board_config_code` (for which `base == code * 0x10`
       holds arithmetically on every row). Parse the carriers; do not encode a
+      base.
+
+      AND THE THIRD CARRIER IS NOW THE WEAKEST OF THE THREE, not the strongest.
+      It was called `unit_offset` and its arithmetic made it look like the law
+      in waiting. The image says it is a board-configuration code that also
+      selects which cell layout the box reports, so its collinearity with the
+      declared width is a mechanism and not a coincidence — which means it
+      carries no information the cells do not already carry, and cannot be the
       base. See reac-pw docs/PLACEMENT-EVIDENCE.md for the corpus, the dead
       candidates and the five-run experiment that would settle it.
     seq:
       - id: selector
         type: u1
-        doc: Model family. 0x82 = the S-1608 family, 0x84 = the S-0808 and
-          S-4000S family (which is then named by an ASCII name frame or by the
-          family default). PLACEMENT CARRIER.
+        doc: |
+          The subtype byte again, repeated as the first payload byte. Observed
+          0x82 on the S-1608 and 0x84 on both the S-0808 and the S-4000S, which
+          is why it reads as a model family and is used as a placement carrier.
+
+          IT IS NOT PURELY A MODEL ID. FUN_0c003c8a picks it at run time
+          between two literal-pool bytes on a link-state test — S-1608 0x82
+          (DAT_0c00401c) or 0x80 (DAT_0c00401e), S-4000 0x84 (DAT_0c013750) or
+          0x83 (DAT_0c013752) — and the same branch decides `board_config_code`
+          below. So the corpus's clean 0x82-vs-0x84 split is the models' first
+          arms, and a box in the second arm would report a byte this schema
+          has never seen paired with its width. Read the cells for the width;
+          treat the selector as a hint. EVIDENCED (image + corpus).
       - id: reserved
         size: 2
         doc: 00 00 on every capture.
-      - id: unit_offset
+      - id: board_config_code
         type: u1
-        doc: 0x02 on the S-1608, 0x00 on the S-0808 and S-4000S. PLACEMENT
-          CARRIER, and the most law-shaped of the three - base == unit_offset *
-          0x10 holds on every observed row - but collinear with the other two, so
-          not adopted as the law.
+        doc: |
+          0x02 on the S-1608, 0x00 on the S-0808 and S-4000S. It was called
+          `unit_offset` and treated as the most law-shaped placement carrier,
+          because base == unit_offset * 0x10 holds on every observed row. THE
+          IMAGE SAYS IT IS NOT AN OFFSET.
+
+          On the S-1608 it is FUN_0c00f6a8, which returns a cell set by
+          FUN_0c00f738 to 2 or 3 depending on a board-presence read; and that
+          same cell is what FUN_0c00f7f8 consults to decide WHICH cell layout to
+          install — 2 gives cells {2,2,2,2,1,1,3...} and anything else gives
+          {1,1,1,1,2,2,3...}. So this byte and the cells below are two views of
+          one board-configuration decision, which is exactly why they look
+          collinear with the width. It is also zeroed outright in the builder's
+          second arm, so it is not even a stable per-model value.
+
+          The arithmetic coincidence stands and the interpretation does not.
+          EVIDENCED (image, S-1608 FUN_0c003c8a + FUN_0c00f738 + FUN_0c00f7f8).
       - id: cells
         type: u1
         enum: inventory_cell
@@ -1320,7 +1498,7 @@ types:
 
       The name frame is not "a frame that happens to hold ASCII". It is a TAG
       0x0500 identity record, the same tag the single-frame 0x0403 identity
-      frames carry at op_len 0x0016 and 0x001a, and it is longer than 26 bytes
+      frames carry at rec_len 0x0016 and 0x001a, and it is longer than 26 bytes
       of body, which is the only reason it is split at all.
 
       A consumer must therefore reassemble link 4 the same way it reassembles
@@ -1338,7 +1516,7 @@ types:
         contents: [0x00, 0x02, 0x00, 0xfe]
       - id: len_echo
         type: u1
-        doc: Bytes of record following, and always op_len - 5.
+        doc: Bytes of record following, and always rec_len - 5.
       - id: fragment
         size: len_echo
         doc: This frame's slice of the record. Concatenate FIRST then LAST.
@@ -1386,9 +1564,9 @@ types:
 
         cd ea        type word, control
         04 03        op, this container
-        00 13        op_len -> record_len 6, data_len 3
+        00 13        rec_len -> record_len 6, data_len 3
         00 02 00 fe  wrapper
-        0e           len_echo, op_len - 5
+        0e           len_echo, rec_len - 5
         f0 41        SysEx start + Roland manufacturer id
         0a           device id
         00 00 12     model id
@@ -1407,7 +1585,7 @@ types:
           signature.
       - id: len_echo
         type: u1
-        doc: SysEx payload length echo, always op_len - 5.
+        doc: SysEx payload length echo, always rec_len - 5.
       - id: sysex_start
         contents: [0xF0]
       - id: roland_id
@@ -1444,32 +1622,59 @@ types:
         doc: Zero fill out to the 32-byte block, last byte the block checksum.
     instances:
       record_len:
-        value: _parent._parent.op_len - 0x0d
+        value: _parent._parent.rec_len - 0x0d
         doc: TAG(2) + data + inner checksum(1).
       data_len:
-        value: _parent._parent.op_len - 0x10
+        value: _parent._parent.rec_len - 0x10
         doc: 3 for head-amp, 4 for the join grant, 6 or 10 for identity.
   head_amp_data:
     doc: |
       TAG 0x0101 — the console's preamp command, and the ONLY three things a box
       owns on the head-amp page.
 
-      # "Head-amp" is THREE granularities, and one name for them would be wrong
+      # WIRE ENCODING and HARDWARE ACTUATION are two axes, not one scale
 
-      EVIDENCED (executed trace) — each watched by running the box's code both
-      ways:
+      This doc used to list three granularities in a single column — per
+      channel, per four, per eight. They do not belong on one scale: two are
+      about which record carries a field, one is about how many channels a
+      write switches, and a consumer reading them as one list gets whichever it
+      picks wrong.
 
-        SENS and the flag bits   PER CHANNEL          ch
-        phantom                  PER GROUP OF FOUR    ch >> 2
-        the readback nibble      PER EIGHT            ch >> 3
+      WIRE ENCODING. This record, {CH, PARAM, VALUE}, is one channel per record
+      for all three params. The per-four thing lives in the OTHER head-amp
+      carrier, the slot map (op-0103 subtype 0x01): FUN_0c002d42 writes its sens
+      byte and three flag bits for EVERY slot, and gates only the high nibble —
+      the INVENTORY CELL — on `(slot & 3) == 0`.
 
-      Two consequences a consumer must not miss. **Only a record whose channel is
-      a multiple of four carries the phantom group byte** — a record to 0x24 moves
-      group 9, one to 0x27 moves nothing, so sweeping phantom per channel writes
-      three records in four into the void. And **the readback nibble and the
-      phantom command do not address the same thing**, being per eight and per
-      four; they are named apart here for that reason and must stay apart in any
-      API generated from this.
+      HARDWARE ACTUATION. Per channel, for phantom, pad and sens alike.
+      FUN_0c007fbc(bank, group) sets its cursor to `group << 3` and loops eight
+      times, and each iteration passes its own within-bank index and that slot's
+      own value to FUN_0c00ac1e, FUN_0c00ac96 and FUN_0c007e6a. Eight is the
+      preamp BANK width and the loop's batch size — the writers take
+      (bank, 0..7), two banks covering an S-1608's sixteen inputs — and nothing
+      is switched eight channels at a time.
+
+      "PHANTOM IS PER FOUR" IS THEREFORE DISPUTED. The image holds exactly one
+      channel-indexed `(x & 3) == 0` test, it is FUN_0c002d42's inventory-cell
+      gate, and it is not on this record's path. The claim's grade is an
+      executed trace, so it stands in protocol-facts.yaml unchanged with the
+      conflict and the discriminating experiment recorded beside it — send
+      phantom to 0x24 and to 0x25 and read the box's re-broadcast back. Do not
+      generate a per-four sweep from this doc until that runs.
+
+      TWO GRANULARITIES, NOT THREE. The readback nibble is not a third axis:
+      FUN_0c007fbc's caller was recovered on 2026-08-23 (a function Ghidra never
+      disassembled — clean prologue past the previous function's rts, absent
+      from the 1395-entry map, reached by a plain bsr), and it confirms the loop
+      shifts by 3 and iterates exactly 8, so group g covers [g*8, g*8+8) and
+      `g == ch >> 3` — the readback nibble's own index. So the list is: PER
+      CHANNEL (actuation) and PER EIGHT (refresh and readback banking).
+
+      BANK IS A SEPARATE AXIS FROM GROUP, and our docs have used the two words
+      loosely. GROUP is 0..9 and equals `ch >> 3`; it selects which eight
+      channels' DATA, an eight-slot window of the 80-slot active table. BANK
+      selects which eight PHYSICAL PREAMPS receive it, and is not a subdivision
+      of channel space. FUN_0c007fbc takes both because they are independent.
 
       # A record writes the ACTIVE table, and the commit overwrites it
 
@@ -1497,7 +1702,7 @@ types:
           space 0x00..0x2f. It addresses a BOX INPUT — not a console channel
           strip, and not an audio fabric slot (that space is 40 wide). A table
           bounded by 40 silently rejects the top half of a 16-input box based at
-          0x20. The base itself is session state — see config_announce_page.
+          0x20. The base itself is session state — see commit_report_page.
       - id: param
         type: u1
         enum: head_amp_param
@@ -1520,6 +1725,22 @@ types:
           curve spanning 48.75 dB in which three pairs of steps delivered
           IDENTICAL gain, so the two expressions of this protocol disagreed by
           6 dB at the top of the travel and by the very shape of the function.
+
+          AND THE FIRMWARE HOLDS THE CURVE AS A TABLE. S-1608.BIN at 0x0c0327a0
+          and S-0808.BIN at file offset 0x45ec8 (a raw byte match only — there
+          is no S-0808 decompilation) carry the same 56 two-byte
+          entries, read by FUN_0c007e30, which clamps the step to 0x37 — so
+          0x37 is the top of the travel by construction, not by observation.
+          The two bytes are a two-bit coarse analog range and a serial fine
+          gain code, not decibels. The fine code steps by exactly 2 for every
+          SENS step throughout, and the coarse range changes at three places
+          only: between steps 0x07/0x08, 0x17/0x18 and 0x27/0x28. So the law is
+          uniform by construction everywhere except at three known indices, and
+          the ranges begin at 0, 8, 24 and 40 — each break placed exactly where
+          the fine field runs out, which is a design that intends them to abut.
+          The full table is printed in protocol-facts.yaml's headamp_sens
+          group. It settles the SHAPE; the decibel per fine code is an analog
+          value and is not in any image.
 
           Settled 2026-08-23 on an S-0808 with output 1 cabled to input 1, so the
           source is an electrical loopback of a known digital level rather than a
@@ -1605,7 +1826,7 @@ enums:
   page_kind:
     0: unknown_page
     1: chanmap
-    2: config_announce
+    2: commit_report
     3: enroll_group_map
     4: box_heartbeat
   ctrl_kind:
@@ -1618,6 +1839,10 @@ enums:
     6: head_amp
     7: box_hb
     8: unknown_ctrl
+    9: config_announce
+    10: group_map
+    11: record_fragment
+    12: link2
   dt_command:
     0x11: rq1_request
     0x12: dt1_set
