@@ -1,90 +1,90 @@
 {
- "captures": 83,
+ "captures": 85,
  "files": {
   "captures/deskc9919c-s1608-unk-clean__zoneA-48k.pcap": {
-   "blocks": 0,
+   "blocks": 43,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 43,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2000,
+   "ok": 2000
   },
   "captures/deskc9919d-s0808-unk-clean__zoneB-48k.pcap": {
-   "blocks": 0,
+   "blocks": 18,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 18,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2000,
+   "ok": 2000
   },
   "captures/deskca154d-s0808-unk-clean__reac-jitter-sample.pcap": {
-   "blocks": 4000,
+   "blocks": 2004,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 2004,
    "failed": 0,
    "frames": 0,
    "ok": 0
   },
   "captures/deskca154d-s1608-unk-mirror__wired-reac-a-bothdirs-2026-06-09.pcap": {
-   "blocks": 0,
+   "blocks": 30,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 30,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2000,
+   "ok": 2000
   },
   "captures/deskca154d-s1608-unk-mirror__wired-reac-loud-bothdirs-2026-06-09.pcap": {
-   "blocks": 0,
+   "blocks": 30,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 30,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2000,
+   "ok": 2000
   },
   "captures/m200i-none-48k-clean__m200-probing-nobox-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 316,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 316,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/m200i-none-48k-clean__m200-s1608-boxB-synced-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 9,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 9,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/m200i-none-48k-clean__m200-s1608-realbox-establish-2026-07-11.pcap": {
-   "blocks": 4000,
+   "blocks": 5971,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 5971,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/m200i-none-48k-clean__m200-s1608-realbox-unicast-2026-07-11.pcap": {
-   "blocks": 4000,
+   "blocks": 1479,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 1479,
    "failed": 0,
    "frames": 0,
    "ok": 0
   },
   "captures/m200i-none-48k-clean__s0808-synced-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 10,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 10,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/m200i-s0808-48k-mirror__m200-BIDIR-coldboot-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 2169,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 2169,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
@@ -98,20 +98,20 @@
    "ok": 1705
   },
   "captures/m200i-s0808-48k-mirror__m200-s1608-BIDIR-establish-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 1155,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1155,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "captures/m200i-s0808-48k-mirror__matrix-m200-s0808-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 1182,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1182,
    "failed": 0,
-   "frames": 3271,
-   "ok": 3271
+   "frames": 2089,
+   "ok": 2089
   },
   "captures/m200i-s1608-48k-clean__reacpw-s1608-cfeatiming-2026-07-18.pcap": {
    "blocks": 0,
@@ -138,33 +138,33 @@
    "ok": 787
   },
   "captures/m200i-s1608-48k-clean__reacpw-slave-m200-CONNECTED-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 10,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 10,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2000,
+   "ok": 2000
   },
   "captures/m200i-s1608-48k-mirror__m200-s1608-BIDIR-coldboot-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 146,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 146,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "captures/m200i-s1608-48k-mirror__m200-s1608-BIDIR-reboot-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 3105,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 3105,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3805,
+   "ok": 3805
   },
   "captures/m200i-s1608-48k-mirror__m200-s1608-establish-switch-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 1166,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1166,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
@@ -178,129 +178,129 @@
    "ok": 1225
   },
   "captures/m200i-s1608-48k-mirror__matrix-m200-s1608-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 1226,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1226,
    "failed": 0,
-   "frames": 3316,
-   "ok": 3316
+   "frames": 2090,
+   "ok": 2090
   },
   "captures/m200i-s1608-48k-mirror__real-m200-s1608-coldboot-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 3362,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 3362,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "captures/m200i-s4000s-48k-mirror__matrix-m200-s4000-2026-07-24.pcap": {
-   "blocks": 0,
+   "blocks": 1391,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1391,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 4844,
+   "ok": 4844
   },
   "captures/m200i-s4000s-48k-mirror__matrix-m200-s4000-coldconnect-2026-07-24.pcap": {
-   "blocks": 0,
+   "blocks": 900,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 900,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 4844,
+   "ok": 4844
   },
   "captures/m200i-s4000s-48k-mirror__s4000s-coldboot-m5000-2026-07-12.pcap": {
-   "blocks": 0,
+   "blocks": 2234,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 2234,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 4039,
+   "ok": 4039
   },
   "captures/m300-none-48k-clean__m200-s1608-establish-2026-07-10.pcap": {
-   "blocks": 4000,
+   "blocks": 2228,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 2228,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/m300-none-48k-clean__m300-coldboot-mirror-2026-07-10.pcap": {
-   "blocks": 4000,
+   "blocks": 1983,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 1983,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1003,
+   "ok": 1003
   },
   "captures/m300-none-48k-clean__m300-s1608-coldboot-mirror-2026-07-10.pcap": {
-   "blocks": 4000,
+   "blocks": 2674,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 2674,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/m300-none-48k-clean__m300-s1608-coldconnect-mirror-2026-07-10.pcap": {
-   "blocks": 4000,
+   "blocks": 3016,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 3016,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/m300-none-48k-clean__m300-s1608-establish-2026-07-10.pcap": {
-   "blocks": 4000,
+   "blocks": 4470,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 4470,
    "failed": 0,
    "frames": 0,
    "ok": 0
   },
   "captures/m300-s0808-48k-mirror__matrix-m300-s0808-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 1306,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1306,
    "failed": 0,
-   "frames": 3416,
-   "ok": 3416
+   "frames": 2110,
+   "ok": 2110
   },
   "captures/m300-s1608-48k-mirror__matrix-m300-s1608-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 308,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 308,
    "failed": 0,
-   "frames": 2388,
-   "ok": 2388
+   "frames": 2080,
+   "ok": 2080
   },
   "captures/m5000-none-96k-mirror__matrix-m5000-s4000-unit2-coldconnect-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 67650,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 67650,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2026,
+   "ok": 2026
   },
   "captures/m5000-s0808-96k-mirror__matrix-m5000-s0808-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 1135,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1135,
    "failed": 0,
-   "frames": 3224,
-   "ok": 3224
+   "frames": 2089,
+   "ok": 2089
   },
   "captures/m5000-s1608-96k-mirror__matrix-m5000-s1608-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 3514,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 3514,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2124,
+   "ok": 2124
   },
   "captures/m5000-s1608-96k-mirror__reacpw-slave-m5000-postfix-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 13117,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 13117,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
@@ -314,52 +314,52 @@
    "ok": 167
   },
   "captures/m5000-s1608-96k-mirror__real-s1608-alltraffic-m5000-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 10016,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 10016,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2038,
+   "ok": 2038
   },
   "captures/m5000-s1608-96k-mirror__real-s1608-coldboot-m5000-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 6468,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 6468,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "captures/m5000-s4000s-96k-mirror__matrix-m5000-s4000-unit1-coldconnect-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 32603,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 32603,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2107,
+   "ok": 2107
   },
   "captures/reacpw-none-96k-clean__s1608-master-bounce-2026-07-06.pcap": {
-   "blocks": 0,
+   "blocks": 1327,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1327,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/reacpw-none-96k-clean__s1608-master-first-link-2026-07-06.pcap": {
-   "blocks": 0,
+   "blocks": 1370,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1370,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1000,
+   "ok": 1000
   },
   "captures/reacpw-s0808-48k-mirror__s0808-reboot-enrollfix-2026-07-12.pcap": {
-   "blocks": 0,
+   "blocks": 32276,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 32276,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2061,
+   "ok": 2061
   },
   "captures/unk-none-unk-clean__real_reac_stream.pcap": {
    "blocks": 0,
@@ -370,12 +370,12 @@
    "ok": 4
   },
   "captures/unk-s1608-unk-clean__reacpw-slave-m5000-established-2026-07-11.pcap": {
-   "blocks": 0,
+   "blocks": 10003,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 10003,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 1038,
+   "ok": 1038
   },
   "m200-headamp-re/captures/m200-s1608-headamp-48v-pad-sens-2026-07-17.pcap": {
    "blocks": 400,
@@ -386,20 +386,20 @@
    "ok": 0
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__ctl-session1-precut.pcap": {
-   "blocks": 0,
+   "blocks": 1529,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1529,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2624,
+   "ok": 2624
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__ctl2.pcap": {
-   "blocks": 0,
+   "blocks": 6620869,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 6620869,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 6000,
+   "ok": 6000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__enrol-01-control.pcap": {
    "blocks": 0,
@@ -434,84 +434,84 @@
    "ok": 72
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap01": {
-   "blocks": 0,
+   "blocks": 73,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 73,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap02": {
-   "blocks": 0,
+   "blocks": 74,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 74,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap03": {
-   "blocks": 0,
+   "blocks": 70,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 70,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap04": {
-   "blocks": 0,
+   "blocks": 70,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 70,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap05": {
-   "blocks": 0,
+   "blocks": 75,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 75,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap06": {
-   "blocks": 0,
+   "blocks": 75,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 75,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap07": {
-   "blocks": 0,
+   "blocks": 72,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 72,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2000,
+   "ok": 2000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap08": {
-   "blocks": 0,
+   "blocks": 742,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 742,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3652,
+   "ok": 3652
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap09": {
-   "blocks": 0,
+   "blocks": 143,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 143,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-headamp-re/m200i-s0808-48k-mirror__m200-%Y%m%d-%H%M%S.pcap10": {
-   "blocks": 0,
+   "blocks": 40,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 40,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 2000,
+   "ok": 2000
   },
   "m200-headamp-re/m5000-s0808-96k-mirror__enrol-00-control.pcap": {
    "blocks": 0,
@@ -522,149 +522,165 @@
    "ok": 1140
   },
   "m200-headamp-re/m5000-s0808-96k-mirror__m200-%Y%m%d-%H%M%S.pcap00": {
-   "blocks": 0,
+   "blocks": 1100,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1100,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-anchor-openwindow-20260721-221150.pcap": {
-   "blocks": 0,
+   "blocks": 653,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 653,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-ch16-anchor-toggle-20260721-220347.pcap": {
-   "blocks": 0,
+   "blocks": 103,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 103,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-ch16-anchor-v2-20260721-220654.pcap": {
-   "blocks": 0,
+   "blocks": 191,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 191,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-ch7-ON-OFF-ON-20260721-215743.pcap": {
-   "blocks": 0,
+   "blocks": 192,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 192,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3002,
+   "ok": 3002
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-headamp-1357_16-toggle3-20260721-214420.pcap": {
-   "blocks": 0,
+   "blocks": 123,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 123,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-pad-sweep-20260721-222651.pcap": {
-   "blocks": 0,
+   "blocks": 897,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 897,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3000,
+   "ok": 3000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-pad-v2-20260721-223131.pcap": {
-   "blocks": 0,
+   "blocks": 2717,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 2717,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3001,
+   "ok": 3001
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-s1608-COLDCONNECT-clean-2026-07-24.pcap": {
-   "blocks": 0,
+   "blocks": 105,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 105,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3002,
+   "ok": 3002
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__m200-s1608-establish-today-20260721-235750.pcap": {
-   "blocks": 0,
+   "blocks": 1390,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1390,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__reacpw-cc03-headamp-20260721-231501.pcap": {
-   "blocks": 0,
+   "blocks": 60,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 60,
    "failed": 0,
-   "frames": 4000,
-   "ok": 4000
+   "frames": 3013,
+   "ok": 3013
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__reacpw-establish-20260721-234355.pcap": {
-   "blocks": 0,
+   "blocks": 1434,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 1434,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__reacpw-estcommit-233158.pcap": {
-   "blocks": 4000,
+   "blocks": 4768,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 4768,
    "failed": 0,
    "frames": 0,
    "ok": 0
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__reacpw-in1-phantom-20260721-224512.pcap": {
-   "blocks": 0,
+   "blocks": 88,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 88,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-s1608-headamp/m200i-s1608-48k-mirror__reacpw-reconnect-20260722-000735.pcap": {
-   "blocks": 0,
+   "blocks": 23768,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 23768,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-s1608-headamp/reacpw-s1608-48k-mirror__reacpw-headamp-fulllen-20260721-230628.pcap": {
-   "blocks": 0,
+   "blocks": 109,
    "blocks_failed": 0,
-   "blocks_ok": 0,
+   "blocks_ok": 109,
    "failed": 0,
    "frames": 4000,
    "ok": 4000
   },
   "m200-s1608-headamp/reacpw-s1608-48k-mirror__reacpw-headamp-preset-20260721-225954.pcap": {
-   "blocks": 4000,
+   "blocks": 4115,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 4115,
    "failed": 0,
    "frames": 0,
    "ok": 0
   },
   "m200-scene-recall-re/m200i-s1608-48k-mirror__m200-scene-recall-2026-07-17.pcap": {
-   "blocks": 4000,
+   "blocks": 5599,
    "blocks_failed": 0,
-   "blocks_ok": 4000,
+   "blocks_ok": 5599,
+   "failed": 0,
+   "frames": 0,
+   "ok": 0
+  },
+  "s1608-bank-2026-08-22/reacpw-s1608-48k-clean__nightR-wire-2026-08-22.pcap": {
+   "blocks": 2030,
+   "blocks_failed": 0,
+   "blocks_ok": 2030,
+   "failed": 0,
+   "frames": 0,
+   "ok": 0
+  },
+  "s1608-bank-2026-08-22/reacpw-s1608-48k-clean__nightR-wire-act-2026-08-22.pcap": {
+   "blocks": 2182,
+   "blocks_failed": 0,
+   "blocks_ok": 2182,
    "failed": 0,
    "frames": 0,
    "ok": 0
   }
  },
- "per_file": 4000
+ "per_file": 0
 }
