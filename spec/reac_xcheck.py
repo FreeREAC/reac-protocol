@@ -626,9 +626,7 @@ def test_only_three_tags_are_validated_by_the_box():
     assert tags == {0x000: b"1234", 0x368: b"SYSP", 0x37c: b"SCEN"}
     for off, want in tags.items():
         assert SCENE_BODY[off:off + 4] == want
-    windows = {off // 128 for off, _ in tags.items() for off in
-               range(off, off + 4)} if False else {
-        o // 128 for off in tags for o in range(off, off + 4)}
+    windows = {o // 128 for off in tags for o in range(off, off + 4)}
     assert windows == {0, 6}
     assert -(-len(SCENE_BODY) // 128) == 70
 
