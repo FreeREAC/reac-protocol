@@ -45,8 +45,12 @@ Decode returns samples-per-channel (12) per frame.
 
 Measure packets-per-second:
 
+- ~3675 pps → 44.1 kHz
 - ~4000 pps → 48 kHz
 - ~8000 pps → 96 kHz
+
+`rate = pps × 12`. The rate is not a field anywhere in the frame, but it is fully
+observable from the wire this way — the frame itself is identical at all three.
 
 Confirm the live channel count (40) to rule out any channel-halving model.
 
