@@ -579,10 +579,15 @@ types:
       pool against one staging base, and every one lands on a boundary the wire
       body shows independently. The box stages the whole body into one buffer,
       then its state-4 commit reads `unit_map_select`, publishes `revision`,
-      copies 800 bytes of `slots` and 6 bytes of `master_id` into its live
-      tables, pushes twelve `inventory_cell`s, and emits the `01 03 00 10`
-      committed report. That commit is the only unconditional promoter of
-      head-amp state in the box.
+      promotes all 80 slots into its LIVE head-amp table, copies 6 bytes of
+      `master_id`, installs the map, pushes twelve groups, and emits the
+      `01 03 00 10` report.
+
+      Two things follow that an emitter must get right. The commit writes the
+      SAME (0, 1, 0, 0) into all eighty slots, so **a scene body cannot address an
+      individual channel**. And it overwrites the very table an op-0403 head-amp
+      record writes directly, so **records must FOLLOW the commit, never precede
+      it** — see `head_amp_data`.
 
       # What is the console's, and what is the format
 
@@ -722,11 +727,21 @@ types:
       - id: cell
         type: u2le
         enum: inventory_cell
-        doc: +0. Not committed; read by the twelve-cell declaration loop at every
-          fourth record. INFERRED that the enum is the same vocabulary as
-          `config_announce_page.cells` — the values coincide (0x02 analog input,
-          0x03 absent), the cell count and the four-channel grouping coincide, and
-          nothing in either image names it.
+        doc: |
+          +0. NOT promoted by the commit; read by the twelve-group loop from every
+          fourth record. Two readings of what it means, and the grammar does not
+          choose between them:
+
+          - a PHANTOM GROUP marker — EVIDENCED (executed trace) that the loop it
+            feeds drives the phantom groups, and phantom is per group of four,
+            which is exactly this stride;
+          - an INVENTORY CELL in the same vocabulary as
+            `config_announce_page.cells` — INFERRED, from the values coinciding
+            (0x02 analog input, 0x03 absent) and the twelve-by-four grouping
+            coinciding.
+
+          They may be the same thing seen from two ends. Nothing in either image
+          names it, so the enum here is a convenience and not a claim.
       - id: field_2
         type: u2le
       - id: field_4
@@ -789,9 +804,28 @@ types:
         size: 4
   page_0103:
     doc: |
-      op 0x0103 is a multiplexer whose sub-page is selected by op_len, not by a
-      further opcode: 0x0019 chanmap, 0x0010 box config-announce, 0x000d enroll
-      group map, 0x0001 box heartbeat.
+      op 0x0103 is a multiplexer, and it has TWO discriminators.
+
+      `op_len` selects the sub-page: 0x0019 chanmap, 0x0010 box config-announce /
+      commit report, 0x000d enroll group map, 0x0001 box heartbeat.
+
+      `payload[0]` — that is block[4], the byte a scene frame requires to be zero
+      — is a SUBTYPE SELECTOR, not a reserved byte. EVIDENCED (executed trace),
+      corroborated in the image by the box's own report builder writing it from a
+      literal-pool byte:
+
+        0x00  scene
+        0x01  head-amp: 1 + 3k bytes of {ch, flags, sens}, eight records a frame
+        0x82  the commit's report
+
+      That is why `01 03 00 10` and a head-amp block share an opcode without being
+      the same message. `subtype` below exposes it. The report builder also has a
+      0x80 arm; what selects it is UNEXPLAINED.
+
+      The enroll group map (0x000d) is only ever a REPLY — its builder is
+      pool-referenced from exactly one word, inside the master's state-3 wait — so
+      it follows a 0x83 or 0x84 announce and never a 0x80 or 0x82. Its ten bytes
+      take three values only: 0x00, 0x41, 0xc3. EVIDENCED (image).
     seq:
       - id: page
         size-eos: true
@@ -802,6 +836,12 @@ types:
             0x0010: config_announce_page
             0x000d: enroll_group_map
     instances:
+      subtype:
+        pos: 0
+        type: u1
+        doc: |
+          block[4], the first byte of this payload. 0x00 scene, 0x01 head-amp,
+          0x82 the commit report. A SUBTYPE SELECTOR, not a reserved byte.
       page_kind:
         value: >-
           _parent.op_len == 0x0019 ? page_kind::chanmap :
@@ -1038,6 +1078,42 @@ types:
     doc: |
       TAG 0x0101 — the console's preamp command, and the ONLY three things a box
       owns on the head-amp page.
+
+      # "Head-amp" is THREE granularities, and one name for them would be wrong
+
+      EVIDENCED (executed trace) — each watched by running the box's code both
+      ways:
+
+        SENS and the flag bits   PER CHANNEL          ch
+        phantom                  PER GROUP OF FOUR    ch >> 2
+        the readback nibble      PER EIGHT            ch >> 3
+
+      Two consequences a consumer must not miss. **Only a record whose channel is
+      a multiple of four carries the phantom group byte** — a record to 0x24 moves
+      group 9, one to 0x27 moves nothing, so sweeping phantom per channel writes
+      three records in four into the void. And **the readback nibble and the
+      phantom command do not address the same thing**, being per eight and per
+      four; they are named apart here for that reason and must stay apart in any
+      API generated from this.
+
+      # A record writes the ACTIVE table, and the commit overwrites it
+
+      There is no head-amp staging table. A record writes the box's live table
+      directly, at the same base the scene commit overwrites in full for all 80
+      slots. EVIDENCED (executed trace).
+
+      **So records must FOLLOW the commit, never precede it.** A record sent
+      before the commit is erased by it, silently: the bytes are right, the
+      checksums are right, the box acknowledges, and the value is gone. Emit the
+      scene transfer, wait for the box's `01 03 00 10`, then sweep.
+
+      # One pass, no banks
+
+      Every real desk sweep is ONE contiguous pass over the box's full declared
+      width, every channel getting all three parameters: 24 records for an
+      S-0808, 48 for an S-1608, 96 for an S-4000S, at about 3.2 ms a record. No
+      desk addresses a bank, splits a sweep or repeats one. EVIDENCED (corpus),
+      31 of 47 captures, three desk generations agreeing on the same box.
     seq:
       - id: ch
         type: u1
@@ -1050,6 +1126,11 @@ types:
       - id: param
         type: u1
         enum: head_amp_param
+        doc: |
+          WHICH BIT IS PHANTOM AND WHICH IS PAD IS OUR NAME, NOT THE FIRMWARE'S.
+          The firmware acts on them without naming them; the mapping comes from
+          the corpus and from the rig. EVIDENCED (corpus), explicitly NOT
+          EVIDENCED (image).
       - id: value
         type: u1
         doc: |
