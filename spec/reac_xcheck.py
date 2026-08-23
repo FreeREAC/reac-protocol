@@ -610,6 +610,29 @@ def test_scene_body_parses_on_a_second_desk_generation():
     assert bytes(m.sysp.tag) == b"SYSP" and bytes(m.scen.tag) == b"SCEN"
 
 
+def test_only_three_tags_are_validated_by_the_box():
+    """The box's commit checks three four-byte tags and nothing else.
+
+    Run the box's own code over real capture data with the body zeroed in
+    128-byte windows and exactly 2 of the 70 windows break the commit. This test
+    is the static half of that result: the three tags fall in exactly two
+    windows, and the parser finds them at the offsets the box hard-codes. Two
+    methods, one answer.
+
+    The consequence for an emitter is the point: twelve bytes are checked and
+    8892 are not, so a wrong value anywhere else is promoted silently."""
+    b = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY)))
+    tags = {0x000: bytes(b.magic), 0x368: bytes(b.sysp.tag), 0x37c: bytes(b.scen.tag)}
+    assert tags == {0x000: b"1234", 0x368: b"SYSP", 0x37c: b"SCEN"}
+    for off, want in tags.items():
+        assert SCENE_BODY[off:off + 4] == want
+    windows = {off // 128 for off, _ in tags.items() for off in
+               range(off, off + 4)} if False else {
+        o // 128 for off in tags for o in range(off, off + 4)}
+    assert windows == {0, 6}
+    assert -(-len(SCENE_BODY) // 128) == 70
+
+
 def test_scene_declares_twelve_inventory_cells_like_the_box_does():
     """The box's commit walks twelve cells at a stride of 0x28 over the slot
     table — four records each — so the desk declares its inventory in exactly the
