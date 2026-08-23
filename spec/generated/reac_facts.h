@@ -191,6 +191,160 @@
 /* The op a cfea announce always carries. [EVIDENCED (corpus).] */
 #define REAC_OP_ANNOUNCE                0xffff
 
+/* ---- The control block's header, as the firmware builds it ---------------------
+ * The two bytes at block[0:2] have always been read as one 16-bit op. The
+ * stagebox firmware writes them as two independent fields, and the receive
+ * side gates on them separately.
+ *
+ * EVIDENCED (image), S-1608 `FUN_0c003398` @0c003398 — the box's own
+ * segmented upload, which writes block[0] = 1, block[4] = 0, then sets
+ * block[1] to 3 when the whole body fits in one frame, to 1 for the first of
+ * many, to 0 for a middle frame and to 2 for the last. The receiver agrees:
+ * `FUN_0c003aae` @0c003aae gates on `buf[1] & 1` and `FUN_0c003b88`
+ * @0c003b88 on `buf[1] in {0, 2}`.
+ *
+ * So there are not seven scene-and-record ops. There is a LINK selector, a
+ * two-bit SEGMENT field, a length, and an opcode.
+ */
+/* block[0] — the link selector. [EVIDENCED (image) — every builder writes it
+ * first.]
+ */
+#define REAC_HDR_LINK_OFF               0
+
+/* block[1] — the segment flags. [EVIDENCED (image).] */
+#define REAC_HDR_SEG_OFF                1
+
+/* block[2:4] — the big-endian length. [EVIDENCED (image).] */
+#define REAC_HDR_LEN_OFF                2
+
+/* block[4] — the opcode, and the base the length counts from on every family
+ * except a link-1 bulk transfer. [EVIDENCED (image) — FUN_0c002c70 @0c002c70
+ * writes 25 for eight three-byte records at block[5:29], and 25 = 1 + 8*3.]
+ */
+#define REAC_HDR_OPCODE_OFF             4
+
+/* block[1] bit 0 — the frame opens a transfer and carries its total.
+ * [EVIDENCED (image).]
+ */
+#define REAC_SEG_FIRST_BIT              0x01
+
+/* block[1] bit 1 — the frame closes a transfer. [EVIDENCED (image).] */
+#define REAC_SEG_LAST_BIT               0x02
+
+/* Both bits — a complete message in one frame, which is what every chanmap,
+ * heartbeat, declaration and single-frame record is. [EVIDENCED (image +
+ * corpus).]
+ */
+#define REAC_SEG_SINGLE                 0x03
+
+/* The stagebox control link — the scene transfer, the chanmap, the heartbeat
+ * and the declarations. [EVIDENCED (image + corpus).]
+ */
+#define REAC_LINK_CONTROL               0x01
+
+/* A second link the S-4000S image builds for and the S-1608 image has no code
+ * for at all. [EVIDENCED (image) — FUN_0c0128b8 @0c0128b8 (S-4000S). NEVER
+ * OBSERVED on the wire.]
+ */
+#define REAC_LINK_AUX_S4000S            0x02
+
+/* The record link — the Roland DT1 container and its two fragments.
+ * [EVIDENCED (corpus).]
+ */
+#define REAC_LINK_RECORD                0x04
+
+/* A link-1 bulk FIRST frame puts its declared total at block[5:7] and its
+ * payload at block[7]. [EVIDENCED (image + corpus).]
+ */
+#define REAC_SEG_FIRST_PAYLOAD_OFF      7
+
+/* Every other bulk frame puts its payload at block[5]. [EVIDENCED (image +
+ * corpus).]
+ */
+#define REAC_SEG_CONT_PAYLOAD_OFF       5
+
+/* 24 — the largest first-frame chunk, and exactly 31 - 7. The builder
+ * reserves block[31] for the checksum. [EVIDENCED (image) — FUN_0c003398
+ * @0c003398.]
+ */
+#define REAC_SEG_FIRST_MAX              24   /* 0x0018 */
+
+/* 26 — the largest continuation chunk, and exactly 31 - 5. [EVIDENCED
+ * (image).]
+ */
+#define REAC_SEG_CONT_MAX               26   /* 0x001a */
+
+/* ---- The chanmap's three-byte record and the table it writes -------------------
+ * Each record is `{slot, flags, value}` and it is the same shape in both
+ * directions: the box's transmitter is the inverse of its receiver, cell for
+ * cell. EVIDENCED (image), `FUN_0c002bb2` @0c002bb2 (build) and
+ * `FUN_0c002d42` @0c002d42 (apply), S-1608; `FUN_0c014488` and `FUN_0c014674`
+ * in the S-4000S carry the identical arithmetic.
+ *
+ * The third byte is not padding. It lands in the same table cell the box's
+ * own gain path reads.
+ */
+/* slot, flags, value. [EVIDENCED (image + corpus).] */
+#define REAC_CHANMAP_REC_BYTES          3
+
+/* One window of the ring per frame. [EVIDENCED (image + corpus).] */
+#define REAC_CHANMAP_RECS_PER_FRAME     8
+
+/* 48 slots plus the one non-channel record id, which the box's cursor emits
+ * as index 0x30 before wrapping to 0. [EVIDENCED (image + corpus).]
+ */
+#define REAC_CHANMAP_RING_LEN           49
+
+/* 48 — the protocol slot space, the present-bit array length and the
+ * fully-enrolled sum. Identical in the S-1608 and S-4000S images, so it is a
+ * protocol constant and not a per-model one. [EVIDENCED (image, both boxes).]
+ */
+#define REAC_SLOT_SPACE                 48   /* 0x0030 */
+
+/* The per-slot table's stride, in the chanmap apply, in the scene commit and
+ * in the scene store alike. [EVIDENCED (image, both boxes).]
+ */
+#define REAC_SLOT_RECORD_STRIDE         10
+
+/* 80 — the table is 80 records long though only the first 48 are addressable
+ * from the wire. [EVIDENCED (image, both boxes).]
+ */
+#define REAC_SLOT_TABLE_RECORDS         80   /* 0x0050 */
+
+/* Table offset the record's VALUE byte writes — the cell the gain path reads.
+ * [EVIDENCED (image) — FUN_0c007fbc @0c007fbc feeds it to FUN_0c007e6a
+ * @0c007e6a.]
+ */
+#define REAC_SLOT_CELL_VALUE            2
+
+/* Table offset written from flags bit 3. [EVIDENCED (image).] */
+#define REAC_SLOT_CELL_FLAG_BIT3        4
+
+/* Table offset written from flags bit 1 — the one the group apply shadows and
+ * never actuates. [EVIDENCED (image).]
+ */
+#define REAC_SLOT_CELL_FLAG_BIT1        6
+
+/* Table offset written from flags bit 2. [EVIDENCED (image).] */
+#define REAC_SLOT_CELL_FLAG_BIT2        8
+
+/* The mask the builder ANDs with `cell << 4`, so the cell code is a full four
+ * bits. Read out of the image at DAT_0c002d7c. [EVIDENCED (image).]
+ */
+#define REAC_CHANMAP_CELL_MASK          0xf0
+
+/* The non-channel record whose FLAGS byte reaches the box's one-word identity
+ * cell and its change detector. Read out of the image at DAT_0c002d7e and
+ * DAT_0c002e6e. [EVIDENCED (image + corpus) — 3804 in the corpus.]
+ */
+#define REAC_CHANMAP_ID_IDENTITY        0xfe
+
+/* The all-zero record the builder emits past the sentinel. Read out of the
+ * image at DAT_0c002d80. [EVIDENCED (image). NEVER OBSERVED — the cursor
+ * wraps at 0x30, so the branch is unreachable on that path.]
+ */
+#define REAC_CHANMAP_ID_FILLER          0xff
+
 /* ---- op-0103 sub-pages and subtypes --------------------------------------------
  * op 0x0103 multiplexes on two axes at once, and reading only one of them
  * is how `01 03 00 10` and a head-amp block got taken for the same message.
