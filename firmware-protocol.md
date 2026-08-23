@@ -472,52 +472,79 @@ the known site at 0x0C002EB2 until it reported presence before any absence was b
 
 ## How this was validated
 
-The grammar is not a description here; it is a parser, and it was run over the whole corpus
-BEFORE the changes and again after, with the before-run taken from the pre-edit grammar recovered
-out of git. `spec/corpus-check.py` is that check, committed and re-runnable:
+`spec/corpus-check.py` parses every capture with the grammar and refuses a regression against
+`spec/corpus-baseline.json`. The baseline is taken from the grammar as it stood at 5159f58,
+recovered from git — a baseline taken after a change proves nothing.
 
 ```
 make corpus-check    CAPTURES=~/Devel/audio/reac-captures
 make corpus-selftest CAPTURES=~/Devel/audio/reac-captures
+./corpus-check.py --captures DIR --classify-delta
 ```
 
 | | captures | whole frames | ok | failed | truncated control blocks | ok | failed | files clean |
 |---|---|---|---|---|---|---|---|---|
-| **baseline**, grammar at 5159f58 | 72 | 214 524 | 214 524 | 0 | 44 400 | 44 400 | 0 | 72 |
-| **after**, this branch | 72 | 214 524 | 214 524 | 0 | 44 400 | 44 400 | 0 | 72 |
+| **baseline**, grammar at 5159f58 | 83 | 258 524 | 258 524 | 0 | 44 400 | 44 400 | 0 | 83 |
+| **after**, this branch | 83 | 258 524 | 258 524 | 0 | 44 400 | 44 400 | 0 | 83 |
 
-Delta in both directions: **no regressions, no improvements, no missing or new files.** Nothing
-the corpus used to parse stopped parsing, and nothing that failed before started passing — there
-was nothing failing to fix.
+**0 regressions, 0 improvements, 0 missing, 0 new.** Nothing the corpus used to parse stopped
+parsing.
 
-The checker was sabotage-proven before its clean run was believed, because this project has
-shipped inert gates before:
+### The classification change is a partition, and that is measured
+
+`--classify-delta` runs both the pre-2026-08-23 rule and the current one over every frame and
+requires the difference to be a SPLIT of the old buckets, never a move between them. Over all
+44 868 346 REAC frames in the 83 captures:
+
+| old bucket | → | frames |
+|---|---|---|
+| `scene_transfer` 779 163 | `scene_transfer` | 778 751 |
+| | `config_announce` | 305 |
+| | `group_map` | 107 |
+| `unknown_ctrl` 40 | `record_fragment` | 40 |
+| every other bucket | unchanged | — |
+
+Each old bucket's parts sum to it exactly and nothing moved sideways. The check fails if a frame
+leaves a bucket that is not being split, and fails if NOTHING moves — a comparison that observes
+no change is not evidence that the change is safe.
+
+### Three sabotages, and one that had to be re-forged
 
 | sabotage | result |
 |---|---|
-| `--self-test`, every frame corrupted and every control-block window shortened | 214 524 frames and 44 400 blocks ALL rejected — both paths shown capable of failing |
-| end marker `C2 EA` → `C2 EB` | **70 of 72 captures regress**, exit 1 |
-| the DT1 wrapper `00 02 00 fe` → `00 02 00 ff` | **5 captures, 12 frames** regress, exit 1 — precisely the `record_fragment` frames, which proves the new type is really exercised by the corpus |
-| restore | 72 captures clean, exit 0 |
+| `--self-test`: every frame corrupted, every control-block window shortened | 258 524 frames + 44 400 blocks all rejected — both paths shown capable of failing |
+| end marker `C2 EA` → `C2 EB` | 70 captures regress, exit 1 |
+| DT1 wrapper `00 02 00 fe` → `…ff` | 5 captures / 12 frames regress, exit 1 — precisely the `record_fragment` frames |
+| ksy classifies `group_map` as `master_hb` | the grammar-vs-oracle agreement test goes red |
+| the oracle moves `config_announce` to `master_announce` | the partition test goes red on a sideways move |
+| **delete the `record_fragment` wrapper guard entirely** | **the whole suite stayed GREEN** |
 
-The first version of the self-test did NOT catch the block path: flipping a byte of the type word
-is tolerated by the grammar, since the type switch has no default and the block falls through as
-raw bytes, so 44 400 corrupted blocks reported clean. It now shortens the window instead, and
-requires both paths to fail independently.
+That last one is the finding. The `contents: [0x00, 0x02, 0x00, 0xfe]` guard could be deleted
+with no test noticing, because nothing ever fed the parser a fragment with a wrong wrapper — the
+guard was decoration. `test_a_fragment_with_the_wrong_wrapper_is_REFUSED` now forges one, and
+forges it properly: the block checksum is restamped so the forgery is valid in every respect
+except the four bytes under test, and the test asserts the forgery still CLASSIFIES as a fragment
+so the parser actually reaches the guard. A forgery that is malformed somewhere else can be
+refused for the wrong reason, and then the guard is still unproven. With the guard deleted the
+new test is red; with it restored, green.
 
 Two traps the corpus set, both of which had already produced a wrong answer:
 
 - **A snaplen-truncated record is not a short frame.** Several captures were taken at snaplen
   64/128/200/400, and a truncated frame's length can land on `52 + 36n` by coincidence, reach the
-  parser and fail the end marker — 3 200 "grammar failures" that were nothing of the kind.
-- **Discarding those records silently is the other half of the same trap.** Seven of the 72
-  captures are truncated in EVERY record, so a whole-frame-only check reads zero frames from them
-  and still calls the corpus clean. A snaplen of 50 or more carries the entire control block, so
-  those records are now parsed as a bare `frame[16:50]` window: seven silent files become live
-  coverage, and 44 400 blocks that were being thrown away join the gate.
+  parser and fail the end marker — 3 200 "grammar failures" that were nothing of the kind. Every
+  pcap record carries `caplen` and `origlen`; compare them.
+- **Discarding those records silently is the other half of the same trap.** Seven captures are
+  truncated in EVERY record, so a whole-frame-only check reads zero from them and still calls the
+  corpus clean. A snaplen of 50 or more carries the entire control block, so those records are
+  parsed as a bare `frame[16:50]` window: 44 400 blocks that were being thrown away now gate.
 
-Alongside the corpus, `spec/reac_xcheck.py` and `spec/facts_xcheck.py` go from 277 to **328**
-assertions on the checked-in goldens, also sabotage-verified: swapping the FIRST bit for the LAST
-bit reddens four tests, shortening the DT1 checksum span by one byte reddens the reassembly test,
-and changing the ring length from 49 to 50 reddens the derived-fact ratchet. The unit suite and
-the corpus are different bodies of evidence and neither substitutes for the other.
+And one the corpus set for the SCAN rather than the grammar: `tcpdump -C` splits a long capture
+into `.pcap00`, `.pcap01` …, and a glob of `*.pcap` silently covered 72 of the 83 files. The
+eleven it dropped were the longest sessions in the set.
+
+Alongside the corpus, `spec/reac_xcheck.py` and `spec/facts_xcheck.py` run **340** assertions on
+the checked-in goldens. The unit suite and the corpus are different bodies of evidence and neither
+substitutes for the other: deleting the wrapper guard left the unit suite green and turned the
+corpus red, and keying the classification on a length left both green while mislabelling every
+commit report on the wire.
