@@ -575,6 +575,31 @@ types:
       tables, pushes twelve `inventory_cell`s, and emits the `01 03 00 10`
       committed report. That commit is the only unconditional promoter of
       head-amp state in the box.
+
+      # What is the console's, and what is the format
+
+      Across 27 real-desk bodies — three desk generations, four box models — 8 of
+      the 8904 bytes vary and 8896 are constant. Two of the four varying runs are
+      fields; two are M-5000 padding that changes between that desk's own runs.
+
+        +0x014      1 B   `revision`, 0 on a V-Mixer desk and 1 on an M-5000
+        +0x343..345 3 B   the low half of `master_id`
+        +0x366..367 2 B   M-5000 only, uninitialised
+        +0x22c6..7  2 B   M-5000 only, uninitialised
+
+      So an emitter fills in `master_id` and `revision` and copies the rest. A
+      body built from this layout alone, with no template bytes, reproduces a real
+      M-200i's and a real M-300's exactly.
+
+      # What it does NOT carry
+
+      No per-channel values of any kind. All 880 records in every real body read
+      (cell, 0, 1, 0, 0), and the commit's copy of fields +2..+8 moves constants.
+      `slots` is the DECLARATION table, not a head-amp staging table. Head-amp
+      values travel entirely on the op-0403 TAG 0x0101 sweep, where consecutive
+      channels do carry different sens values. The scene's job in enrolment is to
+      be COMPLETED, not to be filled in: the box's commit is unconditional over
+      all 80 slots and is the only unconditional promoter of its head-amp state.
     seq:
       - id: magic
         contents: [0x31, 0x32, 0x33, 0x34]
