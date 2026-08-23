@@ -667,10 +667,13 @@ def test_chanmap_ring_is_identical_for_every_box():
         assert len(page.entries) == 8
         for e in page.entries:
             if e.slot == 0xfe:
-                assert e.bank == 0x00
+                assert e.is_identity_record
+                assert e.value == 0x00
                 continue
             assert e.slot < 0x30
-            assert e.bank == (0x38 if e.slot >= 0x28 else 0x28)
+            assert e.flags == (0x38 if e.slot >= 0x28 else 0x28)
+            assert e.value == 0x00, "no console has ever put a value here"
+            assert e.flag_slot_4 == 1 and e.flag_slot_8 == 0 and e.flag_slot_6 == 0
             seen.add(e.slot)
         assert page.entries[0].slot == bytes.fromhex(blk["hex"])[7]  # sel2 cursor
     assert seen
