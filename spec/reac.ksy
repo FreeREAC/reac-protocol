@@ -557,6 +557,14 @@ types:
       to an S-1608 and to an S-0808, and the only bytes that differ between an
       M-200i's and an M-300's are the four low bytes of `master_id`.
 
+      # Evidence classes used below
+
+      EVIDENCED (image) — read out of a firmware image, as a resolved pointer, a
+      literal-pool word or an instruction operand. EVIDENCED (corpus) — measured
+      over the capture set. EVIDENCED (executed trace) — observed by running the
+      box's own code over real capture data in an SH-2A interpreter. INFERRED —
+      everything else, and it says so.
+
       # Endianness
 
       Fields here are LITTLE-endian, against the frame's big-endian everywhere
@@ -591,6 +599,21 @@ types:
       body built from this layout alone, with no template bytes, reproduces a real
       M-200i's and a real M-300's exactly.
 
+      # What the box VALIDATES, and what it does not
+
+      The commit checks **three four-byte tags and nothing else**: `magic` at
+      +0x000, `sysp.tag` at +0x368 and `scen.tag` at +0x37c. Fail any one and it
+      promotes nothing and replies nothing, while the transfer still looks
+      complete from the wire. EVIDENCED (executed trace): the box's own task loop
+      run over real capture data, with the body zeroed in 128-byte windows —
+      exactly 2 of the 70 windows break the commit, and they are windows 0 and 6,
+      the only two that contain a tag. That independently reproduces the field map
+      above, which was built from resolved pointers rather than from execution.
+
+      So an instantiator MUST get those twelve bytes right and cannot be caught by
+      the box for getting anything else wrong. That is a reason for more care, not
+      less: a wrong value elsewhere is promoted silently into the live tables.
+
       # What it does NOT carry
 
       No per-channel values of any kind. All 880 records in every real body read
@@ -618,6 +641,10 @@ types:
         doc: +0x08. The value the commit passes on when `unit_map_select` is 1.
           EVIDENCED (image) that it is read there; 0x0004 on every capture. What
           it selects is UNRESOLVED.
+
+          Both arms of the switch call the SAME setter and differ only in which
+          field they read from (EVIDENCED, executed trace), so this is one action
+          with two sources, not two behaviours.
       - id: unknown_0a
         size: 10
         doc: +0x0a..+0x13. Constant across every desk seen (01 80 02 00 01 00 01
