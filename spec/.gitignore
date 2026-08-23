@@ -12,3 +12,4 @@ __pycache__/
 
 # the dev-only oracle diff links against a libreac checkout
 c_oracle_dump
+c_ctrl_dump
