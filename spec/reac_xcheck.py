@@ -696,3 +696,83 @@ def test_every_fixture_parses_and_is_covered():
     unknown = {n for n, b in BLOCKS
                if oracle_ctrl_kind(bytes.fromhex(b["hex"])) == KIND_UNKNOWN}
     assert unknown == {"s0808_name_block", "s0808_extra_block"}
+
+
+# --------------------------------------------------------------------------
+# The control block's header, as the stagebox firmware builds it
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name,blk", BLOCKS)
+def test_op_decomposes_into_link_and_segment(name, blk):
+    """block[0] is a LINK selector and block[1] a two-bit SEGMENT field.
+
+    The 16-bit `op` every tool indexes on is those two bytes side by side, so
+    the decomposition must reproduce it exactly on every captured block. A test
+    that only checked one direction would pass on a grammar that had silently
+    dropped the second byte."""
+    t = parse_block(blk["hex"])
+    if not hasattr(t.block, "link"):
+        pytest.skip("FILLER carries no control header")
+    raw = bytes.fromhex(blk["hex"])
+    assert int(t.block.link) == raw[2]
+    assert t.block.seg == raw[3]
+    assert t.block.seg_kind == raw[3] & 3
+    assert t.block.seg_is_first == bool(raw[3] & 1)
+    assert t.block.seg_is_last == bool(raw[3] & 2)
+    assert t.block.opcode == raw[6]
+    assert t.op_raw == (raw[2] << 8) | raw[3], "the two views must agree"
+
+
+def test_op_len_counts_from_block_4_on_the_record_link():
+    """On link 4 the length counts block[4] inclusive, so it lands exactly on
+    the SysEx terminator of a single-frame record."""
+    seen = 0
+    for name, blk in BLOCKS:
+        raw = bytes.fromhex(blk["hex"])
+        if raw[2] != 0x04 or (raw[3] & 3) != 3 or raw[6] != 0x00:
+            continue
+        n = (raw[4] << 8) | raw[5]
+        assert raw[6 + n - 1] == 0xF7, f"{name}: length {n:#x} does not end on F7"
+        seen += 1
+    assert seen >= 4, f"only {seen} single-frame link-4 blocks — too few to mean anything"
+
+
+def test_op_len_counts_from_block_4_on_the_chanmap():
+    """25 = one opcode byte + eight three-byte records. The length is a length,
+    not the sub-page selector it was read as."""
+    seen = 0
+    for name, blk in BLOCKS:
+        raw = bytes.fromhex(blk["hex"])
+        if raw[2:4] != b"\x01\x03" or raw[6] != 0x01:
+            continue
+        assert (raw[4] << 8) | raw[5] == 1 + 8 * 3
+        seen += 1
+    assert seen, "no chanmap block in the fixtures — this test proved nothing"
+
+
+# --------------------------------------------------------------------------
+# op 0401 + op 0402 are ONE Roland DT1 record, split across two frames
+# --------------------------------------------------------------------------
+
+def _fragment(name):
+    blk = dict(BLOCKS)[name]
+    return parse_block(blk["hex"]).block.payload
+
+
+def test_the_two_link4_fragments_reassemble_into_one_sysex():
+    first, last = _fragment("s0808_name_block"), _fragment("s0808_extra_block")
+    assert first._parent.seg_kind == 1, "0x0401 must read FIRST"
+    assert last._parent.seg_kind == 2, "0x0402 must read LAST"
+    assert first.len_echo == 0x16 and last.len_echo == 0x08
+    rec = bytes(first.fragment) + bytes(last.fragment)
+
+    assert rec[0] == 0xF0 and rec[-1] == 0xF7, "not a complete SysEx"
+    assert rec[1] == 0x41, "not Roland"
+    assert rec[6] == 0x12, "not a DT1 write"
+    assert rec[7:9] == b"\x05\x00", "not the identity tag"
+    assert sum(rec[7:-1]) % 128 == 0, "the DT1 checksum does not close"
+    assert bytes(rec[12:18]) == b"S-0808"
+
+    # Neither fragment closes on its own — which is the whole point.
+    assert sum(bytes(first.fragment)[7:]) % 128 != 0
+    assert 0xF7 not in bytes(first.fragment)
