@@ -1341,12 +1341,15 @@ groups:
       # binding, so reac_xcheck.py does not read them — sabotaging HEADAMP_BASE_MULTIPLIER
       # to 0x11 leaves the cross-check green. By this repo's own law a row with no reader is
       # a comment, and these are comments until bound.
-      # The binding is also a CORRECTNESS fix, not bookkeeping: libreac's
+      # The binding is also a CORRECTNESS fix, not bookkeeping. RULED by the operator
+      # 2026-08-23: "it must come from the announce on the wire." libreac's
       # `reac_headamp_base(int in_ch)` (src/reac_ports.c:31) derives the base from the box's
-      # INPUT COUNT, while the firmware derives it from the announced strap byte. The two
-      # agree on every box we own only because width and strap are collinear — a 16-input
-      # chassis always straps 2. A model that breaks that collinearity breaks libreac, which
-      # is precisely the "blocks any new box model" gap these rows exist to close.
+      # INPUT COUNT — a second declaration of a fact the box itself states — and a caller with
+      # no announce must answer NOT KNOWN rather than return a width-derived guess. The width
+      # reading agrees with the announce on every box we own only because a 16-input chassis
+      # always straps 2, so it is wrong in the one way nothing downstream can detect, which is
+      # how it survived. A model that breaks that collinearity breaks it, and that is precisely
+      # the "blocks any new box model" gap these rows exist to close.
       - name: HEADAMP_APPLY_UNIT_SLOTS
         value: 8
         why: |
