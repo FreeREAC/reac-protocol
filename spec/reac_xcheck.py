@@ -921,3 +921,33 @@ def test_grammar_and_oracle_agree_on_every_fixture():
     for h in GRANT_FRAMES:
         t = parse_block(h)
         assert int(t.ctrl_kind) == oracle_ctrl_kind(bytes.fromhex(h))
+
+
+def test_a_fragment_with_the_wrong_wrapper_is_REFUSED():
+    """The `contents` guard on record_fragment's wrapper must actually reject.
+
+    Deleting that guard left the whole suite GREEN, because nothing fed the
+    parser a fragment with a wrong wrapper -- the guard was decoration. So this
+    forges one, and forges it PROPERLY: the block checksum is restamped so the
+    forgery is valid in every respect except the four bytes under test. A
+    forgery that is also malformed somewhere else can be refused for the wrong
+    reason, and then the guard is still unproven."""
+    good = bytearray(bytes.fromhex(dict(BLOCKS)["s0808_name_block"]["hex"]))
+    assert good[6:10] == bytearray(b"\x00\x02\x00\xfe"), "fixture moved"
+    assert sum(good[2:]) % 256 == 0, "the fixture block must sum to zero"
+
+    forged = bytearray(good)
+    forged[9] = 0xff                       # wrapper byte 3: fe -> ff
+    forged[33] = (forged[33] - 1) % 256    # restamp so the block still sums to 0
+    assert sum(forged[2:]) % 256 == 0, "the forgery must be checksum-valid"
+    assert oracle_ctrl_kind(bytes(forged)) == KIND_RECORD_FRAGMENT, \
+        "the forgery must still CLASSIFY as a fragment, or the parser would " \
+        "never reach the guard and this test would prove nothing"
+
+    with pytest.raises(Exception):
+        t = parse_block(bytes(forged).hex())
+        t.block.payload.fragment      # force the lazy payload
+
+    # and the untouched original must still parse, so the test is not simply
+    # rejecting everything
+    parse_block(bytes(good).hex()).block.payload.fragment
