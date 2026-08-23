@@ -168,11 +168,20 @@
  */
 #define REAC_OP_PAGE_0103               0x0103
 
-/* The ASCII model-name frame. [EVIDENCED (corpus).] */
-#define REAC_OP_NAME_FRAME              0x0401
+/* Link 4 with the segment field reading FIRST — the opening fragment of a DT1
+ * record too long for one frame. Previously carried as "the ASCII model-name
+ * frame", which is what its one observed use holds. [EVIDENCED (image +
+ * corpus) — the segmentation rule is FUN_0c003398 @0c003398 (S-1608); the
+ * pairing is proved by the DT1 checksum, which closes only across both
+ * fragments.]
+ */
+#define REAC_OP_DT1_FIRST_FRAGMENT      0x0401
 
-/* The extra cold-connect frame some models send. [EVIDENCED (corpus).] */
-#define REAC_OP_EXTRA_COLD_CONNECT      0x0402
+/* The same record's closing fragment, carrying the inner checksum and the
+ * SysEx terminator. Previously carried as "the extra cold-connect frame some
+ * models send". [EVIDENCED (image + corpus).]
+ */
+#define REAC_OP_DT1_LAST_FRAGMENT       0x0402
 
 /* A record container — a Roland DT1 SysEx, or the box's upstream return
  * block. Discriminated by payload[0]. [EVIDENCED (corpus).]
