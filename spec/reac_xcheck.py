@@ -779,3 +779,18 @@ def test_the_two_link4_fragments_reassemble_into_one_sysex():
     # Neither fragment closes on its own — which is the whole point.
     assert sum(bytes(first.fragment)[7:]) % 128 != 0
     assert 0xF7 not in bytes(first.fragment)
+
+
+def test_group_map_bytes_decode_as_the_firmware_reads_them():
+    """The only firmware that parses op-0103 0x000d reads its ten bytes as two
+    packed fields, not as two five-byte arrays. Reproduce both loops."""
+    page = parse_block(
+        next(b for n, b in BLOCKS if n == "enroll_000d_w8")["hex"]
+    ).block.payload.page
+    g = bytes(page.group_bytes)
+    assert g == bytes(page.input_groups) + bytes(page.output_groups), \
+        "group_bytes must be exactly the same ten bytes, in order"
+    low6 = [g[i >> 1] & 0x3f for i in range(12)]
+    top2 = [(v if (v := g[i] >> 6) in (0, 1) else -1) for i in range(10)]
+    assert low6 == [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert top2 == [1, 0, 0, 0, 0, 0, -1, -1, -1, -1]
