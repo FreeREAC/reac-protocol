@@ -197,9 +197,9 @@ frame: `pps = rate / 12`, 12 samples per frame.
 
 | rate | pps (downstream) | slot period | audio bandwidth | status |
 |---|---|---|---|---|
-| 44.1 kHz | 3675 | 272.1 µs | ~46 Mbit/s | [?] not yet exercised on our rig |
-| 48 kHz | 4000 | 250.0 µs | ~46 Mbit/s | [V] measured ~4000 pps |
-| 96 kHz | 8000 | 125.0 µs | ~92 Mbit/s | [V] settled — double-pps |
+| 44.1 kHz | 3675 | 272.1 µs | 44.6 Mbit/s | [?] not yet exercised on our rig |
+| 48 kHz | 4000 | 250.0 µs | 48.5 Mbit/s | [V] measured ~4000 pps |
+| 96 kHz | 8000 | 125.0 µs | 97.0 Mbit/s | [V] settled — double-pps |
 
 What changes with rate is **only the packet rate** — and therefore the inter-frame
 interval (the *slot period*, `1e9 / pps` ns). The frame layout, channel count (40),
@@ -274,16 +274,20 @@ rate.
 
 ### Downstream vs upstream packet rate
 
-The two directions packetise differently:
+Both directions packetise the **same** way. A frame is `52 + n × 36` bytes, and the 36 is
+12 samples × 3 B **at every sample rate**, so neither direction changes shape with rate:
+what scales is the packet rate, `pps = rate / 12` → 3675 / 4000 / 8000. The only difference
+between the two is `n` — downstream carries the fabric's 40 slots, upstream carries the
+box's own input width.
 
-- **Downstream** (master → box, broadcast 1492 B): **fixed 12 samples/frame**; the packet
-  rate scales with sample rate (3675 / 4000 / 8000 pps).
-- **Upstream** (box → master, unicast ~628 B at 96 kHz): **fixed ~8000 fps**; the samples
-  per frame scale with rate instead (12 at 96 kHz, 6 at 48 kHz → ~288 B audio). Same plain
-  LE sample-major packing; the channel map is FPGA-scrambled (see the upstream section).
+- **Downstream** (master → box, broadcast): 40 channels → 1492 B, at 3675 / 4000 / 8000 pps.
+- **Upstream** (box → master, unicast): the box's width → 340 B at 8 ch, 628 B at 16 ch,
+  1204 B at 32 ch, at the same 3675 / 4000 / 8000 pps. Same even/odd braid as downstream;
+  the channel map is FPGA-scrambled (see the upstream section).
 
-The slot period a stagebox slaves to is the **downstream** cadence; the upstream return
-runs on its own fixed-rate packetisation.
+The slot period a stagebox slaves to is the **downstream** cadence. `spec/reac.ksy` recovers
+the width from the length by this law in **both** directions, and `spec/protocol-facts.yaml`
+carries the 36 with its corpus evidence across 44.1 / 48 / 96 kHz.
 
 ## Source control (head-amp) — op `0x04 0x03` [V]
 
@@ -690,25 +694,32 @@ mixer to box carrying whatever the mixer routed to each slot (post-routing).
 
 The upstream return frame is unicast to the master MAC and is **smaller** than the
 downstream broadcast: it carries the box's *own* input count, not the fabric's
-40-channel block. At 96 kHz a **16-channel** box returns ~628 B (= ~49–52 B header +
-576 B audio + trailer; 576 = 16 ch × 3 B × 12 samples) and an **8-channel** box
-returns ~340 B (= header + 288 B audio + trailer; 288 = 8 ch × 3 B × 12 samples).
-The packing is the **same even/odd braid as downstream** — see "Audio de-interleave"
-above. (This paragraph once read "plain 24-bit LE, sample-major … the obs-h8819 braid
-does not apply upstream", inferred from a single injected tone against the then-current
-plain-LE reading of the M-5000 downstream. Both halves of that inference fell with the
-plain-LE reading; the upstream braid is since confirmed on real captures at three box
-widths — the goldens in `spec/fixtures/upstream.json`.)
+40-channel block. It obeys the same `52 + n × 36` law, at every rate:
+
+| width | box | audio bytes | frame |
+|---|---|---|---|
+| 8 ch | S-0808 | 288 = 8 × 3 × 12 | **340 B** |
+| 16 ch | S-1608 | 576 = 16 × 3 × 12 | **628 B** |
+| 32 ch | S-4000S | 1152 = 32 × 3 × 12 | **1204 B** |
+
+The width is the only thing that varies — **not** the samples per frame, which are 12 at
+44.1, 48 and 96 kHz alike. The packing is the **same even/odd braid as downstream** — see
+"Audio de-interleave" above — confirmed on real captures at all three widths, the goldens in
+`spec/fixtures/upstream.json`.
 
 The audio is intact on the wire (every tone decoded clean) but the channel **MAP** is
 scrambled — the wire does **not** carry input N → channel N. The scramble is
 FPGA-owned, rate-independent, and not caused by loss / jitter or by a byte-transparent
 re-pacer. Single-tone sweeps could not pin the exact map (a smooth sine reads high
 autocorrelation across a plateau of adjacent bytes); resolving it needs distinct
-simultaneous tones, one frequency per input. **The exact map is OPEN.** 48 kHz is
-inferred: 8000 fps fixed, samples/frame scale with rate (96k→12, 48k→6), so 48 kHz
-audio = 16 ch × 3 B × 6 = 288 B, frame ~342 B; same plain LE packing; same
-rate-independent scramble.
+simultaneous tones, one frequency per input. **The exact map is OPEN.**
+
+The scramble is rate-independent, and so is the frame: a 16-channel box returns 628 B at
+48 kHz exactly as at 96 kHz, at 4000 pps instead of 8000. **[?]** The geometry is settled —
+it is the `52 + n × 36` law, corpus-evidenced across all three rates in
+`spec/protocol-facts.yaml`. What is UNVERIFIED is the upstream **packet rate** at 48 kHz
+specifically: it follows from 12 samples per frame at 48 kHz, but has not been counted
+directly. One 48 kHz upstream capture with a frame count over a known interval settles it.
 
 Distinguishing source / direction from the wire alone: **source MAC** → which
 device/port (OUI `00:40:ab`); **dest MAC** → direction/role (mixer→box OUTPUT frames
@@ -720,8 +731,24 @@ remote-control query in [firmware-findings.md](firmware-findings.md)).
 
 ## Bandwidth / link budget
 
-- **48 kHz:** 40 ch × 24 bit × 48 kHz ≈ 46 Mbit/s audio (~48–60 Mbit/s with framing)
-  — comfortably under 100BASE-TX.
-- **96 kHz double-pps:** ~92–97 Mbit/s — about saturating 100BASE-TX.
+The frame is fixed, so the budget is arithmetic on the packet rate. Count the whole
+Ethernet slot: the 1492 B frame **already includes** its 14-byte Ethernet header, so what
+the wire adds beyond it is **24 bytes** — 8 preamble/SFD, 4 FCS, 12 inter-frame gap.
+(Adding 38 double-counts the Ethernet header.)
+
+    downstream bits/s = pps × (1492 + 24) × 8
+
+| rate | pps | downstream on the wire |
+|---|---|---|
+| 44.1 kHz | 3675 | 44.6 Mbit/s |
+| 48 kHz | 4000 | 48.5 Mbit/s |
+| 96 kHz | 8000 | **97.0 Mbit/s** |
+
+So a 96 kHz segment is 97.0 Mbit/s — it about saturates 100BASE-TX, which is why a 96 kHz
+REAC run wants its own port and tolerates nothing else sharing it.
+
+**On a gigabit trunk:** 1000 / 97.0 ≈ 10 segments is the ceiling, and **8 is the
+recommended figure** — the remainder is headroom for the upstream returns, the control
+plane and switch scheduling, none of which a 100 %-loaded trunk leaves room for.
 
 Payload growth is ruled out: REAC adds **packets**, not bytes-per-packet.
