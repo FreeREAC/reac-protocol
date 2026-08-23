@@ -94,14 +94,38 @@ The wire-format reference documents *what* head-amp records look like
 the practical reason a software master can command 48 V correctly on the wire and still not light every
 input.
 
-**A superseded model, recorded so it is not re-derived.** An earlier revision of this document described
-a **staging vs active** pair of tables flushed by a *sustained* `cd ea 01 01` → `cd ea 01 02` commit
-pair, with only a default-enrolled **anchor** input committing without it. That model is **falsified**.
-A later audit against the same captures found that `cd ea 01 01` / `01 02` are establishment messages
-(op-`0101` carries ASCII `"1234"`), not a scene-commit bracket; op-`0100` is a probe, not a scene; and no
-anchor rule exists in the box's apply path — it gates on the channel number only. A master implementation
-built on the sustained-pair theory was written, tested against real boxes, and **removed** as dead code.
-Do not resurrect it.
+**A model falsified from captures, and restored from the images. Read this before re-deriving either.**
+
+An early revision described a **staging vs active** pair of tables flushed by a `cd ea 01 01` →
+`cd ea 01 02` commit bracket. A later audit against the captures declared that falsified, on the
+grounds that `01 01` carries ASCII `"1234"` so it must be an establishment handshake, and that
+op-`0100` is a probe rather than a scene. A master built on the first model was written, tested and
+removed.
+
+**The audit was wrong, and reading both firmwares says so** (2026-08-23, lane N):
+
+- The staging/active pair is real and is in the box's code. `FUN_0c003c8a` copies 80 records of 10
+  bytes from a staging base to a live base, then copies 6 bytes of master id, pushes twelve
+  inventory cells and emits the `01 03 00 10` report. It is the only unconditional promoter of
+  head-amp state in the box.
+- The bracket is real. `FUN_0c003aae` gates on the header, `FUN_0c003b88` reassembles continuations
+  and finishes on the `01 02` phase, and finishing is what enters the commit.
+- op-`0100` is not a probe. It is the continuation phase of an 8904-byte scene transfer, and every
+  one of the corpus's ten distinct op-`0100` payloads is a literal 26-byte slice of a recovered
+  body.
+- The `"1234"` in op-`0101` is not a handshake token. It is the first four bytes of the scene body,
+  which that frame carries at block offset 7.
+
+What the audit got right is that the transfer is not *sustained*: it is bounded, and it is repeated
+every 2.695 s until the box answers rather than held. The **anchor** input rule remains unsupported —
+nothing in the box's apply path has been shown to implement it — so that part of the old model stays
+retired.
+
+Named from the firmware in
+`openmixer/docs/design/notes/scene/reac-enrolment-from-firmware.md` and modelled in
+`spec/reac.ksy` as `scene_body`. **The lesson worth keeping is the method:** the falsifying audit
+read captures and reasoned about what a byte pattern must mean; the correction read the code that
+produces and consumes it.
 
 **What the evidence supports instead.** Every head-amp edit is carried by one standalone op-`0403`
 record; the box is armed by the **complete** per-input scene delivered during establishment. Two
