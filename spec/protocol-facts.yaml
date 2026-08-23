@@ -1,0 +1,846 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
+#
+# protocol-facts — the ONE declarative source for the REAC constants that two
+# artefacts currently spell independently.
+#
+# There are two expressions of this protocol and they can drift. `spec/reac.ksy`
+# is declarative: it parses and validates, and today it parses the whole capture
+# corpus with no unexplained bytes. `libreac` is imperative C: it builds frames
+# and drives boxes. Neither generates the other, and nothing caught a constant
+# changed in one and not the other.
+#
+# Kaitai cannot close that on its own — it has no plain-C backend and it emits
+# parsers, not serialisers — so the convergence is two narrower things, and this
+# file is the first: the numbers both sides spell, written once.
+#
+#   spec/gen-facts.py            reads this and writes spec/generated/
+#   spec/facts_xcheck.py         asserts reac.ksy still agrees with it
+#   spec/xcheck_ctrl_oracle.py   the second thing: builds with libreac, parses
+#                                with the generated parser, compares
+#
+# WHAT BELONGS HERE: a number, offset, size or code that appears in BOTH
+# expressions, or that an emitter must get right and neither states clearly.
+# WHAT DOES NOT: anything one side owns alone (the braid byte map is libreac's;
+# the establishment FSM is nobody's), and anything not evidenced. A schema that
+# over-declares is a lie its consumers cannot detect.
+#
+# Every row carries `why` (what the number is) and `evidence`. The evidence
+# grades are the grammar's own: EVIDENCED (image) read out of a firmware image,
+# EVIDENCED (corpus) measured over the captures, EVIDENCED (executed trace)
+# observed by running the box's code, EVIDENCED (rig) measured on hardware,
+# INFERRED for everything else.
+#
+# WHAT IS DELIBERATELY ABSENT, so nobody re-derives it and finds it missing:
+#
+#   * A DEVICE-TYPE ENUM and a wire-devtype -> model-id table. Both were asked
+#     for. Neither is written down anywhere in reac-protocol, libreac, reac-pw,
+#     reac-firmware-re or openmixer, so putting numbers here would be inventing
+#     a fact and dressing it as a shared one. What DOES exist and is captured
+#     above is the CONFIG-ANNOUNCE SELECTOR (0x82 the S-1608 family, 0x84 the
+#     S-0808 and S-4000S family, in reac.ksy's config_announce_page) and the
+#     twelve-cell inventory the width is read from. If a device-type enum turns
+#     out to be real, it lands here with its evidence line and both sides pick
+#     it up; until then this schema does not claim one.
+#
+#   (The SENS step -> gain curve used to be listed here as deliberately absent,
+#   because three live readings disagreed and a schema must not be where a
+#   contested number gets frozen by whoever typed the file. It was measured on
+#   2026-08-23 and now has a group of its own below.)
+#
+# `ksy:` names a path into reac.ksy that must carry the same value. It is a
+# path, not a string match: `types/scene_chunk_payload/seq/1/size` resolves
+# through the grammar's own structure, so a grammar edit that moves a field is
+# caught even when the prose around it still reads correctly.
+
+meta:
+  id: reac_facts
+  guard: REAC_FACTS_H
+  title: REAC protocol facts — generated, do not hand-edit
+  ksy_id: reac_facts
+  ksy_title: REAC protocol constants, shared by reac.ksy and libreac
+
+groups:
+
+  - id: frame_geometry
+    title: Frame geometry
+    doc: |
+      A REAC frame is a fixed L2 header, a control block, an audio region of
+      whole 36-byte channels, and a two-byte end marker. Every length in the
+      protocol is 52 + n*36 for some channel count n, and that one law is what
+      lets a parser recover the width from the size — REAC carries no width
+      field in an audio frame.
+
+      The 52 is 50 bytes of header plus the 2-byte end marker. A capture may
+      carry two more bytes of Ethernet FCS residue; they are residue, not a
+      field, and are stripped before any of this arithmetic runs.
+    facts:
+      - name: ETHERTYPE
+        libreac: REAC_ETHERTYPE
+        value: 0x8819
+        fmt: hex4
+        why: REAC's registered non-IP EtherType.
+        evidence: EVIDENCED (corpus) — every frame in 72 captures.
+        ksy: seq/2/contents
+        ksy_as: bytes_be
+      - name: L2_HEADER_LEN
+        libreac: REAC_L2_HEADER_LEN
+        value: 50
+        why: 14 eth + 2 counter + 2 type word + 32 control block.
+        evidence: EVIDENCED (corpus).
+      - name: AUDIO_OFFSET
+        libreac: REAC_AUDIO_OFFSET
+        value: 50
+        why: Where the audio region starts. Same number as the header length,
+          and it is the same fact.
+        evidence: EVIDENCED (corpus) — a golden offset scan decodes real desk
+          program as noise at every other offset.
+      - name: HDR_COUNTER_OFF
+        libreac: REAC_HDR_COUNTER_OFF
+        value: 14
+        why: u16 LITTLE-endian free-running sequence counter, against the
+          big-endian everything else.
+        evidence: EVIDENCED (corpus).
+        ksy: seq/3/type
+        ksy_as: literal
+        ksy_value: u2le
+      - name: FRAME_OVERHEAD
+        libreac: REAC_UPSTREAM_OVERHEAD
+        value: 52
+        why: The non-audio bytes of any frame — 50 header + 2 end marker. The
+          52 in `52 + n*36`.
+        evidence: EVIDENCED (corpus).
+        ksy: instances/has_fcs_residue/value
+        ksy_as: substring
+        ksy_value: "raw_len - 52"
+      - name: BYTES_PER_CHANNEL
+        libreac: REAC_UPSTREAM_BYTES_PER_CH
+        value: 36
+        why: 12 samples x 3 bytes, per channel, at EVERY sample rate. The 36 in
+          `52 + n*36`.
+        evidence: EVIDENCED (corpus) — holds across 44.1k, 48k and 96k.
+        ksy: instances/num_channels/value
+        ksy_as: substring
+        ksy_value: ") / 36"
+      - name: SAMPLES_PER_PKT
+        libreac: REAC_SAMPLES_PER_PKT
+        value: 12
+        why: Samples per channel per frame. The RATE is the packet rate; the
+          frame does not change shape with it.
+        evidence: EVIDENCED (corpus).
+      - name: RESOLUTION
+        libreac: REAC_RESOLUTION
+        value: 3
+        why: Bytes per sample per channel — 24-bit.
+        evidence: EVIDENCED (corpus).
+      - name: MAX_CHANNELS
+        libreac: REAC_MAX_CHANNELS
+        value: 40
+        why: The downstream audio fabric, 40 slots. NOT the head-amp channel
+          space, which is 48 wide; conflating the two was a real bug.
+        evidence: EVIDENCED (corpus).
+        ksy: instances/is_downstream_width/value
+        ksy_as: substring
+        ksy_value: "== 40"
+      - name: FRAME_BYTES
+        libreac: REAC_FRAME_BYTES
+        value: 1492
+        why: The fixed downstream broadcast — 52 + 40*36.
+        evidence: EVIDENCED (corpus).
+        derived: FRAME_OVERHEAD + MAX_CHANNELS * BYTES_PER_CHANNEL
+      - name: AUDIO_BYTES
+        libreac: REAC_AUDIO_BYTES
+        value: 1440
+        why: 40 ch x 12 samples x 3 B.
+        evidence: EVIDENCED (corpus).
+        derived: MAX_CHANNELS * BYTES_PER_CHANNEL
+      - name: FCS_RESIDUE
+        value: 2
+        why: |
+          The two bytes a mirrored/SPAN capture leaves on the end of a frame.
+          EXPLAINED, STRIPPED, NEVER MODELLED — and load-bearing twice: it is
+          how mirrored duplicates are told apart (by GEOMETRY, never by
+          comparing bytes), and a truncated capture whose residue happens to
+          fit makes a short frame look like a legal narrower one.
+        evidence: EVIDENCED (corpus).
+        ksy: instances/has_fcs_residue/value
+        ksy_as: substring
+        ksy_value: "% 36 == 2"
+      - name: END_MARKER_0
+        libreac: REAC_END_MARKER_0
+        value: 0xC2
+        fmt: hex2
+        why: First byte of the two-byte end marker.
+        evidence: EVIDENCED (corpus).
+        ksy: seq/6/contents
+        ksy_as: byte0
+      - name: END_MARKER_1
+        libreac: REAC_END_MARKER_1
+        value: 0xEA
+        fmt: hex2
+        why: Second byte of the end marker.
+        evidence: EVIDENCED (corpus).
+        ksy: seq/6/contents
+        ksy_as: byte1
+
+  - id: control_block
+    title: The 32-byte control block and its two checksums
+    doc: |
+      Every non-FILLER frame carries a 32-byte control block at frame[18:50],
+      whose last byte is a checksum over the block. A FILLER frame (type word
+      0x0000) carries audio there instead and is checksum-exempt.
+
+      There are TWO checksum rules and they differ. The block sums to 0 mod 256.
+      A nested record inside it — the Roland DT1 head-amp record and its
+      relatives — sums to 0x80. The record's is stamped FIRST: a record fixed up
+      after the block is stamped invalidates the block, which is a real bug this
+      ordering exists to prevent.
+    facts:
+      - name: CTRL_BLOCK_OFF
+        libreac: REAC_CTRL_BLOCK_OFF
+        value: 18
+        why: Frame offset of the control block.
+        evidence: EVIDENCED (corpus).
+      - name: CTRL_BLOCK_END
+        libreac: REAC_CTRL_BLOCK_END
+        value: 50
+        why: One past the end — and therefore the audio offset.
+        evidence: EVIDENCED (corpus).
+        derived: CTRL_BLOCK_OFF + CTRL_BLOCK_LEN
+      - name: CTRL_BLOCK_LEN
+        libreac: REAC_CTRL_BLOCK_LEN
+        value: 32
+        why: The checksummed span.
+        evidence: EVIDENCED (corpus).
+        ksy: types/typed_block/seq/1/size
+      - name: CTRL_CKSUM_OFF
+        libreac: REAC_CTRL_CKSUM_OFF
+        value: 49
+        why: The checksum byte, last of the block. Block-relative 31.
+        evidence: EVIDENCED (corpus).
+        derived: CTRL_BLOCK_END - 1
+      - name: CTRL_CKSUM_OFF_IN_BLOCK
+        value: 31
+        why: The same byte, block-relative — what a caller stamping a bare
+          32-byte block indexes.
+        evidence: EVIDENCED (corpus).
+        ksy: types/control_block/instances/block_checksum/pos
+      - name: CTRL_BLOCK_SUM
+        value: 0x00
+        fmt: hex2
+        why: Sum(block[0..31]) mod 256 must equal this.
+        evidence: EVIDENCED (corpus) — every control frame in the corpus.
+      - name: CTRL_RECORD_SUM
+        value: 0x80
+        fmt: hex2
+        why: Sum(record TAG..CKSUM) mod 256 must equal this. The Roland DT1
+          rule, and NOT the block rule.
+        evidence: EVIDENCED (corpus).
+      - name: TYPED_BLOCK_OFF
+        value: 16
+        why: Frame offset of the type word — the start of the [16:50] window
+          the goldens store and the C tests use.
+        evidence: EVIDENCED (corpus).
+      - name: TYPED_BLOCK_LEN
+        value: 34
+        why: Type word (2) + control block (32).
+        evidence: EVIDENCED (corpus).
+        derived: 2 + CTRL_BLOCK_LEN
+        ksy: seq/4/size
+
+  - id: frame_type
+    title: Type-word codes
+    doc: The two bytes at frame[16:18].
+    kind: enum
+    ksy_enum: frame_type
+    facts:
+      - name: TYPE_FILLER
+        value: 0x0000
+        fmt: hex4
+        ksy_name: filler
+        why: Audio-only, no control op, checksum-exempt.
+        evidence: EVIDENCED (corpus).
+      - name: TYPE_CONTROL
+        value: 0xCDEA
+        fmt: hex4
+        ksy_name: control
+        why: A control record.
+        evidence: EVIDENCED (corpus).
+      - name: TYPE_ANNOUNCE
+        value: 0xCFEA
+        fmt: hex4
+        ksy_name: announce
+        why: The master announce. Same block shape, op always 0xffff.
+        evidence: EVIDENCED (corpus).
+
+  - id: control_op
+    title: Control ops
+    doc: The two bytes at block[0:2].
+    kind: enum
+    ksy_enum: control_op
+    facts:
+      - name: OP_SCENE_CHUNK
+        value: 0x0100
+        fmt: hex4
+        ksy_name: scene_chunk
+        why: A continuation chunk of the scene transfer.
+        evidence: EVIDENCED (image + corpus).
+      - name: OP_SCENE_HEADER
+        value: 0x0101
+        fmt: hex4
+        ksy_name: scene_header
+        why: The scene header, declaring the total.
+        evidence: EVIDENCED (image + corpus).
+      - name: OP_SCENE_FINAL
+        value: 0x0102
+        fmt: hex4
+        ksy_name: scene_final
+        why: The final chunk. The box's commit is gated on it.
+        evidence: EVIDENCED (image + corpus).
+      - name: OP_PAGE_0103
+        value: 0x0103
+        fmt: hex4
+        ksy_name: page_0103
+        why: A multiplexer with TWO discriminators — op_len selects the
+          sub-page, payload[0] selects the subtype.
+        evidence: EVIDENCED (image + executed trace).
+      - name: OP_NAME_FRAME
+        value: 0x0401
+        fmt: hex4
+        ksy_name: name_frame
+        why: The ASCII model-name frame.
+        evidence: EVIDENCED (corpus).
+      - name: OP_EXTRA_COLD_CONNECT
+        value: 0x0402
+        fmt: hex4
+        ksy_name: extra_cold_connect
+        why: The extra cold-connect frame some models send.
+        evidence: EVIDENCED (corpus).
+      - name: OP_DT1_CONTAINER
+        value: 0x0403
+        fmt: hex4
+        ksy_name: dt1_container
+        why: A record container — a Roland DT1 SysEx, or the box's upstream
+          return block. Discriminated by payload[0].
+        evidence: EVIDENCED (corpus).
+      - name: OP_ANNOUNCE
+        value: 0xFFFF
+        fmt: hex4
+        ksy_name: announce
+        why: The op a cfea announce always carries.
+        evidence: EVIDENCED (corpus).
+
+  - id: page_0103
+    title: op-0103 sub-pages and subtypes
+    doc: |
+      op 0x0103 multiplexes on two axes at once, and reading only one of them
+      is how `01 03 00 10` and a head-amp block got taken for the same message.
+
+      `op_len` selects the SUB-PAGE. `payload[0]` — block[4], the byte a scene
+      frame requires to be zero — is a SUBTYPE SELECTOR, not a reserved byte.
+    facts:
+      - name: PAGE_CHANMAP
+        value: 0x0019
+        fmt: hex4
+        why: op_len of the master's established chanmap heartbeat.
+        evidence: EVIDENCED (corpus).
+      - name: PAGE_CONFIG_ANNOUNCE
+        value: 0x0010
+        fmt: hex4
+        why: op_len of the box's setup declaration — and of the commit report.
+        evidence: EVIDENCED (corpus).
+      - name: PAGE_ENROLL_GROUP_MAP
+        value: 0x000d
+        fmt: hex4
+        why: op_len of the master's prepare-to-grant frame.
+        evidence: EVIDENCED (image + corpus).
+      - name: PAGE_BOX_HEARTBEAT
+        value: 0x0001
+        fmt: hex4
+        why: op_len of the box's heartbeat.
+        evidence: EVIDENCED (corpus).
+      - name: SUB_0103_OFF
+        value: 4
+        why: Block offset of the subtype selector — payload[0].
+        evidence: EVIDENCED (executed trace).
+        ksy: types/page_0103/instances/subtype/pos
+        ksy_offset: 4
+      - name: SUB_0103_SCENE
+        value: 0x00
+        fmt: hex2
+        why: Subtype 0 — scene. A scene frame requires this byte to be zero and
+          the box refuses the frame otherwise.
+        evidence: EVIDENCED (executed trace, image).
+      - name: SUB_0103_HEADAMP
+        value: 0x01
+        fmt: hex2
+        why: Subtype 1 — head-amp, 1 + 3k bytes of {ch, flags, sens}, eight
+          records to a frame.
+        evidence: EVIDENCED (executed trace, image).
+      - name: SUB_0103_COMMIT_REPORT
+        value: 0x82
+        fmt: hex2
+        why: Subtype 0x82 — the commit's report. The report builder also has a
+          0x80 arm; what selects it is UNEXPLAINED.
+        evidence: EVIDENCED (executed trace, image).
+      - name: SUB_0403_OFF
+        value: 4
+        why: The SAME block position discriminates op-0403's two forms.
+        evidence: EVIDENCED (corpus).
+        ksy: types/container_0403/instances/subtype/pos
+        ksy_offset: 4
+      - name: SUB_0403_DT1_RECORD
+        value: 0x00
+        fmt: hex2
+        why: A genuine Roland DT1 record.
+        evidence: EVIDENCED (corpus).
+      - name: SUB_0403_BOX_RETURN
+        value: 0x02
+        fmt: hex2
+        why: The box's upstream return block — 6.05 million of them in the
+          corpus, and the look-alike a naive DT1 dispatch acts on.
+        evidence: EVIDENCED (corpus).
+
+  - id: scene
+    title: The scene push
+    doc: |
+      After link-up a desk pushes its scene to the box as one bounded transfer:
+      an op-0101 header declaring the total and carrying the body's first 24
+      bytes, 341 op-0100 chunks of 26, and an op-0102 final of 14.
+
+        24 + 341*26 + 14 = 8904 = 0x22c8
+
+      The three sizes and the total are ONE fact, not four: the lengths a step
+      declares are what must sum to what the header declares. A body whose
+      lengths do not sum leaves the box waiting for bytes that never come.
+
+      The box completes reassembly ONLY on the final chunk, and completion runs
+      its state-4 commit — the sole promoter of staged head-amp into the active
+      table. A transfer that stops short leaves the box in reassembly for the
+      life of the link.
+    facts:
+      - name: SCENE_BYTES
+        libreac: REAC_SCENE_BYTES
+        value: 8904
+        fmt: dec_hex
+        why: The declared total, 0x22c8. The box gates its header on this exact
+          value.
+        evidence: EVIDENCED (image, both sides) — the same constant resolved out
+          of the S-1608's own image and out of the master's.
+      - name: SCENE_HEAD_BYTES
+        libreac: REAC_SCENE_HEAD_BYTES
+        value: 24
+        why: Body bytes carried by the op-0101 header, at block[7:31].
+        evidence: EVIDENCED (image + corpus).
+        ksy: types/scene_header_payload/seq/2/size
+      - name: SCENE_CHUNK_BYTES
+        libreac: REAC_SCENE_CHUNK_BYTES
+        value: 26
+        why: Body bytes per op-0100, at block[5:31]. Its declared op_len.
+        evidence: EVIDENCED (image + corpus).
+        ksy: types/scene_chunk_payload/seq/1/size
+      - name: SCENE_TAIL_BYTES
+        libreac: REAC_SCENE_TAIL_BYTES
+        value: 14
+        why: Body bytes in the op-0102 final. 8880 mod 26 — a length like any
+          other chunk's, not a fixed block.
+        evidence: EVIDENCED (image + corpus).
+      - name: SCENE_CHUNKS
+        libreac: REAC_SCENE_CHUNKS
+        value: 341
+        why: op-0100 count for a whole body.
+        evidence: EVIDENCED (corpus) — measured back-to-back in 0.680 s on a
+          real M-200i driving an S-1608.
+        derived: (SCENE_BYTES - SCENE_HEAD_BYTES - SCENE_TAIL_BYTES) / SCENE_CHUNK_BYTES
+      - name: SCENE_STEPS
+        libreac: REAC_SCENE_STEPS
+        value: 343
+        why: Header + chunks + final.
+        evidence: derived.
+        derived: 1 + SCENE_CHUNKS + 1
+      - name: SCENE_OP_OFF
+        value: 0
+        why: Block offset of the op word.
+        evidence: EVIDENCED (image).
+      - name: SCENE_LEN_OFF
+        value: 2
+        why: Block offset of the BE payload length.
+        evidence: EVIDENCED (image) — a big-endian 16-bit store from the same
+          variable the master passes to the memcpy that fills the payload.
+      - name: SCENE_SUB_OFF
+        value: 4
+        why: Block offset of the reserved/subtype byte. Zero on every scene
+          step; the box refuses the frame otherwise.
+        evidence: EVIDENCED (image + executed trace).
+      - name: SCENE_CHUNK_PAY_OFF
+        value: 5
+        why: Block offset of a chunk's and the final's body bytes.
+        evidence: EVIDENCED (image).
+      - name: SCENE_HEAD_TOTAL_OFF
+        value: 5
+        why: Block offset of the header's BE declared total. The header's
+          payload therefore starts two bytes later than a continuation's.
+        evidence: EVIDENCED (image) — `movi20 #0x22c8` then a BE 16-bit store.
+      - name: SCENE_HEAD_PAY_OFF
+        value: 7
+        why: Block offset of the header's 24 body bytes — which is why a capture
+          of this frame alone shows the ASCII "1234" that opens the body.
+        evidence: EVIDENCED (image + corpus).
+        derived: SCENE_HEAD_TOTAL_OFF + 2
+
+  - id: scene_body
+    title: What the box validates in the body, and what it reads
+    doc: |
+      The commit checks THREE four-byte tags and nothing else. Fail any one and
+      it promotes nothing and replies nothing, while the transfer still looks
+      complete from the wire. Two of the three ride MIDDLE chunks, so a body
+      whose interior is wrong fails silently.
+
+      THE TAGS ARE A GATE, NOT A DESCRIPTION OF WHAT THE BOX USES. Measured on
+      hardware: a body of zeros carrying only the three tags PASSES the commit
+      and leaves the box reporting model=unknown with ZERO capture ports, where
+      a recovered body brings it up as s1608 with 16. The unvalidated 8892 bytes
+      are not free — a wrong value there is not rejected, it is acted on.
+    facts:
+      - name: SCENE_TAG_ID_OFF
+        libreac: REAC_SCENE_TAG_ID_OFF
+        value: 0x000
+        fmt: hex3
+        why: '"1234". Rides the op-0101 header.'
+        evidence: EVIDENCED (executed trace) — 2 of 70 zeroed 128-byte windows
+          break the commit, and they are the two containing a tag.
+        ksy_scene_field: magic
+      - name: SCENE_TAG_SYSP_OFF
+        libreac: REAC_SCENE_TAG_SYSP_OFF
+        value: 0x368
+        fmt: hex3
+        why: '"SYSP". Rides op-0100 chunk 32.'
+        evidence: EVIDENCED (executed trace).
+        ksy_scene_field: sysp
+      - name: SCENE_TAG_SCEN_OFF
+        libreac: REAC_SCENE_TAG_SCEN_OFF
+        value: 0x37c
+        fmt: hex3
+        why: '"SCEN". Rides op-0100 chunk 33.'
+        evidence: EVIDENCED (executed trace).
+        ksy_scene_field: scen
+      - name: SCENE_MAC_OFF
+        libreac: REAC_SCENE_MAC_OFF
+        value: 0x340
+        fmt: hex3
+        why: The master's own MAC, INSIDE the body. On-wire identity must equal
+          the L2 source, so a master replaying a recovered body substitutes its
+          own.
+        evidence: EVIDENCED (image + corpus).
+        ksy_scene_field: master_id
+      - name: SCENE_REVISION_OFF
+        value: 0x014
+        fmt: hex3
+        why: The generation byte — 0 on a V-Mixer desk, 1 on an M-5000. One of
+          only two fields an emitter fills in.
+        evidence: EVIDENCED (corpus) — 8 of 8904 bytes vary across 27 real-desk
+          bodies over three desk generations and four box models.
+        ksy_scene_field: revision
+      - name: SCENE_SLOTS_OFF
+        value: 0x01a
+        fmt: hex3
+        why: The 80-slot declaration table.
+        evidence: EVIDENCED (image + corpus).
+        ksy_scene_field: slots
+      - name: SCENE_SLOT_COUNT
+        value: 80
+        why: Slots the commit promotes — unconditionally, all of them, with the
+          SAME constant. A scene body therefore CANNOT address an individual
+          channel.
+        evidence: EVIDENCED (executed trace).
+        ksy: types/scene_body/seq/7/repeat-expr
+      - name: SCENE_SLOT_BYTES
+        value: 10
+        why: The scene record stride. 26 mod 10 = 6 and gcd(26,10) = 2 is the
+          whole of the "period-10 probe rotation with a phase step of +6" that
+          was read as a master state for a year.
+        evidence: EVIDENCED (image + corpus).
+      - name: SCENE_UNIT_MAP_SELECT
+        value: 0x0001
+        fmt: hex4
+        why: Value at +0x04 on every desk generation and against every box. The
+          commit branches on it.
+        evidence: EVIDENCED (image + corpus).
+      - name: SCENE_MAP_A_ARG
+        value: 0x0004
+        fmt: hex4
+        why: Value at +0x08 on every capture. What it selects is UNRESOLVED.
+        evidence: EVIDENCED (image + corpus).
+
+  - id: head_amp
+    title: Head-amp — the record, and its three granularities
+    doc: |
+      A head-amp record is a Roland DT1 inside op-0403: TAG 0x0101, then
+      {CH, PARAM, VALUE}. Two things about it are routinely got wrong.
+
+      IT IS THREE GRANULARITIES UNDER ONE NAME. SENS and the flag bits are PER
+      CHANNEL. Phantom is PER GROUP OF FOUR (ch >> 2). The readback nibble is
+      PER EIGHT (ch >> 3). So only a record whose channel is a multiple of four
+      carries the phantom group byte — a record to 0x24 moves group 9, one to
+      0x27 moves nothing — and sweeping phantom per channel writes three records
+      in four into the void. The readback nibble and the phantom command do not
+      address the same thing and must stay named apart in any API generated from
+      this.
+
+      A RECORD WRITES THE ACTIVE TABLE, AND THE COMMIT OVERWRITES IT. There is
+      no head-amp staging table. So records must FOLLOW the commit, never
+      precede it: a record sent before it is erased, silently — the bytes are
+      right, the checksums are right, the box acknowledges, and the value is
+      gone.
+    facts:
+      - name: HEADAMP_TAG
+        value: 0x0101
+        fmt: hex4
+        why: The DT1 register page for head-amp.
+        evidence: EVIDENCED (corpus).
+      - name: HEADAMP_PARAM_PHANTOM
+        value: 0x00
+        fmt: hex2
+        why: +48V, value 0 or 1. WHICH BIT IS PHANTOM AND WHICH IS PAD IS OUR
+          NAME, NOT THE FIRMWARE'S — the mapping comes from the corpus and the
+          rig, explicitly NOT from the image.
+        evidence: EVIDENCED (corpus + rig).
+      - name: HEADAMP_PARAM_PAD
+        value: 0x01
+        fmt: hex2
+        why: -20 dB pad, value 0 or 1.
+        evidence: EVIDENCED (corpus + rig).
+      - name: HEADAMP_PARAM_SENS
+        value: 0x02
+        fmt: hex2
+        why: Sensitivity step.
+        evidence: EVIDENCED (corpus + rig).
+      - name: HEADAMP_SENS_MAX
+        libreac: REAC_HEADAMP_SENS_MAX
+        value: 0x37
+        fmt: hex2
+        why: 55 — the 56th and last entry of the box's own step table, which is
+          exactly 56 rows with no spares. What each step is WORTH in dB is the
+          headamp_sens group below; this row is only the count.
+        evidence: EVIDENCED (image) — a 56-entry table at 0x0c0327a0 in the
+          S-1608 image, reached by both write paths, ending exactly where the
+          "V03.05" version string begins. The count is what that table proves;
+          reading a gain curve off its stage structure did not survive the rig.
+      - name: HEADAMP_CH_SPAN
+        libreac: REAC_HEADAMP_MAX_CH
+        value: 0x30
+        fmt: hex2
+        why: 48 addressable wire channels, 0x00..0x2f. NOT the 40-slot audio
+          fabric — a table bounded by 40 silently rejects a 16-input box based
+          at 0x20, so its inputs 9..16 can never be given phantom, pad or sens.
+        evidence: EVIDENCED (corpus).
+      - name: HEADAMP_GRAN_SENS_SHIFT
+        value: 0
+        why: SENS is per channel — ch >> 0.
+        evidence: EVIDENCED (executed trace).
+      - name: HEADAMP_GRAN_FLAGS_SHIFT
+        value: 0
+        why: The flag bits are per channel — ch >> 0.
+        evidence: EVIDENCED (executed trace).
+      - name: HEADAMP_GRAN_PHANTOM_SHIFT
+        value: 2
+        why: Phantom is per group of FOUR — ch >> 2.
+        evidence: EVIDENCED (executed trace).
+      - name: HEADAMP_GRAN_READBACK_SHIFT
+        value: 3
+        why: The readback nibble is per EIGHT — ch >> 3. A different axis from
+          phantom, deliberately named apart.
+        evidence: EVIDENCED (executed trace).
+      - name: HEADAMP_SWEEP_RECORDS_PER_CH
+        libreac: REAC_HEADAMP_NPARAMS
+        value: 3
+        why: Every real desk sweep is ONE contiguous pass over the box's full
+          declared width, every channel getting all three parameters — 24
+          records for an S-0808, 48 for an S-1608, 96 for an S-4000S. No desk
+          addresses a bank, splits a sweep or repeats one.
+        evidence: EVIDENCED (corpus) — 31 of 47 captures, three desk generations
+          agreeing on the same box.
+
+  - id: headamp_sens
+    title: The SENS step -> sensitivity curve
+    doc: |
+      One decibel per step, over all 56 steps, with no duplicates anywhere.
+      Sensitivity runs -10 dBu at 0x00 down to -65 dBu at 0x37 with the pad off,
+      and the pad shifts the whole travel up by 20 dB:
+
+        sensitivity_dBu = -10 - value + (pad ? 20 : 0)
+
+      MEASURED 2026-08-23, S-0808, output 1 cabled to input 1 so the source is an
+      electrical loopback of a level we generated and therefore know — not a
+      microphone in a room, which is what produced the third and wildest of the
+      readings this replaces. All 56 steps at three generator levels whose ranges
+      overlap and agree to 0.05 dB where they meet. Span 54.60 dB against the
+      55.00 a flat 1 dB implies; least-squares slope 0.988 dB/step with a maximum
+      residual of 0.44 dB, which is the size of the measurement's own scatter, so
+      the law declared here is the round decibel and not the fitted 0.988. The pad
+      measured 20.12 and 20.20 dB at two different steps — the check that this dB
+      axis is the box's own.
+
+      WHAT THIS SETTLES, because it was the schema's one openly contested number.
+      Three readings were live: reac.ksy and reac-pw both spelled the flat 1 dB
+      law, which is how a number nobody had measured came to look confirmed by two
+      sources; libreac carried a 56-entry firmware curve spanning 48.75 dB whose
+      stage breaks at 8, 24 and 40 made three pairs of steps deliver IDENTICAL
+      gain, so the map was not injective and a round trip through it was a
+      different function; and a rig measurement of 1.235 dB/step, since shown to
+      be an artefact of its acoustic source.
+
+      The twins were the discriminating test and they were run: each pair by rapid
+      A/B/A alternation, twice, at two generator levels, so residual drift shows
+      as a mismatch between the A readings.
+
+        7 -> 8     +0.92 and +1.12 dB      drift control 0.08 / 0.10 dB
+        23 -> 24   +1.36 and +1.31 dB      drift control 0.34 / 0.15 dB
+        39 -> 40   +0.97 and +0.84 dB      drift control 0.26 / 0.08 dB
+
+      Every pair steps by about a decibel, an order of magnitude outside its own
+      control. The firmware's four coarse stages are real; gain being continuous
+      across their breaks was an inference from that structure and it is refuted.
+
+      THE ANCHOR, stated honestly because half of it is not measured here. A
+      loopback measures the SPAN exactly — 54.60 dB between the endpoints, which
+      is what discriminates 48.75 from 55.00 — but the absolute dBu of either
+      endpoint needs one constant this experiment cannot separate: the box's own
+      converter reference, the dBu it puts out at 0 dBFS and the dBFS its
+      sensitivity spec refers to. The loop measures their SUM. So -10 dBu at step
+      0 is carried over unchanged from every source that already agreed on it, and
+      -65 at 0x37 is what the measured span then makes it. Raw data:
+      reac-pw docs/measurements/sens-sweep-2026-08-23-*.csv.
+    facts:
+      - name: HEADAMP_SENS_REF_CDB
+        libreac: REAC_HEADAMP_SENS_REF_CDB
+        value: -1000
+        why: Step 0x00 with the pad off, in hundredths of a dBu — the least
+          sensitive setting and the reference the whole travel hangs off.
+        evidence: INFERRED — agreed by every prior reading and not independently
+          measurable through a loopback, which sees only this plus the box's
+          converter reference. The SPAN below is what was measured.
+        ksy: types/head_amp_data/seq/2/doc
+        ksy_as: substring
+        ksy_value: "-10 dBu at 0x00"
+      - name: HEADAMP_SENS_STEP_CDB
+        libreac: REAC_HEADAMP_SENS_STEP_CDB
+        value: 100
+        why: One decibel, every step, all 55 transitions. The number that was
+          disputed, and the one thing a consumer cannot get wrong quietly.
+        evidence: EVIDENCED (rig) — 2026-08-23 loopback sweep of all 56 steps,
+          span 54.60 dB, slope 0.988 dB/step, and all three predicted
+          duplicate-gain pairs refuted by A/B/A at ~1 dB against controls of
+          0.08 to 0.34 dB.
+        ksy: types/head_amp_data/seq/2/doc
+        ksy_as: substring
+        ksy_value: "1 dB"
+      - name: HEADAMP_PAD_CDB
+        libreac: REAC_HEADAMP_PAD_CDB
+        value: 2000
+        why: The pad's 20 dB, in hundredths, added to the sensitivity when it is
+          on. Independent of the step, and it earns its place here by being the
+          one number in this group whose absolute value the loopback DOES
+          measure.
+        evidence: EVIDENCED (rig) — 20.12 and 20.20 dB by A/B/A at steps 0x37 and
+          0x28, against pad-off controls of 0.11 and 0.16 dB.
+        ksy: types/head_amp_data/seq/2/doc
+        ksy_as: substring
+        ksy_value: "pad ? 20 : 0"
+
+  - id: placement
+    title: Head-amp base per declared width
+    doc: |
+      A head-amp record's CH is base + (box_input - 1), and the base depends on
+      the box's declared INPUT width.
+
+      THIS IS NEGOTIATED SESSION STATE, NOT A WIRE FIELD, and that is why it
+      lives here rather than in the grammar: no byte in any frame carries it. A
+      42-establishment, three-console, four-unit study killed every testable
+      candidate law and left three carriers — declared width, the config
+      selector, and unit_offset — perfectly collinear on every row. reac.ksy
+      parses the CARRIERS as typed fields and refuses to encode a base;
+      libreac's reac_headamp_base() returns the MEASURED table below and refuses
+      any width it has not seen, which is the same refusal expressed the other
+      way round. Both are right; neither may guess.
+    kind: table
+    columns: [in_ch, base]
+    rows:
+      - in_ch: 8
+        base: 0x00
+        why: S-0808.
+        evidence: EVIDENCED (corpus) — 42 grant sweeps across 82 captures.
+      - in_ch: 16
+        base: 0x20
+        why: S-1608. The one width that is not zero, and the reason a
+          40-bounded table drops half the box.
+        evidence: EVIDENCED (corpus).
+      - in_ch: 32
+        base: 0x00
+        why: S-4000S. Wider than the S-1608 and still based at 0 — which is what
+          kills "lowest fit" and "top alignment" as candidate laws.
+        evidence: EVIDENCED (corpus).
+
+  - id: inventory
+    title: The config-announce port table
+    doc: |
+      A box declares its own geometry: twelve cells of four channels each,
+      spanning the 48-channel fabric ring. Geometry comes from the declaration,
+      not from a hand-kept model list.
+    facts:
+      - name: PORTS_TABLE_OFF
+        libreac: REAC_PORTS_TABLE_OFF
+        value: 8
+        why: Block-relative start of the twelve-cell table.
+        evidence: EVIDENCED (corpus).
+      - name: PORTS_TABLE_SLOTS
+        libreac: REAC_PORTS_TABLE_SLOTS
+        value: 12
+        why: 12 x 4 = the 48-channel fabric.
+        evidence: EVIDENCED (corpus).
+        ksy: types/config_announce_page/seq/3/repeat-expr
+      - name: PORTS_CH_PER_SLOT
+        libreac: REAC_PORTS_CH_PER_SLOT
+        value: 4
+        why: Channels per cell.
+        evidence: EVIDENCED (corpus).
+      - name: PORT_SLOT_OUT
+        libreac: REAC_PORT_SLOT_OUT
+        value: 0x01
+        fmt: hex2
+        ksy_enum: inventory_cell
+        ksy_name: output
+        why: A 4-output group.
+        evidence: EVIDENCED (corpus).
+      - name: PORT_SLOT_IN
+        libreac: REAC_PORT_SLOT_IN
+        value: 0x02
+        fmt: hex2
+        ksy_enum: inventory_cell
+        ksy_name: analog_input
+        why: A 4-input group.
+        evidence: EVIDENCED (corpus).
+      - name: PORT_SLOT_EMPTY
+        libreac: REAC_PORT_SLOT_EMPTY
+        value: 0x03
+        fmt: hex2
+        ksy_enum: inventory_cell
+        ksy_name: absent
+        why: An empty cell. A code outside {01,02,03} is a table nobody has
+          captured — REFUSE, never guess.
+        evidence: EVIDENCED (corpus).
+      - name: ENROLL_GROUP_IN
+        value: 0x41
+        fmt: hex2
+        why: One per enrolled input group of 8, front-packed.
+        evidence: EVIDENCED (image + corpus).
+      - name: ENROLL_GROUP_OUT
+        value: 0xc3
+        fmt: hex2
+        why: One per non-input group, back-packed.
+        evidence: EVIDENCED (image + corpus).
+      - name: ENROLL_GROUPS
+        value: 5
+        why: Five groups of 8 span exactly the 40-slot audio fabric.
+        evidence: EVIDENCED (image + corpus).
+        ksy: types/enroll_group_map/seq/3/repeat-expr
