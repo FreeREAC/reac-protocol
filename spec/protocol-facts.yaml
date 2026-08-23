@@ -44,7 +44,7 @@
 #     it up; until then this schema does not claim one.
 #
 #   * The SENS step -> gain curve. It is not shared, it is DISPUTED: three live
-#     and mutually inconsistent readings, see docs/CONVERGENCE-DEFECTS.md. A
+#     and mutually inconsistent readings, see convergence-defects.md. A
 #     schema whose job is to stop drift must not be the place a contested number
 #     gets frozen by whoever wrote the file.
 #
@@ -76,6 +76,7 @@ groups:
       field, and are stripped before any of this arithmetic runs.
     facts:
       - name: ETHERTYPE
+        libreac: REAC_ETHERTYPE
         value: 0x8819
         fmt: hex4
         why: REAC's registered non-IP EtherType.
@@ -83,16 +84,19 @@ groups:
         ksy: seq/2/contents
         ksy_as: bytes_be
       - name: L2_HEADER_LEN
+        libreac: REAC_L2_HEADER_LEN
         value: 50
         why: 14 eth + 2 counter + 2 type word + 32 control block.
         evidence: EVIDENCED (corpus).
       - name: AUDIO_OFFSET
+        libreac: REAC_AUDIO_OFFSET
         value: 50
         why: Where the audio region starts. Same number as the header length,
           and it is the same fact.
         evidence: EVIDENCED (corpus) — a golden offset scan decodes real desk
           program as noise at every other offset.
       - name: HDR_COUNTER_OFF
+        libreac: REAC_HDR_COUNTER_OFF
         value: 14
         why: u16 LITTLE-endian free-running sequence counter, against the
           big-endian everything else.
@@ -101,6 +105,7 @@ groups:
         ksy_as: literal
         ksy_value: u2le
       - name: FRAME_OVERHEAD
+        libreac: REAC_UPSTREAM_OVERHEAD
         value: 52
         why: The non-audio bytes of any frame — 50 header + 2 end marker. The
           52 in `52 + n*36`.
@@ -109,6 +114,7 @@ groups:
         ksy_as: substring
         ksy_value: "raw_len - 52"
       - name: BYTES_PER_CHANNEL
+        libreac: REAC_UPSTREAM_BYTES_PER_CH
         value: 36
         why: 12 samples x 3 bytes, per channel, at EVERY sample rate. The 36 in
           `52 + n*36`.
@@ -117,15 +123,18 @@ groups:
         ksy_as: substring
         ksy_value: ") / 36"
       - name: SAMPLES_PER_PKT
+        libreac: REAC_SAMPLES_PER_PKT
         value: 12
         why: Samples per channel per frame. The RATE is the packet rate; the
           frame does not change shape with it.
         evidence: EVIDENCED (corpus).
       - name: RESOLUTION
+        libreac: REAC_RESOLUTION
         value: 3
         why: Bytes per sample per channel — 24-bit.
         evidence: EVIDENCED (corpus).
       - name: MAX_CHANNELS
+        libreac: REAC_MAX_CHANNELS
         value: 40
         why: The downstream audio fabric, 40 slots. NOT the head-amp channel
           space, which is 48 wide; conflating the two was a real bug.
@@ -134,11 +143,13 @@ groups:
         ksy_as: substring
         ksy_value: "== 40"
       - name: FRAME_BYTES
+        libreac: REAC_FRAME_BYTES
         value: 1492
         why: The fixed downstream broadcast — 52 + 40*36.
         evidence: EVIDENCED (corpus).
         derived: FRAME_OVERHEAD + MAX_CHANNELS * BYTES_PER_CHANNEL
       - name: AUDIO_BYTES
+        libreac: REAC_AUDIO_BYTES
         value: 1440
         why: 40 ch x 12 samples x 3 B.
         evidence: EVIDENCED (corpus).
@@ -156,6 +167,7 @@ groups:
         ksy_as: substring
         ksy_value: "% 36 == 2"
       - name: END_MARKER_0
+        libreac: REAC_END_MARKER_0
         value: 0xC2
         fmt: hex2
         why: First byte of the two-byte end marker.
@@ -163,6 +175,7 @@ groups:
         ksy: seq/6/contents
         ksy_as: byte0
       - name: END_MARKER_1
+        libreac: REAC_END_MARKER_1
         value: 0xEA
         fmt: hex2
         why: Second byte of the end marker.
@@ -184,20 +197,24 @@ groups:
       ordering exists to prevent.
     facts:
       - name: CTRL_BLOCK_OFF
+        libreac: REAC_CTRL_BLOCK_OFF
         value: 18
         why: Frame offset of the control block.
         evidence: EVIDENCED (corpus).
       - name: CTRL_BLOCK_END
+        libreac: REAC_CTRL_BLOCK_END
         value: 50
         why: One past the end — and therefore the audio offset.
         evidence: EVIDENCED (corpus).
         derived: CTRL_BLOCK_OFF + CTRL_BLOCK_LEN
       - name: CTRL_BLOCK_LEN
+        libreac: REAC_CTRL_BLOCK_LEN
         value: 32
         why: The checksummed span.
         evidence: EVIDENCED (corpus).
         ksy: types/typed_block/seq/1/size
       - name: CTRL_CKSUM_OFF
+        libreac: REAC_CTRL_CKSUM_OFF
         value: 49
         why: The checksum byte, last of the block. Block-relative 31.
         evidence: EVIDENCED (corpus).
@@ -403,6 +420,7 @@ groups:
       life of the link.
     facts:
       - name: SCENE_BYTES
+        libreac: REAC_SCENE_BYTES
         value: 8904
         fmt: dec_hex
         why: The declared total, 0x22c8. The box gates its header on this exact
@@ -410,27 +428,32 @@ groups:
         evidence: EVIDENCED (image, both sides) — the same constant resolved out
           of the S-1608's own image and out of the master's.
       - name: SCENE_HEAD_BYTES
+        libreac: REAC_SCENE_HEAD_BYTES
         value: 24
         why: Body bytes carried by the op-0101 header, at block[7:31].
         evidence: EVIDENCED (image + corpus).
         ksy: types/scene_header_payload/seq/2/size
       - name: SCENE_CHUNK_BYTES
+        libreac: REAC_SCENE_CHUNK_BYTES
         value: 26
         why: Body bytes per op-0100, at block[5:31]. Its declared op_len.
         evidence: EVIDENCED (image + corpus).
         ksy: types/scene_chunk_payload/seq/1/size
       - name: SCENE_TAIL_BYTES
+        libreac: REAC_SCENE_TAIL_BYTES
         value: 14
         why: Body bytes in the op-0102 final. 8880 mod 26 — a length like any
           other chunk's, not a fixed block.
         evidence: EVIDENCED (image + corpus).
       - name: SCENE_CHUNKS
+        libreac: REAC_SCENE_CHUNKS
         value: 341
         why: op-0100 count for a whole body.
         evidence: EVIDENCED (corpus) — measured back-to-back in 0.680 s on a
           real M-200i driving an S-1608.
         derived: (SCENE_BYTES - SCENE_HEAD_BYTES - SCENE_TAIL_BYTES) / SCENE_CHUNK_BYTES
       - name: SCENE_STEPS
+        libreac: REAC_SCENE_STEPS
         value: 343
         why: Header + chunks + final.
         evidence: derived.
@@ -480,6 +503,7 @@ groups:
       are not free — a wrong value there is not rejected, it is acted on.
     facts:
       - name: SCENE_TAG_ID_OFF
+        libreac: REAC_SCENE_TAG_ID_OFF
         value: 0x000
         fmt: hex3
         why: '"1234". Rides the op-0101 header.'
@@ -487,18 +511,21 @@ groups:
           break the commit, and they are the two containing a tag.
         ksy_scene_field: magic
       - name: SCENE_TAG_SYSP_OFF
+        libreac: REAC_SCENE_TAG_SYSP_OFF
         value: 0x368
         fmt: hex3
         why: '"SYSP". Rides op-0100 chunk 32.'
         evidence: EVIDENCED (executed trace).
         ksy_scene_field: sysp
       - name: SCENE_TAG_SCEN_OFF
+        libreac: REAC_SCENE_TAG_SCEN_OFF
         value: 0x37c
         fmt: hex3
         why: '"SCEN". Rides op-0100 chunk 33.'
         evidence: EVIDENCED (executed trace).
         ksy_scene_field: scen
       - name: SCENE_MAC_OFF
+        libreac: REAC_SCENE_MAC_OFF
         value: 0x340
         fmt: hex3
         why: The master's own MAC, INSIDE the body. On-wire identity must equal
@@ -589,6 +616,7 @@ groups:
         why: Sensitivity step.
         evidence: EVIDENCED (corpus + rig).
       - name: HEADAMP_SENS_MAX
+        libreac: REAC_HEADAMP_SENS_MAX
         value: 0x37
         fmt: hex2
         why: 55 — the 56th and last entry of the box's own step table, which is
@@ -597,6 +625,7 @@ groups:
           S-1608 image, reached by both write paths, ending exactly where the
           "V03.05" version string begins.
       - name: HEADAMP_CH_SPAN
+        libreac: REAC_HEADAMP_MAX_CH
         value: 0x30
         fmt: hex2
         why: 48 addressable wire channels, 0x00..0x2f. NOT the 40-slot audio
@@ -621,6 +650,7 @@ groups:
           phantom, deliberately named apart.
         evidence: EVIDENCED (executed trace).
       - name: HEADAMP_SWEEP_RECORDS_PER_CH
+        libreac: REAC_HEADAMP_NPARAMS
         value: 3
         why: Every real desk sweep is ONE contiguous pass over the box's full
           declared width, every channel getting all three parameters — 24
@@ -670,19 +700,23 @@ groups:
       not from a hand-kept model list.
     facts:
       - name: PORTS_TABLE_OFF
+        libreac: REAC_PORTS_TABLE_OFF
         value: 8
         why: Block-relative start of the twelve-cell table.
         evidence: EVIDENCED (corpus).
       - name: PORTS_TABLE_SLOTS
+        libreac: REAC_PORTS_TABLE_SLOTS
         value: 12
         why: 12 x 4 = the 48-channel fabric.
         evidence: EVIDENCED (corpus).
         ksy: types/config_announce_page/seq/3/repeat-expr
       - name: PORTS_CH_PER_SLOT
+        libreac: REAC_PORTS_CH_PER_SLOT
         value: 4
         why: Channels per cell.
         evidence: EVIDENCED (corpus).
       - name: PORT_SLOT_OUT
+        libreac: REAC_PORT_SLOT_OUT
         value: 0x01
         fmt: hex2
         ksy_enum: inventory_cell
@@ -690,6 +724,7 @@ groups:
         why: A 4-output group.
         evidence: EVIDENCED (corpus).
       - name: PORT_SLOT_IN
+        libreac: REAC_PORT_SLOT_IN
         value: 0x02
         fmt: hex2
         ksy_enum: inventory_cell
@@ -697,6 +732,7 @@ groups:
         why: A 4-input group.
         evidence: EVIDENCED (corpus).
       - name: PORT_SLOT_EMPTY
+        libreac: REAC_PORT_SLOT_EMPTY
         value: 0x03
         fmt: hex2
         ksy_enum: inventory_cell
