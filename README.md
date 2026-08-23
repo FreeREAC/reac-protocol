@@ -42,8 +42,9 @@ Communications*.
   `spec/facts_xcheck.py` holds the grammar to it and `spec/xcheck_ctrl_oracle.py` makes
   libreac build frames the generated parser has to read back.
 - **[convergence-defects.md](convergence-defects.md)** — where the two expressions of the
-  protocol still disagree, written down rather than reconciled quietly. SENS has three
-  live and mutually inconsistent readings, 19 dB apart at the top of the range.
+  protocol disagree, written down rather than reconciled quietly, each with its resolution
+  or the measurement that would settle it. SENS, the one openly contested number, is
+  resolved: one decibel per step over all 56, measured by electrical loopback.
 - **[capturing.md](capturing.md)** — how to capture and decode REAC yourself: the
   raw socket / tcpdump filter, frame validation, de-interleave, rate sanity-checks,
   and the traps (VLAN tags, level correctness).
