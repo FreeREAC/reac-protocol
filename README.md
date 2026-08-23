@@ -34,6 +34,16 @@ Communications*.
   and the two nested checksums), and the **state-assertion model** (the master's
   declarative, DMX-style periodic re-assert of the whole console state) with a full
   connection-lifecycle state diagram.
+- **[spec/protocol-facts.yaml](spec/protocol-facts.yaml)** — the constants the grammar
+  and libreac each used to spell independently, written once: frame geometry, the scene
+  transfer, the tags the box validates, both checksum rules, the op codes and sub-page
+  selectors, and the three head-amp granularities. `spec/gen-facts.py` writes libreac's
+  `#define` block, an importable Kaitai type and a block of `_Static_assert`s from it;
+  `spec/facts_xcheck.py` holds the grammar to it and `spec/xcheck_ctrl_oracle.py` makes
+  libreac build frames the generated parser has to read back.
+- **[convergence-defects.md](convergence-defects.md)** — where the two expressions of the
+  protocol still disagree, written down rather than reconciled quietly. SENS has three
+  live and mutually inconsistent readings, 19 dB apart at the top of the range.
 - **[capturing.md](capturing.md)** — how to capture and decode REAC yourself: the
   raw socket / tcpdump filter, frame validation, de-interleave, rate sanity-checks,
   and the traps (VLAN tags, level correctness).
