@@ -45,11 +45,53 @@ instances:
     doc: |
       The non-audio bytes of any frame — 50 header + 2 end marker. The 52 in
       `52 + n*36`. [EVIDENCED (corpus).]
+  pace_is_the_masters:
+    value: True
+    doc: |
+      The master sets the pace and the slaves follow it unconditionally.
+      There is no
+      per-rate cadence negotiation, no slave-side rate election, and no case
+      in which a box
+      declines a pace. So a frame rate is read off the master's clock, never
+      inferred from
+      a box's model or its declaration.
+      Consequence for our own docs: statements of the form "the upstream
+      cadence at rate R
+      is X" describe what the master chose, not a property the box asserts.
+        [RULED (operator, 2026-08-23). Consistent with the corpus, which
+        shows one pace per
+      segment and no negotiation exchange.
+      ]
+  rate_is_independent_of_model:
+    value: True
+    doc: |
+      A clock rate is NOT a property of a mixer model. Any legal pace may
+      run on any desk,
+      and the two facts must never be derived from one another.
+      This is stated because our corpus makes them look coupled: each desk
+      we own has been
+      run at a single rate, so model and rate are perfectly correlated in
+      the captures. That
+      correlation is an accident of how the rig was used, not a fact about
+      the protocol, and
+      anything reading a per-desk field as a rate class must justify it on
+      its own evidence.
+        [RULED (operator, 2026-08-23) — LAW. Not an inference from the
+        corpus, and it overrides
+      any correlation the corpus appears to show.
+      ]
   bytes_per_channel:
     value: 36
     doc: |
       12 samples x 3 bytes, per channel, at EVERY sample rate. The 36 in `52
-      + n*36`. [EVIDENCED (corpus) — holds across 44.1k, 48k and 96k.]
+      + n*36`. [EVIDENCED (corpus) at 48k and 96k; RATE-INVARIANT BY
+      CONSTRUCTION (12 x 3).
+      44.1k is DERIVED, not observed: measuring pps straight from the pcap
+      timestamps puts
+      NOTHING in the 3675 band, while cleanly separating the 48k and 96k
+      files. The earlier
+      wording claimed corpus evidence across 44.1k and did not have it.
+      ]
   samples_per_pkt:
     value: 12
     doc: |
@@ -851,6 +893,75 @@ instances:
       records for an S-0808, 48 for an S-1608, 96 for an S-4000S. No desk
       addresses a bank, splits a sweep or repeats one. [EVIDENCED (corpus) —
       31 of 47 captures, three desk generations agreeing on the same box.]
+  headamp_base_from_config_byte7:
+    value: 1
+    doc: |
+      A box's head-amp CH base is its OWN property, announced, never
+      granted. The config
+      announce `01 03 00 10` carries it at buf[7], and the master addresses
+      the box at
+      base = buf[7] * 0x10. An 8-input and a 32-input box are BOTH addressed
+      at 0x00, which
+      is what rules out an allocation: nothing in the box consumes a granted
+      base.
+        [RESOLVED (firmware + corpus) — S-1608.BIN (SH-4 LE, base
+        0x0BFE0000): FUN_0c003c8a at
+      0x0c003c8a sets buf[7] = FUN_0c00f6a8() = *0x0c080918. Corroborated on
+      29 captures in
+      reac-captures/analysis/placement_table.csv (S-0808 0x00->0x00, S-1608
+      0x02->0x20,
+      S-4000S 0x00->0x00) across M-200i, M-300 and M-5000.
+      ]
+  headamp_base_multiplier:
+    value: 0x10
+    doc: |
+      base = config-announce buf[7] * 0x10. Sixteen head-amp rows per strap
+      step, which is
+      two 8-slot groups — the same unit the box applies in.
+      Exercised at exactly two points (0 and 2): firmware-grade for the
+      S-1608, corpus-grade
+      for the others.
+        [RESOLVED (firmware + corpus) — same provenance as
+        HEADAMP_BASE_FROM_CONFIG_BYTE7.
+      ]
+  headamp_base_is_chassis_not_grant:
+    value: 1
+    doc: |
+      A master cannot move where a head-amp write lands by granting
+      differently. The box's
+      fabric-row-to-preamp map is the group number FUN_0c012162 returns, and
+      every input to
+      it is a GPIO strap or a fitted-board inventory. Retires reac-pw's
+      docs/PLACEMENT-EVIDENCE.md five-run rig experiment: declared width was
+      collinear with
+      the base only because a 16-in chassis always straps 2.
+        [RESOLVED (firmware) — S-1608.BIN: FUN_0c0081f6 at 0x0c0081f6 reads
+        *0x0c080918 and
+      applies FUN_0c007fbc(bank, FUN_0c012162(k)); FUN_0c007fbc at
+      0x0c007fbc indexes the
+      head-amp table at 0x0c0cf85a by group*8 + i; the config record is
+      built by FUN_0c0123c0
+      (0x0c0123c0), called only from FUN_0c0052d4 (0x0c0052d4) with
+      constants, and the group
+      table at +0x78 has exactly three writers — FUN_0c0119ac, FUN_0c011bbc,
+      FUN_0c011e2c —
+      none of which reads a frame.
+      ]
+  headamp_apply_unit_slots:
+    value: 8
+    doc: |
+      The box applies head-amp in groups of eight fabric rows, one 8-port
+      board at a time,
+      passing the within-group index 0..7 to the preamp. Anything reasoning
+      about head-amp
+      reach reasons in groups of 8 from the box's base, never per channel —
+      note this is the
+      APPLY unit and is a different axis from actuation, which is per
+      channel.
+        [RESOLVED (firmware) — S-1608.BIN: FUN_0c007fbc at 0x0c007fbc, slot
+        = group << 3, eight
+      iterations.
+      ]
   # ---- The SENS step -> sensitivity curve ----
   headamp_sens_ref_cdb:
     value: -1000
