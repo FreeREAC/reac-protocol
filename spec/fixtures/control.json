@@ -215,6 +215,11 @@
    "name": "s4000s_cc001a",
    "note": "op-0403 cold-connect, tag 0500 identity (10-byte data) (s4000s)",
    "hex": "cdea0403001a000200fe15f0410a0000121205000600000000020001000270f700f4"
+  },
+  {
+   "name": "box_link_ack",
+   "note": "op-0103 rec_len 0x0001 subtype 0x81 -- the box's link ack, subtype byte and nothing else. 10217 frames in 57 captures; no fixture carried one, so KIND_BOX_HB was never exercised.",
+   "hex": "cdea010300018100000000000000000000000000000000000000000000000000007a"
   }
  ],
  "grant_sweep": {
