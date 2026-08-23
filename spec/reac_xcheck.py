@@ -26,6 +26,7 @@ reads is committed next to it.
 
     make -C spec check          # regenerate the parser, then run this
 """
+import collections
 import json
 import pathlib
 
@@ -87,11 +88,18 @@ def oracle_upstream_channels(n):
 
 # enum reac_ctrl_kind, in its C declaration order
 KIND_NONE, KIND_FILLER, KIND_PROBE, KIND_MASTER_HB, KIND_MASTER_ANNOUNCE, \
-    KIND_GRANT, KIND_HEADAMP, KIND_BOX_HB, KIND_UNKNOWN = range(9)
+    KIND_GRANT, KIND_HEADAMP, KIND_BOX_HB, KIND_UNKNOWN, KIND_CONFIG_ANNOUNCE, \
+    KIND_GROUP_MAP, KIND_RECORD_FRAGMENT, KIND_LINK2 = range(13)
+# KIND_PROBE keeps its number and its name because the enum value 2 is
+# `scene_transfer` and libreac still calls it the probe bucket. It is the bucket
+# the new classification SPLITS, so it has to stay addressable by both names.
 
 
-def oracle_ctrl_kind(block34):
-    """reac_ctrl_parse()'s classification, over a frame[16:50] window.
+def legacy_ctrl_kind(block34):
+    """reac_ctrl_parse() AS IT WAS BEFORE 2026-08-23, over a frame[16:50] window.
+
+    Kept only as the left-hand side of the partition proof below. Nothing else
+    should call it: it keys on two lengths where the protocol keys on a subtype.
 
     Transcribed decision for decision, quirks included: op 0x0403 is HEADAMP
     only when the DT1 command byte is 0x12 and the tag is 0x0101, everything
@@ -120,6 +128,46 @@ def oracle_ctrl_kind(block34):
         return KIND_BOX_HB
     if op >> 8 == 0x01:
         return KIND_PROBE
+    return KIND_UNKNOWN
+
+
+def oracle_ctrl_kind(block34):
+    """reac_ctrl_parse() as libreac now implements it: link, then segment,
+    then subtype -- the order the record is built in.
+
+    Transcribed decision for decision so the cross-check compares like with
+    like. The one deliberate coarseness that survives is on link 4: a
+    single-fragment record whose tag is not a DT1-command 0x0101 is GRANT
+    rather than a kind per tag."""
+    b = block34
+    t0, t1 = b[0], b[1]
+    if (t0, t1) == (0x00, 0x00):
+        return KIND_FILLER
+    if (t0, t1) == (0xcf, 0xea):
+        return KIND_MASTER_ANNOUNCE
+    if (t0, t1) != (0xcd, 0xea):
+        return KIND_UNKNOWN
+    link, seg, subtype = b[2], b[3], b[6]
+    if link == 0x02:
+        return KIND_LINK2
+    if link == 0x04:
+        if (seg & 3) != 3:
+            return KIND_RECORD_FRAGMENT
+        if b[16] == 0x12 and b[17] == 0x12 and b[18] == 0x01 and b[19] == 0x01:
+            return KIND_HEADAMP
+        return KIND_GRANT
+    if link != 0x01:
+        return KIND_UNKNOWN
+    if subtype == 0x00:
+        return KIND_PROBE            # enum 2, scene_transfer
+    if subtype == 0x01:
+        return KIND_MASTER_HB
+    if subtype == 0x81:
+        return KIND_BOX_HB
+    if subtype == 0x10:
+        return KIND_GROUP_MAP
+    if subtype in (0x80, 0x82, 0x83, 0x84):
+        return KIND_CONFIG_ANNOUNCE
     return KIND_UNKNOWN
 
 
@@ -314,7 +362,7 @@ def test_op_dispatch_reads_the_op_the_oracle_reads(name, blk):
     assert t.op_len_raw == (raw[4] << 8) | raw[5]
     if t.type_word == R.Reac.FrameType.control.value:
         assert t.block.op.value if hasattr(t.block.op, "value") else t.block.op
-        assert t.block.op_len == t.op_len_raw
+        assert t.block.rec_len == t.op_len_raw
 
 
 def test_page_0103_subpage_dispatch():
@@ -324,9 +372,9 @@ def test_page_0103_subpage_dispatch():
         if t.op_raw == 0x0103:
             kinds[name] = t.block.payload.page_kind
     assert kinds["chanmap_w00"] == R.Reac.PageKind.chanmap.value
-    assert kinds["s1608_config_block"] == R.Reac.PageKind.config_announce.value
-    assert kinds["s0808_config_block"] == R.Reac.PageKind.config_announce.value
-    assert kinds["s4000s_config_block"] == R.Reac.PageKind.config_announce.value
+    assert kinds["s1608_config_block"] == R.Reac.PageKind.commit_report.value
+    assert kinds["s0808_config_block"] == R.Reac.PageKind.commit_report.value
+    assert kinds["s4000s_config_block"] == R.Reac.PageKind.commit_report.value
     assert kinds["enroll_000d_w8"] == R.Reac.PageKind.enroll_group_map.value
 
 
@@ -334,16 +382,16 @@ def test_page_0103_subpage_dispatch():
 # declared / derived widths — the placement CARRIERS, never a base
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("model,in_ch,out_ch,selector,unit_offset", [
+@pytest.mark.parametrize("model,in_ch,out_ch,selector,board_config_code", [
     ("s0808", 8, 8, 0x84, 0x00),
     ("s1608", 16, 8, 0x82, 0x02),
     ("s4000s", 32, 8, 0x84, 0x00),
 ])
-def test_config_announce_declares_the_box_width(model, in_ch, out_ch, selector, unit_offset):
+def test_commit_report_declares_the_box_width(model, in_ch, out_ch, selector, board_config_code):
     blk = next(b for n, b in BLOCKS if n == f"{model}_config_block")
     page = parse_block(blk["hex"]).block.payload.page
     assert page.selector == selector
-    assert page.unit_offset == unit_offset
+    assert page.board_config_code == board_config_code
     assert page.declared_in_channels == in_ch
     assert page.declared_out_channels == out_ch
     assert len(page.cells) == 12
@@ -355,7 +403,7 @@ def test_config_announce_declares_the_box_width(model, in_ch, out_ch, selector, 
     assert inputs == list(range(in_ch // 4))
 
 
-def test_config_announce_carriers_are_collinear_in_this_corpus():
+def test_commit_report_carriers_are_collinear_in_this_corpus():
     """The three surviving placement carriers agree on every row we hold — which
     is exactly why none of them can be promoted to the law. This test pins the
     collinearity so a future fixture that BREAKS it is noticed immediately."""
@@ -364,9 +412,9 @@ def test_config_announce_carriers_are_collinear_in_this_corpus():
         if not name.endswith("_config_block"):
             continue
         page = parse_block(blk["hex"]).block.payload.page
-        rows.append((page.declared_in_channels, page.selector, page.unit_offset))
-    for width, selector, unit_offset in rows:
-        assert (width == 16) == (selector == 0x82) == (unit_offset == 0x02)
+        rows.append((page.declared_in_channels, page.selector, page.board_config_code))
+    for width, selector, board_config_code in rows:
+        assert (width == 16) == (selector == 0x82) == (board_config_code == 0x02)
 
 
 def test_enroll_group_map_is_a_pure_function_of_width():
@@ -535,7 +583,7 @@ def test_scene_chunks_are_slices_of_the_body():
             continue
         t = parse_block(blk["hex"])
         assert t.op_raw == 0x0100
-        assert t.op_len_raw == 0x001a == 26, "op_len is the CHUNK LENGTH"
+        assert t.op_len_raw == 0x001a == 26, "rec_len is the CHUNK LENGTH"
         p = t.block.payload
         assert p.chunk_reserved == 0
         assert bytes(p.chunk) in chunks, f"{name} is not a slice of the body"
@@ -553,7 +601,7 @@ def test_scene_header_declares_the_total_not_a_model_constant():
     t = parse_block(next(b for n, b in BLOCKS if n == "sub01")["hex"])
     p = t.block.payload
     assert t.op_raw == 0x0101
-    assert t.op_len_raw == 0x0018 == 24, "op_len is this chunk's length"
+    assert t.op_len_raw == 0x0018 == 24, "rec_len is this chunk's length"
     assert p.scene_total_len == len(SCENE_BODY) == 0x22c8
     assert bytes(p.body_head) == SCENE_BODY[:24]
     assert bytes(p.body_head)[:4] == b"1234"
@@ -643,7 +691,7 @@ def test_only_three_tags_are_validated_by_the_box():
 def test_scene_declares_twelve_inventory_cells_like_the_box_does():
     """The box's commit walks twelve cells at a stride of 0x28 over the slot
     table — four records each — so the desk declares its inventory in exactly the
-    vocabulary the box declares its own in config_announce_page. An M-200i sends
+    vocabulary the box declares its own in commit_report_page. An M-200i sends
     eight analog-input cells and four absent: 32 declared inputs."""
     b = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY)))
     cells = [b.slots[4 * i].cell for i in range(12)]
@@ -667,10 +715,14 @@ def test_chanmap_ring_is_identical_for_every_box():
         assert len(page.entries) == 8
         for e in page.entries:
             if e.slot == 0xfe:
-                assert e.bank == 0x00
+                assert e.is_identity_record
+                assert e.cell_and_flags in (0x00, 0x01)
+                assert e.sens == 0x00
                 continue
             assert e.slot < 0x30
-            assert e.bank == (0x38 if e.slot >= 0x28 else 0x28)
+            assert e.cell_and_flags == (0x38 if e.slot >= 0x28 else 0x28)
+            assert e.sens == 0x00, "no console has ever put a value here"
+            assert e.flag_slot_4 == 1 and e.flag_slot_8 == 0 and e.flag_slot_6 == 0
             seen.add(e.slot)
         assert page.entries[0].slot == bytes.fromhex(blk["hex"])[7]  # sel2 cursor
     assert seen
@@ -687,12 +739,215 @@ def test_every_fixture_parses_and_is_covered():
     kinds = {oracle_ctrl_kind(bytes.fromhex(b["hex"])) for _, b in BLOCKS}
     kinds |= {oracle_ctrl_kind(bytes.fromhex(h)) for h in GRANT_FRAMES}
     kinds |= {KIND_FILLER}
-    # every kind the oracle can produce on a REAC frame is exercised. UNKNOWN is
-    # reached by the two 0x04-family ops that are not the DT1 container — the
-    # ASCII model-name frame (0x0401) and the extra cold-connect (0x0402).
-    assert kinds == {KIND_FILLER, KIND_PROBE, KIND_MASTER_HB,
-                     KIND_MASTER_ANNOUNCE, KIND_GRANT, KIND_HEADAMP,
-                     KIND_UNKNOWN}
-    unknown = {n for n, b in BLOCKS
-               if oracle_ctrl_kind(bytes.fromhex(b["hex"])) == KIND_UNKNOWN}
-    assert unknown == {"s0808_name_block", "s0808_extra_block"}
+    # Every kind the classifier can produce is either exercised by a fixture or
+    # named here with the reason it cannot be. A set that merely "contains" the
+    # expected kinds would not notice a kind quietly falling out of reach.
+    exercised = {KIND_FILLER, KIND_PROBE, KIND_MASTER_HB, KIND_MASTER_ANNOUNCE,
+                 KIND_GRANT, KIND_HEADAMP, KIND_BOX_HB, KIND_CONFIG_ANNOUNCE,
+                 KIND_GROUP_MAP, KIND_RECORD_FRAGMENT}
+    unreachable = {
+        KIND_NONE: "a non-REAC frame never reaches classification",
+        KIND_UNKNOWN: "no fixture carries an unrecognised link or subtype -- "
+                      "the two that used to, 0x0401 and 0x0402, are now "
+                      "record_fragment",
+        KIND_LINK2: "link 0x02 is built by the S-4000S image and appears in no "
+                    "capture; FIRMWARE-ONLY",
+    }
+    # KIND_BOX_HB had no fixture at all until 2026-08-23 -- 10217 frames on the
+    # wire and nothing in the goldens -- so `box_link_ack` was added rather than
+    # excused here.
+    _ = {
+    }
+    assert kinds == exercised, (
+        "classifier coverage changed: %s" % sorted(kinds ^ exercised))
+    assert not (kinds & set(unreachable)), "an 'unreachable' kind was produced"
+
+    fragments = {n for n, b in BLOCKS
+                 if oracle_ctrl_kind(bytes.fromhex(b["hex"])) == KIND_RECORD_FRAGMENT}
+    assert fragments == {"s0808_name_block", "s0808_extra_block"}
+
+
+# --------------------------------------------------------------------------
+# The control block's header, as the stagebox firmware builds it
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("name,blk", BLOCKS)
+def test_op_decomposes_into_link_and_segment(name, blk):
+    """block[0] is a LINK selector and block[1] a two-bit SEGMENT field.
+
+    The 16-bit `op` every tool indexes on is those two bytes side by side, so
+    the decomposition must reproduce it exactly on every captured block. A test
+    that only checked one direction would pass on a grammar that had silently
+    dropped the second byte."""
+    t = parse_block(blk["hex"])
+    if not hasattr(t.block, "link"):
+        pytest.skip("FILLER carries no control header")
+    raw = bytes.fromhex(blk["hex"])
+    assert int(t.block.link) == raw[2]
+    assert t.block.seg == raw[3]
+    assert t.block.seg_kind == raw[3] & 3
+    assert t.block.seg_is_first == bool(raw[3] & 1)
+    assert t.block.seg_is_last == bool(raw[3] & 2)
+    assert t.block.opcode == raw[6]
+    assert t.op_raw == (raw[2] << 8) | raw[3], "the two views must agree"
+
+
+def test_op_len_counts_from_block_4_on_the_record_link():
+    """On link 4 the length counts block[4] inclusive, so it lands exactly on
+    the SysEx terminator of a single-frame record."""
+    seen = 0
+    for name, blk in BLOCKS:
+        raw = bytes.fromhex(blk["hex"])
+        if raw[2] != 0x04 or (raw[3] & 3) != 3 or raw[6] != 0x00:
+            continue
+        n = (raw[4] << 8) | raw[5]
+        assert raw[6 + n - 1] == 0xF7, f"{name}: length {n:#x} does not end on F7"
+        seen += 1
+    assert seen >= 4, f"only {seen} single-frame link-4 blocks — too few to mean anything"
+
+
+def test_op_len_counts_from_block_4_on_the_chanmap():
+    """25 = one opcode byte + eight three-byte records. The length is a length,
+    not the sub-page selector it was read as."""
+    seen = 0
+    for name, blk in BLOCKS:
+        raw = bytes.fromhex(blk["hex"])
+        if raw[2:4] != b"\x01\x03" or raw[6] != 0x01:
+            continue
+        assert (raw[4] << 8) | raw[5] == 1 + 8 * 3
+        seen += 1
+    assert seen, "no chanmap block in the fixtures — this test proved nothing"
+
+
+# --------------------------------------------------------------------------
+# op 0401 + op 0402 are ONE Roland DT1 record, split across two frames
+# --------------------------------------------------------------------------
+
+def _fragment(name):
+    blk = dict(BLOCKS)[name]
+    return parse_block(blk["hex"]).block.payload
+
+
+def test_the_two_link4_fragments_reassemble_into_one_sysex():
+    first, last = _fragment("s0808_name_block"), _fragment("s0808_extra_block")
+    assert first._parent.seg_kind == 1, "0x0401 must read FIRST"
+    assert last._parent.seg_kind == 2, "0x0402 must read LAST"
+    assert first.len_echo == 0x16 and last.len_echo == 0x08
+    rec = bytes(first.fragment) + bytes(last.fragment)
+
+    assert rec[0] == 0xF0 and rec[-1] == 0xF7, "not a complete SysEx"
+    assert rec[1] == 0x41, "not Roland"
+    assert rec[6] == 0x12, "not a DT1 write"
+    assert rec[7:9] == b"\x05\x00", "not the identity tag"
+    assert sum(rec[7:-1]) % 128 == 0, "the DT1 checksum does not close"
+    assert bytes(rec[12:18]) == b"S-0808"
+
+    # Neither fragment closes on its own — which is the whole point.
+    assert sum(bytes(first.fragment)[7:]) % 128 != 0
+    assert 0xF7 not in bytes(first.fragment)
+
+
+def test_group_map_bytes_decode_as_the_firmware_reads_them():
+    """The only firmware that parses op-0103 0x000d reads its ten bytes as two
+    packed fields, not as two five-byte arrays. Reproduce both loops."""
+    page = parse_block(
+        next(b for n, b in BLOCKS if n == "enroll_000d_w8")["hex"]
+    ).block.payload.page
+    g = bytes(page.group_bytes)
+    assert g == bytes(page.input_groups) + bytes(page.output_groups), \
+        "group_bytes must be exactly the same ten bytes, in order"
+    low6 = [g[i >> 1] & 0x3f for i in range(12)]
+    top2 = [(v if (v := g[i] >> 6) in (0, 1) else -1) for i in range(10)]
+    assert low6 == [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    assert top2 == [1, 0, 0, 0, 0, 0, -1, -1, -1, -1]
+
+
+# --------------------------------------------------------------------------
+# The reclassification is a PARTITION, not a reshuffle
+# --------------------------------------------------------------------------
+
+def test_reclassification_only_splits_and_never_moves_sideways():
+    """Every frame the new classifier moves must come out of the old PROBE
+    bucket or the old UNKNOWN bucket, and nothing else may move at all.
+
+    A classifier rewrite is the kind of change that looks right on the frames
+    you were staring at while quietly relabelling something else. Comparing the
+    two expressions frame by frame is the only way to see that; a spot check on
+    the frames that were MEANT to move cannot."""
+    allowed = {
+        (KIND_PROBE, KIND_PROBE),
+        (KIND_PROBE, KIND_CONFIG_ANNOUNCE),
+        (KIND_PROBE, KIND_GROUP_MAP),
+        (KIND_PROBE, KIND_BOX_HB),
+        (KIND_UNKNOWN, KIND_RECORD_FRAGMENT),
+    }
+    moved = collections.Counter()
+    total = 0
+    for name, blk in BLOCKS:
+        raw = bytes.fromhex(blk["hex"])
+        was, now = legacy_ctrl_kind(raw), oracle_ctrl_kind(raw)
+        total += 1
+        if was == now:
+            continue
+        assert (was, now) in allowed, (
+            "%s moved %d -> %d, which is not a split of the old buckets"
+            % (name, was, now))
+        moved[(was, now)] += 1
+    for h in GRANT_FRAMES:
+        raw = bytes.fromhex(h)
+        was, now = legacy_ctrl_kind(raw), oracle_ctrl_kind(raw)
+        total += 1
+        assert was == now or (was, now) in allowed
+        if was != now:
+            moved[(was, now)] += 1
+    assert total >= 90, "too few frames compared for this to mean anything"
+    assert moved, "nothing moved at all -- the two classifiers are identical, "\
+                  "so this test is not observing the change it claims to"
+    # the split must conserve: everything that left PROBE landed in the three
+    # kinds PROBE splits into
+    left_probe = sum(v for (w, n), v in moved.items() if w == KIND_PROBE)
+    into = sum(v for (w, n), v in moved.items()
+               if w == KIND_PROBE and n in (KIND_CONFIG_ANNOUNCE, KIND_GROUP_MAP,
+                                            KIND_BOX_HB))
+    assert left_probe == into, "a frame left PROBE for somewhere else"
+
+
+def test_grammar_and_oracle_agree_on_every_fixture():
+    """The ksy expression and the transcription of libreac must land on the
+    same kind for every fixture, or one of the two has been edited alone."""
+    for name, blk in BLOCKS:
+        t = parse_block(blk["hex"])
+        assert int(t.ctrl_kind) == oracle_ctrl_kind(bytes.fromhex(blk["hex"])), name
+    for h in GRANT_FRAMES:
+        t = parse_block(h)
+        assert int(t.ctrl_kind) == oracle_ctrl_kind(bytes.fromhex(h))
+
+
+def test_a_fragment_with_the_wrong_wrapper_is_REFUSED():
+    """The `contents` guard on record_fragment's wrapper must actually reject.
+
+    Deleting that guard left the whole suite GREEN, because nothing fed the
+    parser a fragment with a wrong wrapper -- the guard was decoration. So this
+    forges one, and forges it PROPERLY: the block checksum is restamped so the
+    forgery is valid in every respect except the four bytes under test. A
+    forgery that is also malformed somewhere else can be refused for the wrong
+    reason, and then the guard is still unproven."""
+    good = bytearray(bytes.fromhex(dict(BLOCKS)["s0808_name_block"]["hex"]))
+    assert good[6:10] == bytearray(b"\x00\x02\x00\xfe"), "fixture moved"
+    assert sum(good[2:]) % 256 == 0, "the fixture block must sum to zero"
+
+    forged = bytearray(good)
+    forged[9] = 0xff                       # wrapper byte 3: fe -> ff
+    forged[33] = (forged[33] - 1) % 256    # restamp so the block still sums to 0
+    assert sum(forged[2:]) % 256 == 0, "the forgery must be checksum-valid"
+    assert oracle_ctrl_kind(bytes(forged)) == KIND_RECORD_FRAGMENT, \
+        "the forgery must still CLASSIFY as a fragment, or the parser would " \
+        "never reach the guard and this test would prove nothing"
+
+    with pytest.raises(Exception):
+        t = parse_block(bytes(forged).hex())
+        t.block.payload.fragment      # force the lazy payload
+
+    # and the untouched original must still parse, so the test is not simply
+    # rejecting everything
+    parse_block(bytes(good).hex()).block.payload.fragment
