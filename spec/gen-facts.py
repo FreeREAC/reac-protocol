@@ -205,9 +205,18 @@ def emit_assert_h(schema):
           ""]
     rows = [(f, g) for g in schema["groups"] for f in facts_of(g) if "libreac" in f]
     for fact, group in rows:
-        val = fmt_value(fact["value"], fact.get("fmt", "dec"))
-        if fact.get("fmt") == "dec_hex":
-            val = str(fact["value"])
+        # A YAML `true`/`false` reaches here as a Python bool, and str() spells it
+        # `True` — which is not C and fails to compile with `'True' undeclared`, an
+        # error naming nothing a reader would connect to the schema. C has no bool
+        # literal in a _Static_assert either, so render it as the 1/0 libreac's own
+        # #define spells. Handled HERE rather than by asking every author to
+        # remember `value: 1`: a rule nobody can forget beats a rule in a comment.
+        if isinstance(fact["value"], bool):
+            val = "1" if fact["value"] else "0"
+        else:
+            val = fmt_value(fact["value"], fact.get("fmt", "dec"))
+            if fact.get("fmt") == "dec_hex":
+                val = str(fact["value"])
         L.append(f'_Static_assert({fact["libreac"]} == {val},')
         L.append(f'               "{fact["libreac"]} has drifted from '
                  f'protocol-facts.yaml {fact["name"]}");')
