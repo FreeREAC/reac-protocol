@@ -8,6 +8,10 @@ builds. This writes the numbers they both spell, from one source:
 
     generated/reac_facts.h      the #define block, for libreac
     generated/reac_facts.ksy    the same constants as a Kaitai type, importable
+    generated/reac_facts_assert.h
+                                _Static_asserts binding libreac's own macros
+                                to the schema, for the lane that has not
+                                adopted the header yet
 
     ./gen-facts.py              write both
     ./gen-facts.py --check      fail if either differs from what would be written
@@ -173,7 +177,50 @@ def emit_ksy(schema):
     return "\n".join(L) + "\n"
 
 
-TARGETS = {"reac_facts.h": emit_h, "reac_facts.ksy": emit_ksy}
+
+def emit_assert_h(schema):
+    """A translation unit's worth of _Static_assert: every schema row that
+    libreac ALSO spells, checked against libreac's own macro at compile time.
+
+    This is the cheap half of the convergence, and it is the half that works
+    before anybody adopts anything. libreac keeps its hand-written #defines;
+    this header includes them and refuses to compile if one has drifted from
+    the schema, naming the constant in the error. Once the generated header is
+    adopted the assertions become tautologies and can go — until then they are
+    the only thing standing between the two spellings."""
+    L = ["// SPDX-License-Identifier: GPL-3.0-or-later",
+         "// Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>",
+         "//"]
+    L += [f"// {b}".rstrip() for b in BANNER_LINES]
+    L += ["//",
+          "// Compile this against libreac's headers. Every assertion that fails names",
+          "// a constant the two expressions of the protocol no longer agree on.",
+          "",
+          "#ifndef REAC_FACTS_ASSERT_H",
+          "#define REAC_FACTS_ASSERT_H",
+          "",
+          "#include <reac/reac.h>",
+          "#include <reac/reac_ctrlblk.h>",
+          "#include <reac/reac_ports.h>",
+          ""]
+    rows = [(f, g) for g in schema["groups"] for f in facts_of(g) if "libreac" in f]
+    for fact, group in rows:
+        val = fmt_value(fact["value"], fact.get("fmt", "dec"))
+        if fact.get("fmt") == "dec_hex":
+            val = str(fact["value"])
+        L.append(f'_Static_assert({fact["libreac"]} == {val},')
+        L.append(f'               "{fact["libreac"]} has drifted from '
+                 f'protocol-facts.yaml {fact["name"]}");')
+    L += ["",
+          f"#define REAC_FACTS_ASSERTIONS {len(rows)}",
+          "",
+          "#endif /* REAC_FACTS_ASSERT_H */"]
+    return "\n".join(L) + "\n"
+
+
+TARGETS = {"reac_facts.h": emit_h,
+           "reac_facts.ksy": emit_ksy,
+           "reac_facts_assert.h": emit_assert_h}
 
 
 def main():
