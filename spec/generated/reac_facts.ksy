@@ -531,8 +531,9 @@ instances:
       headamp_sens group below; this row is only the count. [EVIDENCED
       (image) — a 56-entry table at 0x0c0327a0 in the S-1608 image, reached
       by both write paths, ending exactly where the "V03.05" version string
-      begins. The count is what that table proves; reading a gain curve off
-      its stage structure did not survive the rig.]
+      begins — in the S-1608 image; the S-0808 copy is a byte match only.
+      The count is what that table proves; reading a gain curve off its
+      stage structure did not survive the rig.]
   headamp_ch_span:
     value: 0x30
     doc: |
@@ -570,12 +571,20 @@ instances:
       misreading of FUN_0c002d42, and that "a record to 0x24 moves group 9"
       describes the inventory cell moving, not phantom.
 
-      NOT CHANGED HERE, because the grade below is an executed trace and a
-      static read must not silently overwrite an observation. THE
-      DISCRIMINATING EXPERIMENT, which needs no rig: send DT1 phantom
-      records to channels 0x24 and 0x25 in turn and read the box's own
-      re-broadcast back. If 0x25 moves, this row is 0 and phantom is per
-      channel on the wire too.
+      THE STATIC CASE STRENGTHENED ON 2026-08-23 and the row still does not
+      flip. Three things now point the same way: actuation is per channel
+      (HEADAMP_ACTUATION_SHIFT); the only channel-indexed `& 3` test in the
+      image is the inventory-cell gate; and the per-eight axis turned out to
+      be BANKING rather than actuation, so nothing on the hardware side is
+      grouped at all. That is a much better static picture than an hour ago
+      and it is still not an observation.
+
+      NOT CHANGED HERE, because the grade below is an executed trace and
+      inference must not overwrite one however good it gets. THE ONE
+      REMAINING DISCRIMINATOR, which needs no rig: send DT1 phantom records
+      to channels 0x24 and 0x25 in turn and read the box's own re-broadcast
+      back. If 0x25 moves, this row is 0 and phantom is per channel on the
+      wire too.
         [DISPUTED — EVIDENCED (executed trace) against EVIDENCED (image,
         S-1608 FUN_0c002d42 + FUN_0c007fbc). Unresolved.]
   headamp_actuation_shift:
@@ -591,30 +600,39 @@ instances:
   headamp_bank_channels:
     value: 8
     doc: |
-      The preamp bank width, and the batch size of the apply loop — NOT an
-      actuation granularity. FUN_0c007fbc(bank, group) walks `group << 3`
-      for eight iterations and its writers take (bank, 0..7), so two banks
-      of eight cover the S-1608's sixteen analog inputs. `group` runs 0..9
-      over the 80-slot active table.
-        [EVIDENCED (image, S-1608 FUN_0c007fbc).]
-  headamp_gran_readback_shift:
+      THE PER-EIGHT GRANULARITY, and there is only one of them. This row
+      folds together what used to be two — "the hardware bank" and "the
+      readback nibble is per eight" — because they are arithmetically the
+      same thing and were being read as two independent pieces of evidence.
+
+      FUN_0c007fbc sets its cursor to `group << 3` and loops exactly eight
+      times, so group g covers [g*8, g*8+8) and therefore `g == ch >> 3` —
+      which is the readback nibble's own index. One axis, two spellings:
+      this width 8 and HEADAMP_BANK_SHIFT's 3.
+
+      It is a REFRESH AND READBACK banking, not an actuation width: the
+      writers take (bank, 0..7) and each of the eight iterations writes one
+      channel. Two banks of eight cover an S-1608's sixteen analog inputs.
+        [EVIDENCED (image) — S-1608 FUN_0c007fbc for the loop and the
+        per-channel writes; its caller, recovered 2026-08-23 from a function
+        Ghidra never disassembled (clean prologue past the previous
+        function's rts, absent from the 1395-entry map, reached by a plain
+        bsr), for `group == ch >> 3`. Supersedes the earlier UNRESOLVED note
+        that the caller could not be traced.]
+  headamp_bank_shift:
     value: 3
     doc: |
-      The readback nibble is per EIGHT — ch >> 3. It coincides
-      ARITHMETICALLY with the apply loop's bank index, which is also a
-      `>> 3` over the same 80 slots, so "readback per eight" and "the
-      hardware bank" are plausibly one fact rather than two.
+      `ch >> 3` gives the bank/group index. THE SAME FACT AS
+      HEADAMP_BANK_CHANNELS above, spelled as a shift instead of a width —
+      consult one or the other, never both as corroboration.
 
-      NOT ASSERTED AS ONE, because the image does not close it: there is no
-      `ch >> 3` anywhere in the head-amp region of S-1608.BIN, and
-      FUN_0c007fbc has NO caller in the function-only export — it is reached
-      through a data-section pointer, so what drives the banking cannot be
-      traced. The coincidence is real and the identification is not proven.
-      THE EXPERIMENT: the same data-section pointer re-export that would
-      close the enrolled-bit writer would show FUN_0c007fbc's caller and
-      settle whether the readback reports these banks.
-        [EVIDENCED (executed trace) for the shift; the identification with
-        HEADAMP_BANK_CHANNELS is UNRESOLVED (image, caller not exported).]
+      It was called HEADAMP_GRAN_READBACK_SHIFT and sat beside the bank row
+      as if the readback were a third, independent granularity. It is not:
+      the apply loop's group index and the readback nibble are the same
+      `ch >> 3` over the same 80 slots.
+        [EVIDENCED (executed trace for the readback nibble; image for the
+        apply loop's identical index — S-1608 FUN_0c007fbc and its caller).
+        The two agree, which is why they are one row.]
   headamp_sweep_records_per_ch:
     value: 3
     doc: |
@@ -652,7 +670,9 @@ instances:
       Entries in the firmware's SENS table, steps 0x00..0x37. The writer
       FUN_0c007e30 clamps anything above 0x37 to 0x37, so 0x37 is the top of
       the travel and not merely the last one observed. [EVIDENCED (image,
-      S-1608 0x0c0327a0 and S-0808 file 0x45ec8).]
+      S-1608 0x0c0327a0 = file 0x527a0; the same 112 bytes at S-0808 file
+      0x45ec8 as a raw byte match, not a disassembly — there is no S-0808
+      decompilation).]
   headamp_sens_stages:
     value: 4
     doc: |
