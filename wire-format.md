@@ -453,22 +453,57 @@ eight, which is an S-1608's sixteen analog inputs — and `group` selects which 
 window of the 80-slot active table feeds them. It is the preamp's bank width and the refresh
 loop's batch size. Nothing is switched eight channels at a time.
 
-#### "Phantom is per four" is DISPUTED [?]
+#### "Phantom is per four" is SETTLED — it is per channel [V]
 
-The claim that only a record whose channel is a multiple of four carries phantom — a record
-to `0x24` moving group 9, one to `0x27` moving nothing — is graded from an executed trace
-and is **not** supported by the image. `S-1608.BIN` holds exactly one channel-indexed
+Measured 2026-08-23. `HEADAMP_GRAN_PHANTOM_SHIFT` was 2 and is now **0**: phantom rides one
+record per channel, exactly like pad and SENS. The claim it replaces — that only a record
+whose channel is a multiple of four carries phantom, a record to `0x24` moving group 9 and
+one to `0x27` moving nothing — was graded from an executed trace, which is why no amount of
+static reading was allowed to overturn it. It took the wire.
+
+**The capture.** `reacpw-s1608-48k-clean__phantom-ch24-on-off-2026-08-23.pcap` — taken as
+`phantom-test.pcap`, now in `~/Devel/audio/reac-captures-raw/` and still owing the corpus a
+MANIFEST row and a distillation pass. Live rig, interface `enp131s0`, ethertype `0x8819`
+only, snaplen 200, twelve seconds: idle, phantom TRUE on CH `0x24`, four seconds, phantom
+FALSE on `0x24`, nothing else touched. Exactly two head-amp records crossed the wire and
+both name CH `0x24` alone — `0x25`, `0x26` and `0x27` never appear. Every frame is truncated
+by the snaplen, so that is checked rather than assumed: the control block is `[18:50]` and
+the record inside it `[34:40]`, both within 200 bytes, and all 38 control blocks pass the
+block checksum while both head-amp records pass the nested record checksum.
+
+**The discriminating experiment this section used to propose does not exist.** It said: write
+`0x24`, write `0x25`, read the box's own re-broadcast back. There is no re-broadcast. In
+those twelve seconds the S-1608 sent 47122 frames with zero dropped — its 16-bit frame
+counter steps by one across all 47121 intervals — and every one is either an audio frame,
+whose 16-slot descriptor area is a constant `00 7a` per slot and unmoved by either toggle, or
+one of twelve bare link-1 opcode-`0x81` heartbeats whose 32-byte block never changes a byte.
+Nor does the box answer a real desk: in `m200-ch7-ON-OFF-ON-20260721-215743.pcap` it meets an
+M-200i toggling phantom six times with nothing but heartbeats. **Head-amp is write-only on
+this wire.** A consumer keeps its own model; there is nothing to query and compare against.
+
+**So it was settled on the axis the constant actually governs** — what a sender emits, since
+a consumer that trusts a 2 sweeps phantom on multiples of four only. Our own master writing
+one record for `0x24` shows what our encoder does and nothing about Roland's law, so the
+corpus supplied the desks: across 3651 phantom records from three desk generations — M-200i
+`00:40:ab:c9:cc:03`, M-300 `00:40:ab:c9:d8:5b`, M-5000 `00:40:ab:ca:15:4c` — **2304 address a
+channel that is not a multiple of four**. A full S-1608 sweep names `0x20..0x2f`, all sixteen;
+an S-0808 names `0x00..0x07`; an S-4000S names `0x00..0x1f`. The decisive single case is
+`m200-ch7-ON-OFF-ON`: a real M-200i toggling one channel's phantom on and off three times,
+six records, every one CH `0x26`. `0x26 & 3 == 2`, so a desk obeying "per four" would have
+had to write `0x24` and could not have expressed that toggle at all.
+
+The image read was right the whole time. `S-1608.BIN` holds exactly one channel-indexed
 `(x & 3) == 0` test, it is `FUN_0c002d42`'s inventory-cell gate, and it is not on the DT1
-path; every other `& 3` in the image is pointer alignment. And with actuation per channel
-there is no per-four actuator for a per-four record to feed. The likeliest history is that
-this and the retracted "phantom packed 4 ch/group" note are one misreading of the same
-function.
+path; every other `& 3` in the image is pointer alignment. The per-four number that is real
+is `PORTS_CH_PER_SLOT`, the inventory cell, and the likeliest history is that a trace of the
+*cell* moving was read as phantom moving — the same misreading as the retracted "phantom
+packed 4 ch/group" note.
 
-The constant is left unchanged in
-[`spec/protocol-facts.yaml`](spec/protocol-facts.yaml) rather than overwritten from a static
-read. **The discriminating experiment needs no rig:** send DT1 phantom records to `0x24` and
-to `0x25` in turn and read the box's own re-broadcast back. If `0x25` moves, phantom is per
-channel on the wire too. **Until that runs, do not generate a per-four phantom sweep.**
+**Still not measured: hardware actuation.** No capture can show whether energising `0x24`
+also energises `0x25..0x27` inside the box, because the box reports nothing. That axis is
+`HEADAMP_ACTUATION_SHIFT`, it reads 0 from the image, and confirming it needs a physical
+48 V measurement on box inputs 6, 7 and 8 while only input 5 is written — never a soft
+indicator.
 
 #### Two granularities, and "bank" is a third axis of its own [V]
 
