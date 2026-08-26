@@ -635,8 +635,22 @@ types:
           commit_report_page.
       - id: console_field
         type: u1
-        doc: Console generation - 0x00 V-Mixer (M-200 / M-300), 0x01 OHRCA
-          (M-5000). The same 0/1 also appears as the ENROLL console byte.
+        doc: |
+          RATE CLASS the box follows: 0x00 -> 44.1/48 kHz, 0x01 -> 96 kHz.
+          Tool- and rig-verified 2026-08-26 (reac-captures analysis/rate_field_hunt.py
+          over box-at-48k vs box-at-96k): this is the ONLY master control byte that
+          differs between 48k and 96k, and the box's OWN frames are byte-identical
+          across rates -- the box encodes no rate, it follows this byte. A stagebox
+          driven with 0x00 returns 48k, with 0x01 returns 96k, regardless of the TX
+          cadence. Long read as "console generation" (0 V-Mixer M-200/M-300, 1 OHRCA
+          M-5000) and it correlates -- but every desk in the corpus ran ONE rate, so
+          generation and rate-class are confounded there; the rig breaks the tie in
+          favour of rate class. The same 0/1 is the ENROLL console byte. CONFOUND
+          STILL OPEN: no real desk was captured at an off-family rate (M-5000 at 48k
+          or M-300 at 96k) -- see reac-captures/CAPTURE-PLAN-next.md -- so whether a
+          REAL M-5000 at 48k emits 0x00 is unconfirmed; 0x00->48k / 0x01->96k is what
+          drives THIS box. 44.1 kHz has no distinct byte (binary field) -> maps to
+          0x00 and the box runs 48k; 44.1 is a graph/RME rate, not a REAC-wire rate.
       - id: box_count
         type: u2
         doc: Enrolled boxes. 0x0000 idle -> 0x0001 once a box is granted; a
