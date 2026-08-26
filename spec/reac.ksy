@@ -646,10 +646,13 @@ types:
           M-5000) and it correlates -- but every desk in the corpus ran ONE rate, so
           generation and rate-class are confounded there; the rig breaks the tie in
           favour of rate class. The same 0/1 is the ENROLL console byte. CONFOUND
-          STILL OPEN: no real desk was captured at an off-family rate (M-5000 at 48k
-          or M-300 at 96k) -- see reac-captures/CAPTURE-PLAN-next.md -- so whether a
-          REAL M-5000 at 48k emits 0x00 is unconfirmed; 0x00->48k / 0x01->96k is what
-          drives THIS box. 44.1 kHz has no distinct byte (binary field) -> maps to
+          The V-Mixer family (M-200/M-300) is HARDWARE-limited to 48 kHz, so the only
+          off-family rate a real desk can reach is an M-5000 (OHRCA) at 48 kHz -- and
+          its answer is forced: an M-5000 at 48k drives its box at 48k, which requires
+          cfea[19]=0x00 (the box follows this byte), so a real M-5000 at 48k emits 0x00.
+          Were it the family, M-5000 would always emit 0x01 and could never run its box
+          at 48k. Hence rate class, not family. An M-5000-at-48k capture would confirm
+          (predictable), not decide -- see reac-captures/CAPTURE-PLAN-next.md. 44.1 kHz has no distinct byte (binary field) -> maps to
           0x00 and the box runs 48k; 44.1 is a graph/RME rate, not a REAC-wire rate.
       - id: box_count
         type: u2
