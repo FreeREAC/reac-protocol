@@ -636,7 +636,11 @@ types:
       - id: console_field
         type: u1
         doc: |
-          RATE CLASS the box follows: 0x00 -> 44.1/48 kHz, 0x01 -> 96 kHz.
+          CONSOLE FAMILY byte, and on this protocol the family GATES the pace: 0x00 =
+          V-Mixer (M-200 / M-300), capped at 44.1/48 kHz; 0x01 = OHRCA (M-5000), which
+          alone reaches 96 kHz. The box FOLLOWS this byte for its rate class — cfea[19] is
+          the gate. So driving a box at 96 k REQUIRES emulating OHRCA (0x01); a V-Mixer byte
+          holds the box at 48 k however you pace it.
           Tool- and rig-verified 2026-08-26 (reac-captures analysis/rate_field_hunt.py
           over box-at-48k vs box-at-96k): this is the ONLY master control byte that
           differs between 48k and 96k, and the box's OWN frames are byte-identical
