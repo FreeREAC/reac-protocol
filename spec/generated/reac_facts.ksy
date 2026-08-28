@@ -80,6 +80,46 @@ instances:
         corpus, and it overrides
       any correlation the corpus appears to show.
       ]
+  console_field_gates_rate:
+    value: True
+    doc: |
+      The config-announce console_field byte (cfea[19]) gates the box's
+      drivable rate CLASS.
+      0x00 = V-Mixer (M-200 / M-300), capped at 44.1/48 kHz; 0x01 = OHRCA
+      (M-5000), which alone
+      reaches 96 kHz. The box FOLLOWS the byte the master emits, so driving
+      a box at 96 kHz
+      REQUIRES emulating OHRCA (0x01); a V-Mixer byte holds it at 48 kHz.
+      This does NOT contradict RATE_IS_INDEPENDENT_OF_MODEL — it is the
+      specific,
+      evidence-justified case that ruling anticipated ("anything reading a
+      per-desk field as a
+      rate class must justify it on its own evidence"). The rate is still
+      the master's choice
+      (PACE_IS_THE_MASTERS); console_field is the wire byte by which the
+      master DECLARES the
+      class, and the family label (V-Mixer / OHRCA) is only its name. What
+      is independent of a
+      mixer MODEL is a bare clock number; what gates the class is this one
+      announced byte.
+      44.1 kHz has NO distinct value — the field is binary — so it maps to
+      0x00 and the box
+      runs 48 kHz; 44.1 is a graph/RME rate, not a REAC-wire rate.
+        [RIG-VERIFIED (2026-08-27): emitting 0x00 ran the live box at 48 kHz
+        and 0x01 at 96 kHz,
+      with a warm follow on a live change; box frames stayed byte-identical
+      between the two,
+      the master byte the only differing field. LOGIC: an M-5000 running its
+      own box at 48 kHz
+      must emit 0x00, so the byte is the rate class, not merely the console
+      generation. Operator
+      ruling (2026-08-27): only OHRCA drives 96 kHz; V-Mixer is 48
+      kHz-limited (M-300 @ 96 k
+      impossible). The 44.1 kHz mapping is DERIVED from the field being
+      binary, NOT wire-
+      captured — no desk at 44.1 on the wire (see BYTES_PER_CHANNEL and
+      unknowns-census).
+      ]
   bytes_per_channel:
     value: 36
     doc: |
