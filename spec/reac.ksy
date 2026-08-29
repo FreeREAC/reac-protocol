@@ -635,8 +635,28 @@ types:
           commit_report_page.
       - id: console_field
         type: u1
-        doc: Console generation - 0x00 V-Mixer (M-200 / M-300), 0x01 OHRCA
-          (M-5000). The same 0/1 also appears as the ENROLL console byte.
+        doc: |
+          Console generation - 0x00 V-Mixer (M-200 / M-300), 0x01 OHRCA
+          (M-5000). The same 0/1 also appears as the ENROLL console byte AND as
+          the scene body's `revision` (+0x14). ALL THREE MUST AGREE: a master
+          that announces one generation and pushes a scene declaring the other
+          is making a claim its own record contradicts.
+
+          THE ANNOUNCE PROPOSES; THE SCENE DECIDES. This byte is broadcast at
+          1 Hz and a box may act on it, but it is not where a box's rate class
+          settles - `revision` is (see scene_body). EVIDENCED (rig, 2026-08-29):
+          reac-pw announced 0x01 here at 8000 pps while pushing an M-200i-derived
+          scene whose revision read 0x0000, and an S-1608 (firmware 2.200) held
+          48 kHz through every attempt - a runtime assertion, a daemon cold boot
+          at 96 kHz, and a box power-cycle into an already-running 96 kHz stream.
+          Making the scene agree moved it to 96 kHz immediately and cleanly.
+
+          ENFORCEMENT IS FIRMWARE-DEPENDENT, and the two boxes only look
+          contradictory until the model above is applied. EVIDENCED (rig): an
+          S-0808 (firmware 1.003) follows this byte alone, scene revision
+          notwithstanding; an S-1608 (firmware 2.200) requires the scene to agree.
+          One rule covers both: propose in the announce, record in the scene,
+          stamp the record with `revision`.
       - id: box_count
         type: u2
         doc: Enrolled boxes. 0x0000 idle -> 0x0001 once a box is granted; a
@@ -853,6 +873,25 @@ types:
           without any further comparison. EVIDENCED both — the compare is in the
           image, and it is one of only two non-padding bytes that differ between
           a V-Mixer desk (0x0000) and an M-5000 (0x0001).
+
+          SO IT IS THE VERSION STAMP ON THE DESK'S RECORD, and the only way any
+          scene change reaches a box that has already cached one. A master that
+          holds it CONSTANT can never revise what it declared, whatever else it
+          sends. EVIDENCED (rig, 2026-08-29, S-1608 firmware 2.200): pinned to
+          0x0001 the box took 96 kHz and then LATCHED there - neither a console
+          assertion back to 48 kHz nor a daemon cold boot at `--rate 48000`
+          moved it, because the value never changed and the box never re-read.
+          Derived from the announced generation instead (0 for V-Mixer/48 kHz,
+          1 for OHRCA/96 kHz) the same box followed the console in both
+          directions: 8004 pps against our 8004 at 96 kHz and 4002/4002 at
+          48 kHz, no wire-pace mismatch, drift -3.6 ppm, zero discards.
+
+          A CONSEQUENCE WORTH STATING: because the field is binary, a rate class
+          outside {V-Mixer 48k, OHRCA 96k} has no expression here. 44.1 kHz
+          therefore cannot be declared by this route - a master asking for it
+          lands the box on 48 kHz - and where a real desk expresses 44.1 is
+          still unknown. INFERRED; the deciding capture is a real desk at
+          44.1 kHz (reac-captures/CAPTURE-PLAN-next.md).
       - id: reserved_16
         size: 4
       - id: slots
