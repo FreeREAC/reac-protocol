@@ -636,28 +636,45 @@ types:
       - id: console_field
         type: u1
         doc: |
-          CONSOLE FAMILY byte, and on this protocol the family GATES the pace: 0x00 =
-          V-Mixer (M-200 / M-300), capped at 44.1/48 kHz; 0x01 = OHRCA (M-5000), which
-          alone reaches 96 kHz. The box FOLLOWS this byte for its rate class — cfea[19] is
-          the gate. So driving a box at 96 k REQUIRES emulating OHRCA (0x01); a V-Mixer byte
-          holds the box at 48 k however you pace it.
-          Tool- and rig-verified 2026-08-26 (reac-captures analysis/rate_field_hunt.py
-          over box-at-48k vs box-at-96k): this is the ONLY master control byte that
-          differs between 48k and 96k, and the box's OWN frames are byte-identical
-          across rates -- the box encodes no rate, it follows this byte. A stagebox
-          driven with 0x00 returns 48k, with 0x01 returns 96k, regardless of the TX
-          cadence. Long read as "console generation" (0 V-Mixer M-200/M-300, 1 OHRCA
-          M-5000) and it correlates -- but every desk in the corpus ran ONE rate, so
-          generation and rate-class are confounded there; the rig breaks the tie in
-          favour of rate class. The same 0/1 is the ENROLL console byte. CONFOUND
-          The V-Mixer family (M-200/M-300) is HARDWARE-limited to 48 kHz, so the only
-          off-family rate a real desk can reach is an M-5000 (OHRCA) at 48 kHz -- and
-          its answer is forced: an M-5000 at 48k drives its box at 48k, which requires
-          cfea[19]=0x00 (the box follows this byte), so a real M-5000 at 48k emits 0x00.
-          Were it the family, M-5000 would always emit 0x01 and could never run its box
-          at 48k. Hence rate class, not family. An M-5000-at-48k capture would confirm
-          (predictable), not decide -- see reac-captures/CAPTURE-PLAN-next.md. 44.1 kHz has no distinct byte (binary field) -> maps to
-          0x00 and the box runs 48k; 44.1 is a graph/RME rate, not a REAC-wire rate.
+          CONSOLE FAMILY byte: 0x00 = V-Mixer (M-200 / M-300), capped at 44.1/48 kHz;
+          0x01 = OHRCA (M-5000), the only family that reaches 96 kHz. Driving a box at
+          96 k REQUIRES emulating OHRCA (0x01) — but the byte is NOT SUFFICIENT, and how
+          far it carries is FIRMWARE-DEPENDENT. Corrected 2026-08-29: this paragraph
+          previously read "the box FOLLOWS this byte", which is true of one box only.
+            - S-0808 (fw 1.003) FOLLOWS the byte live: 0x00 -> 48k, 0x01 -> 96k. Tool-
+              and rig-verified 2026-08-26 (analysis/rate_field_hunt.py over box-at-48k
+              vs box-at-96k; the box's own frames are byte-identical across rates, so
+              this box encodes no rate and follows the master).
+            - S-1608 (fw 2.200) DOES NOT. It LATCHES its pace and holds it across a full
+              cold power-cycle; only a real M-5000 has ever moved it (measured 2026-07-18,
+              re-measured 2026-08-29 across ten 96 k windows — every one logged WIRE PACE
+              MISMATCH, the box answering 4000 pps under cfea[19]=0x01). The 08-26 rig
+              confirmation ran on the S-0808 alone and was generalised to "the box";
+              rate_field_hunt.py's own 2026-08-22 docstring already recorded the opposite
+              result ("forcing that to OHRCA does not move the box").
+          The 08-26 "ONLY master control byte that differs" is bounded by that tool's
+          reach, not by the protocol: it compares 48 bytes from each control block's tag,
+          grouped by (tag,op,oplen) under a varies-mask. The scene-transfer body
+          (differences measured at offsets ~870 and ~8902) lies thousands of bytes outside
+          that window, and a marker present in 8 of 49 windows folds into VARIABLE rather
+          than standing out as a differing constant. An empty result there is the search's
+          span, not the wire's.
+          What a real M-5000 sends that reac-pw does not — found independently twice,
+          2026-07-18 and 2026-08-29: continuous cdea op 0100 once ESTABLISHED, and the
+          chanmap section marker `fe 01` where reac-pw emits `fe 00`. Either is a candidate
+          for what writes the S-1608's clock latch; neither is proven. Full frame-level
+          diff: openmixer docs/operations/s1608-96k-enrol-diff.md.
+          On rate class vs generation: long read as "console generation" (0 V-Mixer, 1
+          OHRCA) and it correlates -- but every desk in the corpus ran ONE rate, so
+          generation and rate-class are confounded there. The V-Mixer family is HARDWARE-
+          limited to 48 kHz, so the only off-family rate a real desk can reach is an
+          M-5000 at 48 kHz, and its answer is forced: it drives its box at 48k, which on a
+          following box requires 0x00. Were it the family, M-5000 would always emit 0x01
+          and could never run its box at 48k. Hence rate class, not family. An
+          M-5000-at-48k capture would confirm (predictable), not decide -- see
+          reac-captures/CAPTURE-PLAN-next.md. The same 0/1 is the ENROLL console byte.
+          44.1 kHz has no distinct byte (binary field) -> maps to 0x00 and the box runs
+          48k; 44.1 is a graph/RME rate, not a REAC-wire rate.
       - id: box_count
         type: u2
         doc: Enrolled boxes. 0x0000 idle -> 0x0001 once a box is granted; a
