@@ -663,7 +663,13 @@ types:
           2026-07-18 and 2026-08-29: continuous cdea op 0100 once ESTABLISHED, and the
           chanmap section marker `fe 01` where reac-pw emits `fe 00`. Either is a candidate
           for what writes the S-1608's clock latch; neither is proven. Full frame-level
-          diff: openmixer docs/operations/s1608-96k-enrol-diff.md.
+          Evidence: the m5000-s1608-96k and m200i-s1608-48k captures in reac-captures, and
+          recover-scene.py's cross-desk matrix (the scene body is IDENTICAL across M-200i and
+          M-5000, sha256[:12] efc316a55b00 — the scene is not where the generations differ).
+          Measured on the rig 2026-08-29: emitting the M-5000's marker fe 01 00 under
+          cfea[19]=0x01 at 8004 pps did NOT move the S-1608, which answered 3998 pps
+          throughout. So the marker is a real per-generation difference and NOT the pace gate;
+          what makes fw 2.200 follow 96 k is still unfound.
           On rate class vs generation: long read as "console generation" (0 V-Mixer, 1
           OHRCA) and it correlates -- but every desk in the corpus ran ONE rate, so
           generation and rate-class are confounded there. The V-Mixer family is HARDWARE-
