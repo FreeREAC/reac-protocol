@@ -223,6 +223,28 @@ doc: |
     all three parameters each, one pass. A master does not address halves of a
     box and does not repeat the sweep.
 
+  - **The ~1.7 s between the box's declaration (+17.8 s) and the master's sweep
+    (+19.5 s) is an OBSERVED GAP, not a hold the box requires.** It is easy to
+    read this timeline as a mandatory settle and imitate it with a wall-clock
+    timer; reac-pw did, and carried a 1.6 s dwell fitted to this capture.
+    Measured against both boxes on 2026-08-30, granting a SHORT SETTLE (50 ms)
+    after the box has declared and been armed establishes the session just as
+    reliably, three trials each, deterministic, at full declared width:
+
+        S-1608  16/8   1.684 s -> 0.134 s
+        S-4000S 32/8   1.756 s -> 0.206 s
+
+    This follows from the state machine rather than contradicting it: a box
+    leaves COLD_CONNECT **on receipt of the master's GRANT**, not after elapsed
+    time. The exchange is frame-driven, so what the desk's gap records is one
+    desk's scheduling, not a protocol requirement. A wall-clock dwell is still
+    the right CAP for a box that has not declared — one unit is documented as
+    needing ~27 s — but it is the wrong TRIGGER for one that has.
+
+    Not settled by that measurement: whether every firmware tolerates it (two
+    were tested), and audio through the box was not measured, only the declared
+    port width and the wire rate.
+
   # Anti-goals
 
   This grammar does NOT model the establishment FSM as STRUCTURE — a sequence of
