@@ -159,6 +159,22 @@ doc: |
 
   Both are asserted for every checked-in fixture by spec/reac_xcheck.py.
 
+  # The role is the geometry
+
+  A peer's frame LENGTH says which side of the protocol it is, and it is the one
+  claim on the wire that cannot be misconfigured: a master's downstream is always
+  the 40-channel solution (1492 B), a stagebox's upstream its own declared width
+  (S-4000S 32 ch = 1204 B, S-1608 16 ch = 628 B, S-0808 8 ch = 340 B) — all the
+  same `52 + n*36`.
+
+  This outranks the control plane. A stagebox strapped to MASTER broadcasts
+  continuously, never cold-connects, and classifies as a master by every
+  control-frame rule there is, while still emitting a box geometry. A master
+  never joins another master, so a peer announcing itself master while emitting a
+  box width is a misconfigured box to REPORT, not a master to follow. Deciding
+  that from the control frames alone costs a session; the length settles it in
+  one comparison.
+
   # The session, and its two reconnects
 
   A stagebox appearing on a segment is not a special case: it is a lost
