@@ -319,6 +319,22 @@ two unrelated modes.
 box will not join, seat the switch firmly at S and power-cycle — the power-cycle is required, not
 caution.
 
+**How to read a silent box, from its own FSM** (`reac-firmware-re/analysis/REAC-PROTOCOL-FROM-SOURCE.md`
+§10.2). The box has three states and each has a distinct wire signature:
+
+| box state | what you see on the wire |
+|---|---|
+| `BOOT` / link-down | **nothing at all** |
+| `ANNOUNCE` | broadcast filler flood at **8000 fps** + unicast `cdea 04 03` cold-connect |
+| `LINKED` | unicast filler 8000 fps + `cdea 01 03 0001 81` heartbeat ~1/s |
+
+So a box emitting **zero frames** is in `BOOT` — it believes its OWN PHY is down, whatever the
+NIC at our end reports. No console-side change reaches that: it is a cable or a port at the box.
+
+And the trigger is singular: **`BOOT -> ANNOUNCE` happens on PHY LINK-UP and nothing else — "a
+data gap does NOT"**. That is why a box which was streaming and went quiet never recovers on its
+own, and why the remedy is always to bounce the link rather than to wait.
+
 ### Choosing what the master locks to — the clock-source selector [S]
 
 Although the recovered word clock itself is FPGA-internal and never appears on the REAC
