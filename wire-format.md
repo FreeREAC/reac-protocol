@@ -282,6 +282,43 @@ declared purely by **packet length** — the first frame whose length equals a f
 frame flips `connected = true`, independent of the announce handshake. This is exactly
 why a passive tap connects without participating.
 
+### The stagebox's REAC Mode switch — M / S / SP [M]
+
+A stagebox has **no menu**. Its only mode control is one three-position switch labelled **REAC
+Mode**, and it is read **at boot and never re-read** — moving it on a running box changes nothing
+at all (measured 2026-08-31, in both directions).
+
+| position | what the box does |
+|---|---|
+| **S** (slave) | the normal case: enrols with a console, takes its pace from that console's cadence |
+| **SP** (split) | splits its I/O across TWO REAC ports so two consoles share one stagebox |
+| **M** (master) | **the SPLITTER's clock role — NOT "act as a console"** |
+
+**M does not make a stagebox a console, and does not make it a pace master.** The S-4000S
+firmware carries `CMasterReacMsgParser` *and* `CSlave1ReacMsgParser` plus a `Clock Driver` /
+`Tuning Task`: it is **clock-slave on its uplink and master on its split outputs**, re-driving a
+recovered word clock onward to a downstream console
+(`reac-firmware-re/CLOCK-SYNC.md`). M and SP are therefore two halves of one SPLIT feature, not
+two unrelated modes.
+
+**Consequences, measured on a live segment:**
+
+- A box on M with **no uplink** free-runs at its last-known rate — it has no clock to recover and
+  re-drive. Measured +363 ppm off nominal, against −16 ppm for an enrolled box on the same rig.
+  (Rate persists across a power cycle because there is **no rate field**: the box holds whatever
+  cadence it last locked to.)
+- It emits **zero control frames** — no announce, no grant, no heartbeat. A split output runs no
+  handshake; it just emits.
+- It broadcasts its own **upstream** geometry, never a master downstream frame.
+- So **nothing pairs with it in either direction**: a console cannot grant it (it never
+  cold-connects) and cannot slave to it (it never grants). Both were tried.
+- Its **REAC LED is lit and steady — identical to synched** — because its port really is fine.
+  The lamp reports the box's view of its link, never whether it is talking to you.
+
+**A partially seated switch behaves exactly like SP**: link up, LED steady, zero frames. When a
+box will not join, seat the switch firmly at S and power-cycle — the power-cycle is required, not
+caution.
+
 ### Choosing what the master locks to — the clock-source selector [S]
 
 Although the recovered word clock itself is FPGA-internal and never appears on the REAC
