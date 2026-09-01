@@ -153,8 +153,9 @@ It never touches the libreac checkout: libreac is snapshotted with `git archive`
 in a temp directory, so a lane mid-migration there is neither read half-written nor built
 over.
 
-Where the two sides genuinely disagree — and they do — is written down in
-[`../convergence-defects.md`](../convergence-defects.md) rather than reconciled silently.
+Where the two sides genuinely disagree — and they do, occasionally — the resolution is
+argued and cited in `protocol-facts.yaml`'s own `why`/`evidence` fields rather than
+reconciled silently by picking whichever number the person holding the file prefers.
 
 ## Running the cross-check
 
