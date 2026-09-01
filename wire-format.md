@@ -319,8 +319,9 @@ two unrelated modes.
 box will not join, seat the switch firmly at S and power-cycle — the power-cycle is required, not
 caution.
 
-**How to read a silent box, from its own FSM** (`reac-firmware-re/analysis/REAC-PROTOCOL-FROM-SOURCE.md`
-§10.2). The box has three states and each has a distinct wire signature:
+**How to read a silent box, from its own FSM** (see [firmware-findings.md](firmware-findings.md)'s
+source-level section, "10.2 BOX (stagebox / slave) FSM"). The box has three states and each has a
+distinct wire signature:
 
 | box state | what you see on the wire |
 |---|---|
@@ -367,6 +368,42 @@ operator switches the console 48 ↔ 96 kHz) the measured pps jumps, so the rela
 re-detects and re-locks to the new period. Since the frame itself is rate-invariant, the
 relay never changes how it parses or forwards a frame — only the emit period changes with
 rate.
+
+### Building a transparent bridge or relay — the invariants it must not break [S][V]
+
+A relay that only re-clocks (previous section) is necessary but not sufficient once the
+link it rides is lossy or jittery enough to threaten establishment and hold, not just
+sample timing. Distilled from the connection model above and from the source-level FSM
+in [firmware-findings.md](firmware-findings.md): a transparent REAC bridge MUST —
+
+1. **Preserve upstream frame timing toward the master (box→master).** The master holds
+   the link via its FPGA link-check counter, refilled once per received frame, and REAC
+   assumes jitter-free full-duplex delivery. A bridge that re-clocks the downstream but
+   raw-relays the upstream only fixes half the path: de-jitter the upstream on the
+   master-facing side too, with a buffer that smooths the link's jitter while staying
+   small against the link-check budget (600 frames = 75 ms @96 k / 150 ms @48 k). A
+   single stall past that budget drops the link even when the box's own stream was
+   otherwise clean.
+2. **Never alter the heartbeat's keep-alive selector.** The established heartbeat
+   (`cdea 01 03 0001 81`) carries `0x81` as its reply-match/re-arm byte; a `…00` variant
+   LATCHES A DISCONNECT at the master. Relay it verbatim — never synthesize a `00`, and
+   never drop it silently.
+3. **Never change the box's identity (source MAC) mid-link.** The master force-disconnects
+   on any peer-MAC change. A bridge that rewrites or clones MACs must keep the box's MAC
+   stable for the life of the link.
+4. **Don't disturb the establishment mute window.** The master TX-mutes for ~200 ms at
+   connect while its own clock free-runs; the box completes its cold-connect inside that
+   window. Let it pass cleanly rather than injecting into it.
+5. **Preserve the channel-map cadence.** The established heartbeat walks 8 channel-ids
+   per frame (a full 40-channel map every ~6 frames), and the master forces
+   channel-count to 1 after 6 identical map frames in a row (the stale-guard debounce).
+   Don't dedupe or coalesce map frames on the way through.
+6. **Keep the frame counter (bytes 14–15) monotonic per stream.** The master's own clock
+   free-runs even through the mute window, so a bridge that drops or reorders frames
+   must still hand the endpoints a counter that only goes forward.
+7. **Establishment needs a real PHY link-up, not just a data gap.** The box's cold-connect
+   only fires on link-up (see the silent-box FSM above), so a bridge that wants to force
+   a re-establish has to bounce the physical link, not merely stall the data.
 
 ### Downstream vs upstream packet rate
 
