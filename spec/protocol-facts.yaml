@@ -137,6 +137,41 @@ groups:
         evidence: |
           RULED (operator, 2026-08-23) — LAW. Not an inference from the corpus, and it overrides
           any correlation the corpus appears to show.
+      - name: CONSOLE_FIELD_GATES_RATE
+        value: true
+        why: |
+          The config-announce console_field byte (cfea[19]) PROPOSES the box's rate CLASS; the
+          scene body's `revision` field (+0x14, SCENE_REVISION_OFF) is what a box actually
+          latches. 0x00 = V-Mixer (M-200 / M-300), capped at 44.1/48 kHz; 0x01 = OHRCA (M-5000),
+          which alone reaches 96 kHz. Enforcement is FIRMWARE-DEPENDENT: an S-0808 (fw 1.003)
+          follows console_field alone; an S-1608 (fw 2.200) requires the scene's `revision` to
+          agree with it, and otherwise holds its prior rate across a full cold power-cycle.
+          This does NOT contradict RATE_IS_INDEPENDENT_OF_MODEL — it is the specific,
+          evidence-justified case that ruling anticipated ("anything reading a per-desk field as a
+          rate class must justify it on its own evidence"). The rate is still the master's choice
+          (PACE_IS_THE_MASTERS); console_field and `revision` are the two wire fields by which the
+          master DECLARES and then RECORDS the class, and the family label (V-Mixer / OHRCA) is
+          only its name. What is independent of a mixer MODEL is a bare clock number; what gates
+          the class is this announce-plus-scene pair.
+          44.1 kHz has NO distinct value on either field — both are binary — so it maps to 0x00
+          and the box runs 48 kHz; 44.1 is a graph/RME rate, not a REAC-wire rate.
+        evidence: |
+          RIG-VERIFIED (2026-08-27): emitting 0x00 ran the live box at 48 kHz and 0x01 at 96 kHz,
+          with a warm follow on a live change; box frames stayed byte-identical between the two,
+          the master byte the only differing field on that box (S-0808, fw 1.003).
+          CORRECTED (2026-08-29): that confirmation was generalised to "the box" and is not
+          universal. An S-1608 (fw 2.200) held 48 kHz through a runtime assertion, a daemon cold
+          boot at 96 kHz and a power-cycle into an already-running 96 kHz stream, all with
+          console_field=0x01 — ten 96 kHz windows all measured WIRE PACE MISMATCH at 4000 pps.
+          Making the scene's `revision` agree (see SCENE_REVISION_OFF) moved it to 96 kHz
+          immediately and cleanly, and pinning `revision` made the box LATCH: neither a console
+          assertion nor a daemon cold boot at 48 kHz moved it back, because the value never
+          changed and the box never re-read.
+          LOGIC: an M-5000 running its own box at 48 kHz must emit 0x00, so the byte is the rate
+          class, not merely the console generation. Operator ruling (2026-08-27): only OHRCA
+          drives 96 kHz; V-Mixer is 48 kHz-limited (M-300 @ 96 k impossible). The 44.1 kHz mapping
+          is DERIVED from both fields being binary, NOT wire-captured — no desk has been captured
+          at 44.1 kHz.
       - name: BYTES_PER_CHANNEL
         libreac: REAC_UPSTREAM_BYTES_PER_CH
         value: 36
