@@ -692,9 +692,28 @@ types:
           ENFORCEMENT IS FIRMWARE-DEPENDENT, and the two boxes only look
           contradictory until the model above is applied. EVIDENCED (rig): an
           S-0808 (firmware 1.003) follows this byte alone, scene revision
-          notwithstanding; an S-1608 (firmware 2.200) requires the scene to agree.
-          One rule covers both: propose in the announce, record in the scene,
-          stamp the record with `revision`.
+          notwithstanding — tool- and rig-verified 2026-08-26
+          (reac-captures analysis/rate_field_hunt.py over box-at-48k vs
+          box-at-96k: the box's own frames are byte-identical across rates, so
+          this box encodes no rate and just follows the master). An S-1608
+          (firmware 2.200) requires the scene to agree, per the EVIDENCED
+          paragraph above. One rule covers both: propose in the announce,
+          record in the scene, stamp the record with `revision`.
+
+          RATE CLASS, NOT (JUST) CONSOLE GENERATION: read naively this looks
+          like "console generation" and it correlates, because every desk in
+          the corpus ran one rate. But the V-Mixer family is HARDWARE-limited
+          to 48 kHz, so the only off-family rate a real desk can reach is an
+          M-5000 (OHRCA) running its own box at 48 kHz — and that answer is
+          forced: it requires this byte to read 0x00. Were the byte purely
+          "family", an M-5000 would always emit 0x01 and could never run its
+          box at 48 kHz. So the byte declares a rate class, and the family
+          names are what the two known classes are called; an M-5000 captured
+          at 48 kHz would confirm this directly, and has not yet been captured.
+
+          44.1 kHz has no distinct value on this byte — it is binary — so it
+          maps to 0x00 and the box runs 48 kHz; 44.1 is a graph/RME rate, not
+          a REAC-wire rate.
       - id: box_count
         type: u2
         doc: Enrolled boxes. 0x0000 idle -> 0x0001 once a box is granted; a
