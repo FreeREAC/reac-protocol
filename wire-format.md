@@ -312,6 +312,18 @@ two unrelated modes.
 - It broadcasts its own **upstream** geometry, never a master downstream frame.
 - So **nothing pairs with it in either direction**: a console cannot grant it (it never
   cold-connects) and cannot slave to it (it never grants). Both were tried.
+
+**[CORRECTED 2026-09-09 — a box on M DOES grant, and the two bullets above are half right.]**
+Two bridge captures of real gear pairing with real gear, taken with no daemon on the wire:
+an S-1608 in slave mode enrolled with an S-0808 in master mode, and an S-0808 in slave mode
+enrolled with an S-1608 in master mode. Both lamps locked. The master **echoes the joining
+box's own `cdea 04 03` records** — one echo per distinct record, plus its own `0000`
+head_mark — and that echo IS the grant. What holds is that such a box never cold-connects and
+so cannot be granted BY us; what does not is "it never grants". The "zero control frames"
+measurement was an **S-0808** on M, which indeed sends no `cfea` announce; an **S-1608** on M
+sends one about once a second, and the box joining it never floods at all. The full sequence,
+the filler's `0x52` requesting state and what remains unsettled are in libreac's
+`docs/REAC-CONTROL-PLANE.md` and in `spec/reac.ksy`'s enrolment section.
 - Its **REAC LED is lit and steady — identical to synched** — because its port really is fine.
   The lamp reports the box's view of its link, never whether it is talking to you.
 
