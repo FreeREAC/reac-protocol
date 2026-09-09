@@ -221,11 +221,46 @@ doc: |
                                  and the WHOLE TRANSFER AGAIN every 2.695 s
     +17.8 s              box     op 01 03 page 0x0010 config-announce, then
                                  op 04 03 tags 0100 / 0000 / 0302, then heartbeat
+                                 [AMENDED 2026-09-09: that is the GRANT, not the join.
+                                  A joining box sends TWO records - 0100 JOIN then 0302
+                                  BOX_READY - and the MASTER answers three: echo(0100),
+                                  its OWN 0000 head_mark, echo(0302). Measured both ways:
+                                  an S-0808 joining an S-1608 sent two and was answered
+                                  with three; an S-1608 joining an S-0808 sent three and
+                                  drew three echoes, and a replay with its second record
+                                  repeated drew only two, so the master echoes one per
+                                  DISTINCT record. The joining box then sends its FIRST
+                                  HEARTBEAT on the very next frame, BEFORE the grant:
+                                  16.1162 JOIN, 16.1164 BOX_READY, 16.1165 heartbeat,
+                                  grant at 16.118.]
     +19.5 s              master  the head-amp sweep: 48 op 04 03 TAG 0101
                                  records in 0.145 s — 16 wire channels 0x20..0x2f
                                  x phantom, pad, sens
     after                master  back to 1 Hz cfea + page 0x0019; the scene
                                  transfer never runs again for this session
+
+  THE FILLER'S CONTROL AREA CARRIES THE JOINING BOX'S STATE [added 2026-09-09]. Sixteen
+  `00 xx` pairs across block[0:32], and xx moves with the enrolment:
+
+      zero   before the config-announce            (48 frames measured)
+      0x52   from the announce until the grant     (8691 frames - the whole wait)
+      0x7a   once granted                          (the rest of the session)
+
+  Replaying a granted enrolment with the 0x52 window zeroed is REFUSED by an S-1608 in
+  master mode, and it is the only variant of that file which is; an S-0808 in master mode
+  tolerates zeros there. There is no name for the field in this grammar yet; "requesting"
+  is what the wire shows it to mean.
+
+  A STAGEBOX ON M PAIRS WITHOUT A COURTSHIP OF ITS OWN [added 2026-09-09]. An S-0808 in
+  master mode emits no `cfea` announce at all and no probe cycle - only a scene transfer and
+  a ~1 Hz chanmap - and it grants a slave that finds it by flooding. An S-1608 in master mode
+  DOES emit `cfea` about once a second, and the box that joined it broadcast nothing at all:
+  a master that calls is not hunted. Both grant by echoing the joining box's own records.
+
+  THE CONFIG-ANNOUNCE DECLARES THE DECLARER [added 2026-09-09]. Selector 0x80 and
+  board_config_code 0 in both directions, and the port table is the sender's own inventory -
+  `01 01 01 01 02 02` from an 8-input box, `02 02 02 02 01 01` from a 16-input one, each
+  granted by the other. It is NOT the table of the peer being addressed.
 
   Two properties of that order are easy to get wrong and both are load-bearing:
 
