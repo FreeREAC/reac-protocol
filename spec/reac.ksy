@@ -709,11 +709,19 @@ types:
       - id: console_field
         type: u1
         doc: |
-          Console generation - 0x00 V-Mixer (M-200 / M-300), 0x01 OHRCA
-          (M-5000). The same 0/1 also appears as the ENROLL console byte AND as
-          the scene body's `revision` (+0x14). ALL THREE MUST AGREE: a master
-          that announces one generation and pushes a scene declaring the other
-          is making a claim its own record contradicts.
+          The PACE CODE the box follows - 0x00 = 48 kHz, 0x01 = 96 kHz,
+          0x02 = 44.1 kHz. Measured 2026-09-11 on one desk (M-200 c9:cc:03):
+          0x00 while mastering at 48 kHz, 0x02 while mastering at 44.1 kHz;
+          the M-5000 captures write 0x01 at 96 kHz. Until that day the byte was
+          read as the console generation (0x00 V-Mixer M-200/M-300, 0x01 OHRCA
+          M-5000) - a coincidence of a corpus in which every V-Mixer session
+          ran 48 kHz and every OHRCA session 96 kHz; a desk does not change
+          generation with its clock. A box obeys the BYTE, not the cadence: an
+          S-4000S driven at 3675 frames/s with this byte at 0x00 returned
+          4000 frames/s (48 kHz). The ENROLL console byte and the scene body's
+          `revision` (+0x14) still carry the 0/1 generation and were NOT
+          re-measured at 44.1 kHz; whether they follow the pace code too is
+          open (the 44.1 kHz M-200 enrolment of 2026-09-11 is on file).
 
           THE ANNOUNCE PROPOSES; THE SCENE DECIDES. This byte is broadcast at
           1 Hz and a box may act on it, but it is not where a box's rate class
