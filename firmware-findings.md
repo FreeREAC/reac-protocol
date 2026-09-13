@@ -109,7 +109,7 @@ grounds that `01 01` carries ASCII `"1234"` so it must be an establishment hands
 op-`0100` is a probe rather than a scene. A master built on the first model was written, tested and
 removed.
 
-**The audit was wrong, and reading both firmwares says so** (2026-08-23, lane N):
+**The audit was wrong, and reading both firmwares says so:**
 
 - The staging/active pair is real and is in the box's code. `FUN_0c003c8a` copies 80 records of 10
   bytes from a staging base to a live base, then copies 6 bytes of master id, pushes twelve
