@@ -125,7 +125,7 @@ Class `0x01` subtypes:
 | `0x01` | master → box | slot map — eight `{slot, cell+flags, sens}` records a frame |
 | `0x10` | master → box | enroll group map, once before the grant burst |
 | `0x81` | box → master | link-check ack |
-| `0x80` `0x82` `0x83` `0x84` | box → master | **state-4 commit report** |
+| `0x80` `0x82` `0x84` | box → master | **state-4 commit report** — `0x82`/`0x84` to a desk, `0x80` to a box master (`0x83` is in the S-4000 image and has never reached the wire) |
 
 Class `0x04` is the DT1 container; see [Source control](#source-control-head-amp--op-0x04-0x03).
 
@@ -228,19 +228,29 @@ written at the rotation index for channel 48; its accompanying flag byte varies
 (most often `0x00`, sometimes `0x01` or `0x02`) — the channel number, not the flag
 byte, marks the terminator.
 
-Other states stuff the interface MAC, a `0xc0 0xa8` (= 192.168) address prefix
-repeated twice, and the ASCII tag `SYSP` (`53 59 53 50`) into `data[]`. A further
-tag, `XVSCEN` (`58 56 53 43 45 4e`), is named in earlier notes and is **not on the
-wire**. Three complete 8904-byte scene bodies reassembled from an M-200 at 44.1 kHz
-(`reac-captures m200-enrol-441k-2026-09-13`, t = 542.135952 / 544.831563 /
-547.525979, 343 frames each, declared length = recovered length, all three
-byte-identical) carry exactly three ASCII runs of four or more printable bytes:
-`1234` at +0x000, `SYSP` at +0x368 and `SCEN` at +0x37c. There is no `XVSCEN`, no
-`SYSPARAM` and no `SCENE` — the three positives are the control for the negative.
-This region is incompletely understood; treat `data[5..30]` of CONTROL frames as
-partial beyond the 5-byte prefix and the channel-info block. (The `0xc0 0xa8` bytes
-are a protocol fact — what a master stuffs into CONTROL frames — not anyone's
-network address.)
+**The scene body's ASCII runs, and the `0xc0 0xa8` pair, located.** Three complete 8904-byte
+bodies reassembled from an M-200 at 44.1 kHz (`reac-captures m200-enrol-441k-2026-09-13`,
+t = 542.135952 / 544.831563 / 547.525979, 343 frames each, declared length = recovered length,
+all three byte-identical) carry exactly three ASCII runs of four or more printable bytes: `1234`
+at +0x000, `SYSP` at +0x368 and `SCEN` at +0x37c. `SYSPARAM` and `SCENE` are not on the wire.
+
+**`XVSCEN` is not a tag, and it is not imaginary.** `scene_sysp` is `tag(4) version(2) key(2)
+flag(1)` and then 11 bytes; the last two of those, at body +0x37a, are zero on every console and
+read `59 56` on an S-1608 in master mode. `SCEN` begins at +0x37c, so an ASCII scan of a
+box-master body returns the six-character run `YVSCEN` — two bytes of one field abutting the
+four-byte tag of the next. The box's commit gates on `SCEN` at +0x37c, not on the run. The
+`58 56 53 43 45 4e` of the earlier notes is that run, read one bit off or carrying a different
+value on another device (`reac-captures box-to-box-2026-09-13`, two complete bodies,
+byte-identical).
+
+The `0xc0 0xa8` (= 192.168) prefix "repeated twice" sits in the same body: **+0x33c and +0x346,
+each a 4-byte IPv4 immediately followed by a 6-byte MAC**, with `master_id` at +0x340 being the
+first pair's MAC. An S-1608 on M writes `c0 a8 01 01` / `c0 a8 01 02` with its own MAC after
+each; a console leaves both addresses and the second MAC slot zero. (These bytes are a protocol
+fact — what a master stuffs into its scene — not anyone's network address.)
+
+This region is incompletely understood; treat `data[5..30]` of CONTROL frames as partial beyond
+the 5-byte prefix and the channel-info block.
 
 ## Sample rates and the audio clock
 
@@ -317,10 +327,23 @@ SPLIT feature, not two unrelated modes.
 - **An S-0808 on M emits no `cfea` announce; an S-1608 on M emits one about once a second.** A
   box on M never cold-connects, so it never presents as a joinable slave to a console — a console
   can neither grant it nor slave to it.
-- **A box on M does grant a slave joining its split output.** The master side **echoes the
-  joining box's own `cdea 04 03` records** — one echo per distinct record, plus its own `0000`
-  head_mark — and that echo is the grant, the same mechanism a console uses (§4 of
-  [`docs/mixer-protocol.md`](docs/mixer-protocol.md)).
+- **A box on M does grant a slave joining its split output**, and the whole grant is three
+  records. The joining box sends `0100` join, `0000` head_mark and `0302` box-ready; **1.9 ms
+  later the master sends the same three back**. The head mark and the box-ready record are
+  returned byte for byte; the join is normalised to `06 00 01 00` whatever value the box climbed
+  to (measured against a box joining with `06 00 03 00`), exactly as a console normalises it.
+  **There is no head-amp sweep and there are no `0500` identity requests** — a console sends 56
+  records to a 16-input box and 104 to a 32-input one; a box master sends three. It also sends no
+  ENROLL group map at all. MEASURED, two enrolments of the same pair, no console on the segment
+  (`reac-captures box-to-box-2026-09-13`, t = 1789331549.47 and 1789331585.01).
+- **A box master never de-enrols the box it lost.** Through a 42.6 s absence its `cfea` stays
+  byte-identical — `slot_total 0x10` (its own width, against a console's `0x28`),
+  `box_in_width 0x08`, `box_count 0x0001` — and it never updates the width to the 32-input box
+  that enrolled. A console drops `box_count` to 0 and changes `box_in_width` within seconds.
+- **Its first scene transfer after the peer returns is short.** It declares `0x22c8` = 8904 and
+  delivers 8748 (335 chunks instead of 341), then repeats the transfer complete 2.290 s later.
+  Identical in both enrolments, and not capture loss: the frame counter is contiguous across
+  every frame of both transfers.
 - Its **REAC LED is lit and steady — identical to synched** — because its port really is fine.
   The lamp reports the box's view of its link, never whether it is talking to a given peer.
 
