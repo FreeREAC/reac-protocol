@@ -294,9 +294,14 @@ uplink out through its own outputs — clock-slave on the uplink side, master on
 output side — the mechanism the SP (split) position exists for: one box's I/O
 shared between two consoles.
 
-Whether a box on M ever sends a head-amp sweep to a slave that joins it — the way a
-desk does — is not verified; no such record has been observed on the wire in that
-direction.
+A box on M sends no head-amp sweep, no identity requests and no group map to a slave
+that joins it: the whole grant is the three records the slave declared, echoed back
+(`box-to-box-2026-09-13`, an S-1608 on M enrolling an S-4000S twice, against 56 or
+104 records from a console enrolling the same boxes). That is the purpose of the M
+position: a box whose head-amps were set beforehand runs a segment on its own, with
+no console on it, and any program on the wire takes the audio as it is. Head-amp
+control over a box on M does not exist on the wire, so a surface shows those controls
+as unavailable, never as broken.
 
 ## 10. Control-block kinds, by their two-byte tags
 
