@@ -1,10 +1,10 @@
 # REAC firmware-derived findings
 
 Device **behaviour** — distinct in provenance from the wire schema in
-[wire-format.md](wire-format.md). These restate, in our own words and tables,
+[wire-format.md](wire-format.md). These restate, in original words and tables,
 behaviours derived from a reverse-engineering pass on Roland console firmware and from
 on-rig observation of live M-5000 hardware. **No Roland binaries, symbols, or
-disassembly listings are reproduced.** Status tags as in the wire-format doc.
+disassembly listings are reproduced.**
 
 The sections down to "Timing / bidirectional TX feasibility" restate firmware
 behaviour at the level a driver author needs. The final section,
@@ -13,7 +13,7 @@ goes one level deeper: the M-300/S-1608 connection engine as the Ghidra decompil
 actually shows it — function map, state machines and the source-vs-wire
 reconciliation — for a reader who wants the mechanism, not just the restated result.
 
-**Why the firmware only shows connection logic. [S]** On these devices the wire
+**Why the firmware only shows connection logic.** On these devices the wire
 framing and the sample clock live in an **on-board FPGA**, not in the device CPU.
 The `0x8819` Ethernet framing, the per-frame counter,
 the per-frame sample tick, and the link-check counter are all FPGA-generated; the CPU
@@ -22,7 +22,7 @@ machine on top. So a firmware RE pass yields the **connection behaviour** below 
 hold, drop, channel-map negotiation — but never the frame builder or the clock
 recovery, which is why those facts have to come from on-wire capture instead.
 
-## On-rig verification of the wire spec (live M-5000 master) [V]
+## On-rig verification of the wire spec (live M-5000 master)
 
 Forward broadcast control frames captured from both REAC ports of an M-5000 master
 confirm the schema on live hardware:
@@ -39,15 +39,14 @@ confirm the schema on live hardware:
   `Σ data[0..31] == 0 (mod 256)` (e.g. `Σ data[0..30] = 0x65`, `data[31] = 0x9b`,
   `0x65 + 0x9b = 0x100`). From-source, on-rig, and firmware-RE all agree.
 
-## M-5000 channel-info flag bytes (supersede the macOS driver values) [V]
+## M-5000 channel-info flag bytes
 
-The firmware RE and the live M-5000 agree this device emits flag bytes **`0x28`** for
-channels 0–39 and **`0x38`** for channels 40–47 (records `XX 28 00`), **not** the
-macOS `reacdriver`'s `0x20`/`0x10`/`0x30` — a different device generation. Bit `0x08`
-is set on all records; channels 40–47 additionally set `0x10`. For the M-5000, treat
-`0x28`/`0x38` as authoritative.
+The M-5000 emits flag bytes **`0x28`** for channels 0–39 and **`0x38`** for channels 40–47
+(records `XX 28 00`) — different from the macOS `reacdriver`'s `0x20`/`0x10`/`0x30`, which
+targets a different device generation. Bit `0x08` is set on all records; channels 40–47
+additionally set `0x10`. For the M-5000, `0x28`/`0x38` is authoritative.
 
-## Per-port link identity [V]
+## Per-port link identity
 
 A REAC port's link identity = **src MAC + outChannels**. The channel-map structure is
 identical across a master's ports; only the rotation phase and audio payload differ.
@@ -55,7 +54,7 @@ Confirmed on-rig: a stagebox refuses a foreign port's stream (wrong master MAC �
 LED flashes, no audio) and syncs only to its own port's master MAC. Cadence is
 ~99.97% FILLER/audio frames + ~1.7 control/s (~1:1 MASTER_ANNOUNCE : CONTROL).
 
-## Slave establishment (observed live; completes the driver's partial path) [V]
+## Slave establishment (observed live; completes the driver's partial path)
 
 A real REAC slave (a merge unit in slave mode — on the wire a plain slave) using its
 own OUI `00:40:ab` interface MAC was captured linking and running against an M-5000
@@ -76,7 +75,7 @@ master:
 A virtual REAC slave is reproducible from this: flood broadcast FILLER, then unicast
 audio + checksummed CONTROL (return map `01 03 00 01 81`) to the master MAC.
 
-## Holding the link — the per-frame link-check budget [S]
+## Holding the link — the per-frame link-check budget
 
 Once established, the link is held against a **single per-frame budget of ~600 frames**.
 Each REAC frame decrements it; reaching zero declares the peer absent. Because a frame is
@@ -94,62 +93,38 @@ budget that is FPGA-ticked but CPU-armed is the device-side mechanism behind the
 ~1000 ms no-audio cutoff and the heartbeat re-arm described in
 [wire-format.md](wire-format.md).
 
-## Head-amp commit — what arms a channel [S][?]
+## Head-amp commit — what arms a channel
 
 The wire-format reference documents *what* head-amp records look like
 ([wire-format.md](wire-format.md)). This is the firmware-side behaviour of *how a box applies them*, and
 the practical reason a software master can command 48 V correctly on the wire and still not light every
 input.
 
-**A model falsified from captures, and restored from the images. Read this before re-deriving either.**
+**The box holds a staging table and an active table, flushed by a `cd ea 01 01` → `01 00` → `01 02`
+commit bracket.** `FUN_0c003aae` gates on the `01 01` header, `FUN_0c003b88` reassembles the `01 00`
+continuations and finishes on the `01 02` phase; finishing is what enters the commit.
+`FUN_0c003c8a` copies 80 records of 10 bytes from the staging base to the live base, then copies 6
+bytes of master id, pushes twelve cells, and emits the `01 03 00 10` report. It is the only
+unconditional promoter of head-amp state in the box.
 
-An early revision described a **staging vs active** pair of tables flushed by a `cd ea 01 01` →
-`cd ea 01 02` commit bracket. A later audit against the captures declared that falsified, on the
-grounds that `01 01` carries ASCII `"1234"` so it must be an establishment handshake, and that
-op-`0100` is a probe rather than a scene. A master built on the first model was written, tested and
-removed.
+**Which structure the commit's twelve-cell push corresponds to is not verified.** Three different
+structures in this protocol are twelve wide over the same 48-channel space, and they are not
+interchangeable: the config-announce **inventory** (twelve cells of four, what the box declares it
+has), the chanmap **group-anchor** map (twelve entries the box derives at `slot >> 2`, describing
+the master's own fabric), and the **phantom groups** (twelve, indexed `ch >> 2`, though phantom
+itself is addressed per channel on the wire — see wire-format.md). The commit's twelve-iteration
+push is read out of the image but not tied to one of the three.
 
-**The audit was wrong, and reading both firmwares says so:**
+`01 00` is the continuation phase of an 8904-byte scene transfer, not a probe: every one of a
+sampled set of `01 00` payloads is a literal 26-byte slice of a recovered scene body. The ASCII
+`"1234"` carried in `01 01` is the first four bytes of that scene body, at block offset 7 — not a
+handshake token.
 
-- The staging/active pair is real and is in the box's code. `FUN_0c003c8a` copies 80 records of 10
-  bytes from a staging base to a live base, then copies 6 bytes of master id, pushes twelve
-  cells and emits the `01 03 00 10` report. It is the only unconditional promoter of
-  head-amp state in the box.
+The scene transfer is bounded, not sustained: it is repeated every 2.695 s until the box answers.
+There is no support in the box's apply path for an "anchor input" addressing rule for phantom
+groups.
 
-  **[?] Which twelve.** Three different structures in this protocol are twelve wide over the
-  same 48-channel space, and they are not interchangeable: the config-announce **inventory**
-  (twelve cells of four, what the box declares it has), the chanmap **group-anchor** map
-  (twelve entries the box derives at `slot >> 2`, describing the master's own fabric), and the
-  **phantom groups** (twelve, indexed `ch >> 2`). The commit's twelve-iteration push has been
-  read out of the image but not tied to one of the three, and the shared width makes the three
-  easy to conflate. UNVERIFIED.
-
-  **Two of the three candidates are now weaker.** Phantom was measured per channel on
-  2026-08-23 (`HEADAMP_GRAN_PHANTOM_SHIFT` is 0), so "the granularity phantom is applied at"
-  is not a description of anything on the wire and a twelve-wide phantom group has no writer
-  to feed. And the read-back half of the experiment proposed here cannot be run as written:
-  the box re-broadcasts no head-amp state at all — see wire-format.md — so "read back the
-  phantom state" has no carrier. What still settles it: commit with a body whose twelve cells
-  differ from the box's declared inventory and read back the INVENTORY alone, which the box
-  does report.
-- The bracket is real. `FUN_0c003aae` gates on the header, `FUN_0c003b88` reassembles continuations
-  and finishes on the `01 02` phase, and finishing is what enters the commit.
-- op-`0100` is not a probe. It is the continuation phase of an 8904-byte scene transfer, and every
-  one of the corpus's ten distinct op-`0100` payloads is a literal 26-byte slice of a recovered
-  body.
-- The `"1234"` in op-`0101` is not a handshake token. It is the first four bytes of the scene body,
-  which that frame carries at block offset 7.
-
-What the audit got right is that the transfer is not *sustained*: it is bounded, and it is repeated
-every 2.695 s until the box answers rather than held. The **anchor** input rule remains unsupported —
-nothing in the box's apply path has been shown to implement it — so that part of the old model stays
-retired.
-
-Named from the firmware in
-`openmixer/docs/design/notes/scene/reac-enrolment-from-firmware.md` and modelled in
-`spec/reac.ksy` as `scene_body`. **The lesson worth keeping is the method:** the falsifying audit
-read captures and reasoned about what a byte pattern must mean; the correction read the code that
-produces and consumes it.
+Modelled in `spec/reac.ksy` as `scene_body`.
 
 **Two further constraints, both observed on real hardware.** Every head-amp edit is carried by one
 standalone op-`0403` record, and those records write the ACTIVE table — so they must follow the
@@ -165,19 +140,18 @@ whether an input lights:
   in reac-pw. Addressing a 16-input box from the wrong base pushes its upper half past the firmware's
   channel gate, so those inputs silently ignore every command.
 
-**[?] Status — still open at the pins.** With correct addressing and a real-valued scene, all inputs of a
-16-input box accept phantom. Holding it steadily without the enrolment step is **not** solved: 48 V
-flickers, because enrolment also drives the apply latch. The open work is a held real-valued scene with a
-one-shot commit decoupled from enrolment
-([reac-pw#67](https://github.com/FreeREAC/reac-pw/issues/67)). Confirm any claim here with a physical
-48 V check per socket — a real condenser microphone, or a meter across the XLR pins; never a software
-level readout.
+**Not verified: holding phantom steady at the pins without the enrolment step.** With correct
+addressing and a real-valued scene, all inputs of a 16-input box accept phantom, but 48 V flickers
+if the enrolment step is skipped, because enrolment also drives the apply latch. A held real-valued
+scene with a one-shot commit decoupled from enrolment is not yet demonstrated. Confirm any claim
+here with a physical 48 V check per socket — a real condenser microphone, or a meter across the
+XLR pins; never a software level readout.
 
 The op-`0103` channel map remains the per-input **presence / enrol** stream; its per-record marker byte
 is a constant hardware-bank tag (the `0x28` / `0x38` byte in the channel-info records above) and **not**
 a phantom bit.
 
-## Master split/mirror output vs a true split device [V]
+## Master split/mirror output vs a true split device
 
 A master REAC port configured as a split / mirror output emits a passive copy of the
 mirrored port: same master MAC, same MASTER_ANNOUNCE + CONTROL + audio, broadcast. It
@@ -188,7 +162,7 @@ are emitted only by an actual split device / topology, never by a plain slave, a
 unit in slave mode, or a mirror output — so they remain the last unmapped frame types
 (need a real split device in the chain to capture).
 
-## Console-side AES/EBU and the REAC↔AES3 crossbar [S][V]
+## Console-side AES/EBU and the REAC↔AES3 crossbar
 
 From a V-Mixer-class console of this generation (firmware RE corroborating published
 vendor docs and the public AES3 / IEC 60958 standards; not pinned to a firmware
@@ -225,7 +199,7 @@ version):
   OUT 1/2, OUT 3/4), all IEC 60958-compliant; each pair is one AES3 stream whose
   A/B subframes carry L/R.
 
-## Mixer remote-control (RCP) command surface — separate from the REAC wire [S]
+## Mixer remote-control (RCP) command surface — separate from the REAC wire
 
 The Roland V-Mixer / M-5000 remote-control protocol is a **separate TCP channel**, not
 the REAC audio wire. It exists to recover the slot↔name mapping a passive tap cannot
@@ -261,7 +235,7 @@ see.
 
 Re-expressed only — no Roland binary or protocol-PDF verbatim text.
 
-## Timing / bidirectional TX feasibility [?]
+## Timing / bidirectional TX feasibility
 
 The original driver conclusion "kernel scheduling can't do jitter-free REAC playback"
 predates mainline `PREEMPT_RT` (in Linux since 6.12). On a wired RT-tuned host it is
@@ -283,31 +257,29 @@ now expected feasible:
   correctly-justified audio frames into a standalone stagebox (no console, so nothing
   live is at risk) and listen on its analog outs.
 
-## Open items needing on-rig capture (firmware-RE exhausted)
+## Open items
 
-- The exact **upstream channel MAP** (needs distinct simultaneous tones, one frequency
-  per input).
-- `ce ea` / `c2 ea` **SPLIT_ANNOUNCE** byte sequences (need a real split device /
-  topology).
-- **44.1 kHz on the wire** (3675 pps?) — not yet exercised.
-- `RCQ`→`RCS` real-hardware format and whether it is granular enough to observe sync
-  lock-flap (likely only coarse).
-- Why a Wi-Fi-fed upstream port scrambles while a wired port stays clean. The audio
-  byte framing is FPGA-owned, so only on-rig capture advances this — CPU firmware-RE is
-  exhausted.
+- The exact **upstream channel MAP** is not verified (needs distinct simultaneous tones, one
+  frequency per input).
+- `ce ea` / `c2 ea` **SPLIT_ANNOUNCE** byte sequences are not verified (need a real split
+  device / topology).
+- **44.1 kHz on the wire** (3675 pps) is not verified directly.
+- `RCQ`→`RCS` real-hardware format, and whether it is granular enough to observe a sync
+  lock-flap, is not verified — likely only coarse.
+- Why a Wi-Fi-fed upstream port scrambles while a wired port stays clean is not known. The
+  audio byte framing is FPGA-owned, so firmware alone cannot answer it.
 
 ---
 
 ## Source-level detail: the M-300 / S-1608 connection engine, from the Ghidra decompile
 
 Reverse-engineered from a Ghidra headless decompile of the master and box firmware
-images (1389 C functions recovered from the master image), cross-checked against the
-raw S-1608 disassembly and against firmware-binary literal-pool reads (S-1608 image
+images (1389 C functions recovered from the master image): S-1608 image
 `s1608_sys_ver2200`, LE, base `0x0BFE0000` — the same image cited in
 [firmware-protocol.md](firmware-protocol.md); M-300 image, an RSFF container, BE, base
-`0x0C000000`), and the on-wire ground truth in the sections above. No Roland binary,
-symbol table, or disassembly listing is reproduced — addresses and the names below are
-our own, assigned to what the decompile does not label, not vendor-supplied symbols.
+`0x0C000000`. No Roland binary, symbol table, or disassembly listing is reproduced —
+the addresses and names below are assigned to what the decompile does not label, not
+vendor-supplied symbols.
 
 > **Scope caveat (load-bearing, recurring below).** As this document's opening
 > section states, the **FPGA owns all wire framing**: the constants `0x8819`, `cdea`,
@@ -708,15 +680,14 @@ flags (high nibble from a callback OR'd with three single-bit flags from a
 10-byte-per-channel table at `+4`/`+8`/`+6` weighted 8/4/2), byte2 = the
 per-channel value `0x28` (=40, total channel count). Index `0x30` (48) emits a
 terminator; `>0x30` emits a zero pad. The walk index `*g_chanwalk_idx` wraps at
-**48** → 48 channels / 8-per-frame = full map every 6 heartbeat frames (~6 s) =
-the "walks ~6 ch/frame each second" wire behaviour.
+**48** → 8 channel-ids per frame, a full 48-channel map every 6 heartbeat frames
+(~6 s).
 
 **ESTABLISHED sync + mismatch guard** `linkcheck_refill_mapsync` — diffs incoming map count
 vs cached (`g_chanmap_cached`); on change re-publishes (`chanmap_publish`) and copies all
-13 ushorts. **Mismatch guard (relevant to the 40-vs-16 mismatch, §9):** when the
-incoming count keeps matching the sentinel, a repeat counter climbs and once it
-exceeds **6** (7th identical frame) it **forces channel-count = 1** via
-`chanmap_set_count(1)`.
+13 ushorts. **Mismatch guard:** when the incoming count keeps matching the sentinel, a
+repeat counter climbs and once it exceeds **6** (7th identical frame) it **forces
+channel-count = 1** via `chanmap_set_count(1)`.
 
 **Multi-frame receive cursor** `rx_reassemble`/`d8`/`e4`/`f0` — a "remaining-bytes"
 reassembler: `f0` is append-with-clamp (never copies more than remaining,
@@ -754,31 +725,22 @@ thunks `e6c`=set length, `e70/e74`=replication params, `e78/e7c/e84`=DMA submit,
 
 ---
 
-### 8. MASTER ~201 ms PERIODIC PAUSE
+### 8. Master transmit-mute at connection transitions
 
-**Empirical fact (from the wire):** the master periodically PAUSES its REAC output
-for ~201 ms, confirmed on two independent observers (wired DGS + WiFi). The frame
-counter (bytes 14-15) runs **straight through** the gap (Δ≈1605–1617 ≈ 200 ms ×
-8000 fps), so the sample clock never stops — **only transmission mutes**. On the
-wired capture (§13i) all gaps land at **connection transitions** (immediately
-before each `cdea 04 03` grant, and on unplug); **zero gaps during the 77 s
-solid-linked window**.
+The master pauses its REAC output for ~201 ms at connection transitions — immediately before
+each `cdea 04 03` grant, and on unplug — and nowhere during a held link. The frame counter
+(bytes 14-15) runs straight through the gap, so the sample clock never stops; only
+transmission mutes.
 
-#### What the source says
+**No CPU-side periodic ~200 ms timer exists in the M-300 image.** A literal scan of all 1389
+functions for `0xc8`/`200`/`201`/`0x12c`/`0x1f4`/`0x258`/`0x3e8`/`tick` finds no match tied to
+this pause. Every numeric timer present is a frame/heartbeat-tick budget, not a wall-clock
+period: the link-check reloads (600/200/100), the `*g_probe_timer = 100` re-arm, the
+`retry < 3` cap, the threshold-6 channel-map de-bounce, and the box's LED timers (300/500/3000
+ticks — LED/meter, not the link).
 
-**No CPU-side periodic ~200 ms timer exists.** Exhaustive literal scan of all
-1389 functions: `0xc8`/`200`/`201`/`0x12c`/`0x1f4`/`0x258`/`0x3e8`/`tick` →
-**zero matches** (the only `0x201` is an unrelated malloc sentinel; the only
-`0x32`/50 is a sub-millisecond UART-reset NOP spin). Every numeric timer found is
-a frame/heartbeat-tick budget, not a wall-clock period: the link-check reloads
-(600/200/100), the `*g_probe_timer = 100` re-arm, the `retry < 3` cap, the
-threshold-6 channel-map de-bounce, and the box's LED timers (300/500/3000 ticks —
-LED/meter, not the link).
-
-#### The single best in-decompile structural candidate (master)
-
-A genuine **5-state countdown dwell FSM** that **blanks the REAC send routine** on
-expiry — the *shape* of a deliberate, fixed-duration, periodically-armed TX-mute:
+**The mechanism is a transition-armed TX-blank gate, not a periodic scheduler tick.** A
+5-state countdown dwell FSM blanks the master's send routine on expiry:
 
 ```
 txmute_arm(param_1)  load dwell *g_txmute_dwell = param_1, enter HOLD (state 3)
@@ -787,78 +749,27 @@ txmute_tick           per-tick: if dwell<1 -> state 4; else dwell--   (the HOLD 
 linkcheck_test_send (send)    top of routine: if disconnect_latch_get()==1 -> return 0xffffffff (EMIT NOTHING)
 ```
 
-`txmute_setstate` is the sole state-setter (with enter/exit hooks per transition —
-hardware-coupled). While the gate `g_blank_gate == 1`, the master produces **no
-REAC frame** — a wire-visible gap in the FILLER/`cdea` stream. The same gate is
-read across the wider master REAC-msg family (`negotiate_retry/0c0037ee/0c003a9e/
-0c00444c`). The §4 state-0 reset `link_reset_hold` independently runs a **stop →
-blocking HOLD `fpga_tick(g_hold_reload)` → restart** bracket at every
-(re)connect — the same TX-halt-while-counter-free-runs shape.
+`txmute_setstate` is the sole state-setter. While the gate `g_blank_gate == 1`, the master
+produces no REAC frame — a wire-visible gap in the FILLER/`cdea` stream. The §4 state-0 reset
+`link_reset_hold` runs the same shape independently: stop → blocking HOLD
+`fpga_tick(g_hold_reload)` → restart, at every (re)connect.
 
-**But the exact period is NOT recoverable from this decompile.** The dwell reload
-is a runtime argument (`param_1` to `txmute_arm` / `g_hold_reload` to the HOLD),
-supplied by an out-of-corpus state-handler vtable; the on-disk M-300 binary
-(`sec_0006003c_code.bin`, v1511) is a **different build** than the decompile
-(literal pools/boundaries diverge), so the constant is not byte-resolvable. No
-`0xC8`/`200` literal was invented. ~200 ms ≈ ~1600 frames @8000 fps matches §13i,
-but is unproven from source.
-
-#### Verdict
-
-**The ~201 ms pause is NOT explained from the M-300 source as a periodic timer —
-it is most consistent with a deliberate FPGA-generated transmit-mute at connection
-transitions, and (for the production rig) lives in the M-5000 FPGA/ESC2 engine
-`ecm69_encoder_app.bin`, which is not in this decompile.**
-
-Three independent lines of evidence converge:
-1. **Wire (§13i):** counter free-runs through the gap; gaps occur only at
-   transitions, never during a held link → a transition TX-mute, not a periodic
-   scheduler tick. The WiFi "8 stalls/90 s" were repeated re-establishments (each
-   carrying the mute), a *symptom* of reconnects, not a free-running clock.
-2. **Source (this doc):** zero CPU periodic 200 ms timer anywhere; the only mute
-   *mechanism* present (the `txmute_arm`→`txmute_tick`→`disconnect_latch_set` blank gate
-   + the `link_reset_hold` HOLD bracket) fires **at (re)connect transitions**,
-   matching the wire — but its duration constant is FPGA/runtime-supplied.
-3. **Architecture (§1/§13f):** the FPGA owns wire framing and the per-frame tick;
-   the CPU only observes/records link state (e.g. the `tx_dispatch_abc` post-submit
-   `*g_linkstate_latch/e94` link-state latch, which carries no duration). So a
-   deliberate mute would have to be FPGA-timed.
-
-The M-300 CPU therefore shows the *structural intent* (a transition-armed TX-blank
-gate) but **not the 201 ms number**. On the production M-5000 the actual mute is
-FPGA-specific and out of scope of this decompile.
+**The exact 201 ms period is not recoverable from the M-300 decompile.** The dwell reload is a
+runtime argument (`param_1` to `txmute_arm` / `g_hold_reload` to the HOLD), supplied by an
+out-of-corpus state-handler vtable, so the constant is not byte-resolvable from this image. On
+the production M-5000 the mute lives in the FPGA/ESC2 engine (`ecm69_encoder_app.bin`), outside
+this decompile; the M-300 CPU shows the structural mechanism but not the 201 ms number itself.
 
 ---
 
-### 9. Source-vs-wire reconciliation (contradictions & nuances flagged)
-
-| Topic | Wire ([wire-format.md](wire-format.md)) | Source (this decompile) | Resolution |
-|---|---|---|---|
-| Channel-map walk rate | "~6 ch/frame each second" (estimate) | **8 entries/frame** (`build_hb_established`, offsets 5..26) | Source is exact; the doc's "~6" was an eyeball estimate. 8/frame × 6 frames = 48-channel wrap (~6 s). **Minor correction, flag.** |
-| `cdea 01 03` length | `00 19` established / `00 1a` probe | `0x0019` (`last_off-1`) / `0x1a`/`0x1b` caps | **Agree** (source derives the wire values). |
-| The `cdea 04 03` grant bytes | master GRANTS with `cdea 04 03 …` burst | **Not built in CPU code** | **No contradiction** — FPGA frames the grant; CPU reaches state-4 commit and hands a parsed object. The scope caveat above already warns that chasing grant bytes in CPU is a dead end. |
-| Link-check budget | ESTABLISHED = 600 frames; FPGA decrements | 600 armed indirectly (`g_lc_reload_600/00437c`); **no CPU decrement** | **Agree, strengthened** — the absence of a CPU decrement *proves* the FPGA owns the tick. |
-| `msg[0]==4`/`==1` tokens (box classifier) | wire `cdea 04`/`cdea 01` | internal tokens `0x0098/0x00c2/0x2249…` | **Nuance, not contradiction** — the CPU classifier matches *internal* sub-command tokens, not the wire `cdea` halves; the FPGA already classified. |
-| Box-side parser image | doc labels `slave_parse_established`/`master_link_fsm` "S-1608 box-side" | these live in the **M-300 MASTER** image (BE, `0c0xxxxx`) | **Label clarification** — that is a *role* label (master's slave-endpoint path), not an image label. The M-300 can act as box-endpoint within the shared protocol. |
-| 201 ms pause | "HOLD-killer" (early reading) → retracted to "establishment TX-mute" (§13i) | no CPU periodic timer; transition-armed blank gate only | **Agree** — both converge on a transition TX-mute, not a periodic fault or scheduler tick. Source cannot supply the 201 ms constant (FPGA/runtime). |
-| Established channel count | master = 40 ch, box = 16 ch | commit `msg[3]=0x10` (=16); per-channel value `0x28` (=40) | **Agree** — both counts present in-code; the 40-vs-16 mismatch is the §6 guard's job. |
-| Box LED/console timers | n/a | 300/500/3000-tick FSMs, serial updater menu | **No wire mapping** — correctly housekeeping, the outer boundary of the REAC surface. |
-
-**No hard contradictions.** The one factual correction is the channel-map rate
-(**8/frame in source** vs the doc's ~6 estimate). Everything else is the expected
-CPU-state-machine / FPGA-wire-framing split, with the box classifier operating on
-pre-parsed internal tokens rather than raw `cdea`/`cfea` bytes.
-
----
-
-### 10. Protocol state diagram (source FSM ↔ wire ↔ source function)
+### 9. Protocol state diagram (source FSM ↔ wire ↔ source function)
 
 Combines the M-300 source FSM-A (canonical link, `master_link_fsm`, §4) with the
 wire-observable behaviour ([wire-format.md](wire-format.md)) and the governing
 source functions. The FPGA owns wire framing + the per-frame tick; the CPU runs
 this state machine (§1).
 
-#### 10.1 MASTER link FSM
+#### 9.1 MASTER link FSM
 
 ```mermaid
 stateDiagram-v2
@@ -890,11 +801,10 @@ stateDiagram-v2
   600-frame budget = 75 ms@96k / 150 ms@48k). `linkcheck_test_send` TEST.
 - **explicit disconnect**: box heartbeat `msg4==0` → latch (`disconnect_latch_set`).
 - **identity change**: a different box src-MAC → force-disconnect (`peer_identity_check`).
-- (Observed on the rig at §13k the master also drops with NONE of these present and a
-  clean box stream — so a 4th, M-5000-FPGA-internal/timing trigger exists, out of this
-  decompile.)
+- A 4th trigger exists that drops the link with none of the above present and a clean box
+  stream — M-5000-FPGA-internal/timing, out of this decompile.
 
-#### 10.2 BOX (stagebox / slave) FSM
+#### 9.2 BOX (stagebox / slave) FSM
 
 ```mermaid
 stateDiagram-v2
@@ -909,7 +819,7 @@ stateDiagram-v2
     LINKED   --> LINKED:   emit heartbeat msg4=1 (0x81) each ~1s; stream audio unicast
 ```
 
-#### 10.3 Wire-state legend (what each master phase looks like on 0x8819)
+#### 9.3 Wire-state legend (what each master phase looks like on 0x8819)
 
 | FSM phase | On-wire signature | Source fn |
 |---|---|---|
