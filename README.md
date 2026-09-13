@@ -41,10 +41,6 @@ Communications*.
   `#define` block, an importable Kaitai type and a block of `_Static_assert`s from it;
   `spec/facts_xcheck.py` holds the grammar to it and `spec/xcheck_ctrl_oracle.py` makes
   libreac build frames the generated parser has to read back.
-- **[convergence-defects.md](convergence-defects.md)** — where the two expressions of the
-  protocol disagree, written down rather than reconciled quietly, each with its resolution
-  or the measurement that would settle it. SENS, the one openly contested number, is
-  resolved: one decibel per step over all 56, measured by electrical loopback.
 - **[firmware-protocol.md](firmware-protocol.md)** — the protocol as the DEVICE FIRMWARE
   states it, rather than as the wire shows it: the class names the images still carry, the
   message inventory read out of the receive dispatch (including the arms nobody has ever
@@ -59,7 +55,10 @@ Communications*.
   firmware RE and live-hardware observation, re-expressed: on-rig verification,
   slave establishment, the **head-amp commit model** (what actually arms a channel,
   and the staging-vs-active theory that was falsified), the AES/EBU crossbar, the
-  remote-control (RCP) command surface, and bidirectional-TX feasibility.
+  remote-control (RCP) command surface, and bidirectional-TX feasibility. Its final
+  section goes source-level: the M-300/S-1608 connection engine as the Ghidra
+  decompile shows it — function map, the three master FSMs, the box FSM, and a
+  point-by-point reconciliation against the wire.
 
 ## Status tags
 

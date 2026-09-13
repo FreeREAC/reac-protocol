@@ -221,11 +221,46 @@ doc: |
                                  and the WHOLE TRANSFER AGAIN every 2.695 s
     +17.8 s              box     op 01 03 page 0x0010 config-announce, then
                                  op 04 03 tags 0100 / 0000 / 0302, then heartbeat
+                                 [AMENDED 2026-09-09: that is the GRANT, not the join.
+                                  A joining box sends TWO records - 0100 JOIN then 0302
+                                  BOX_READY - and the MASTER answers three: echo(0100),
+                                  its OWN 0000 head_mark, echo(0302). Measured both ways:
+                                  an S-0808 joining an S-1608 sent two and was answered
+                                  with three; an S-1608 joining an S-0808 sent three and
+                                  drew three echoes, and a replay with its second record
+                                  repeated drew only two, so the master echoes one per
+                                  DISTINCT record. The joining box then sends its FIRST
+                                  HEARTBEAT on the very next frame, BEFORE the grant:
+                                  16.1162 JOIN, 16.1164 BOX_READY, 16.1165 heartbeat,
+                                  grant at 16.118.]
     +19.5 s              master  the head-amp sweep: 48 op 04 03 TAG 0101
                                  records in 0.145 s — 16 wire channels 0x20..0x2f
                                  x phantom, pad, sens
     after                master  back to 1 Hz cfea + page 0x0019; the scene
                                  transfer never runs again for this session
+
+  THE FILLER'S CONTROL AREA CARRIES THE JOINING BOX'S STATE [added 2026-09-09]. Sixteen
+  `00 xx` pairs across block[0:32], and xx moves with the enrolment:
+
+      zero   before the config-announce            (48 frames measured)
+      0x52   from the announce until the grant     (8691 frames - the whole wait)
+      0x7a   once granted                          (the rest of the session)
+
+  Replaying a granted enrolment with the 0x52 window zeroed is REFUSED by an S-1608 in
+  master mode, and it is the only variant of that file which is; an S-0808 in master mode
+  tolerates zeros there. There is no name for the field in this grammar yet; "requesting"
+  is what the wire shows it to mean.
+
+  A STAGEBOX ON M PAIRS WITHOUT A COURTSHIP OF ITS OWN [added 2026-09-09]. An S-0808 in
+  master mode emits no `cfea` announce at all and no probe cycle - only a scene transfer and
+  a ~1 Hz chanmap - and it grants a slave that finds it by flooding. An S-1608 in master mode
+  DOES emit `cfea` about once a second, and the box that joined it broadcast nothing at all:
+  a master that calls is not hunted. Both grant by echoing the joining box's own records.
+
+  THE CONFIG-ANNOUNCE DECLARES THE DECLARER [added 2026-09-09]. Selector 0x80 and
+  board_config_code 0 in both directions, and the port table is the sender's own inventory -
+  `01 01 01 01 02 02` from an 8-input box, `02 02 02 02 01 01` from a 16-input one, each
+  granted by the other. It is NOT the table of the peer being addressed.
 
   Two properties of that order are easy to get wrong and both are load-bearing:
 
@@ -674,11 +709,19 @@ types:
       - id: console_field
         type: u1
         doc: |
-          Console generation - 0x00 V-Mixer (M-200 / M-300), 0x01 OHRCA
-          (M-5000). The same 0/1 also appears as the ENROLL console byte AND as
-          the scene body's `revision` (+0x14). ALL THREE MUST AGREE: a master
-          that announces one generation and pushes a scene declaring the other
-          is making a claim its own record contradicts.
+          The PACE CODE the box follows - 0x00 = 48 kHz, 0x01 = 96 kHz,
+          0x02 = 44.1 kHz. Measured 2026-09-11 on one desk (M-200 c9:cc:03):
+          0x00 while mastering at 48 kHz, 0x02 while mastering at 44.1 kHz;
+          the M-5000 captures write 0x01 at 96 kHz. Until that day the byte was
+          read as the console generation (0x00 V-Mixer M-200/M-300, 0x01 OHRCA
+          M-5000) - a coincidence of a corpus in which every V-Mixer session
+          ran 48 kHz and every OHRCA session 96 kHz; a desk does not change
+          generation with its clock. A box obeys the BYTE, not the cadence: an
+          S-4000S driven at 3675 frames/s with this byte at 0x00 returned
+          4000 frames/s (48 kHz). The ENROLL console byte and the scene body's
+          `revision` (+0x14) still carry the 0/1 generation and were NOT
+          re-measured at 44.1 kHz; whether they follow the pace code too is
+          open (the 44.1 kHz M-200 enrolment of 2026-09-11 is on file).
 
           THE ANNOUNCE PROPOSES; THE SCENE DECIDES. This byte is broadcast at
           1 Hz and a box may act on it, but it is not where a box's rate class
@@ -692,9 +735,28 @@ types:
           ENFORCEMENT IS FIRMWARE-DEPENDENT, and the two boxes only look
           contradictory until the model above is applied. EVIDENCED (rig): an
           S-0808 (firmware 1.003) follows this byte alone, scene revision
-          notwithstanding; an S-1608 (firmware 2.200) requires the scene to agree.
-          One rule covers both: propose in the announce, record in the scene,
-          stamp the record with `revision`.
+          notwithstanding — tool- and rig-verified 2026-08-26
+          (reac-captures analysis/rate_field_hunt.py over box-at-48k vs
+          box-at-96k: the box's own frames are byte-identical across rates, so
+          this box encodes no rate and just follows the master). An S-1608
+          (firmware 2.200) requires the scene to agree, per the EVIDENCED
+          paragraph above. One rule covers both: propose in the announce,
+          record in the scene, stamp the record with `revision`.
+
+          RATE CLASS, NOT (JUST) CONSOLE GENERATION: read naively this looks
+          like "console generation" and it correlates, because every desk in
+          the corpus ran one rate. But the V-Mixer family is HARDWARE-limited
+          to 48 kHz, so the only off-family rate a real desk can reach is an
+          M-5000 (OHRCA) running its own box at 48 kHz — and that answer is
+          forced: it requires this byte to read 0x00. Were the byte purely
+          "family", an M-5000 would always emit 0x01 and could never run its
+          box at 48 kHz. So the byte declares a rate class, and the family
+          names are what the two known classes are called; an M-5000 captured
+          at 48 kHz would confirm this directly, and has not yet been captured.
+
+          44.1 kHz has no distinct value on this byte — it is binary — so it
+          maps to 0x00 and the box runs 48 kHz; 44.1 is a graph/RME rate, not
+          a REAC-wire rate.
       - id: box_count
         type: u2
         doc: Enrolled boxes. 0x0000 idle -> 0x0001 once a box is granted; a
