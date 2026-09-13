@@ -87,10 +87,14 @@ instances:
       rate CLASS; the
       scene body's `revision` field (+0x14, SCENE_REVISION_OFF) is what a
       box actually
-      latches. 0x00 = V-Mixer (M-200 / M-300), capped at 44.1/48 kHz; 0x01 =
-      OHRCA (M-5000),
-      which alone reaches 96 kHz. Enforcement is FIRMWARE-DEPENDENT: an
-      S-0808 (fw 1.003)
+      latches. The value is the PACE CODE: 0x00 = 48 kHz, 0x01 = 96 kHz,
+      0x02 = 44.1 kHz.
+      The same code rides four fields of one enrolment: cfea[19], the scene
+      body's
+      `revision`, the chanmap section marker's flags byte (`fe <code> 00`)
+      and the ENROLL
+      group map's console byte (ENROLL[8]). Enforcement is
+      FIRMWARE-DEPENDENT: an S-0808 (fw 1.003)
       follows console_field alone; an S-1608 (fw 2.200) requires the scene's
       `revision` to
       agree with it, and otherwise holds its prior rate across a full cold
@@ -108,10 +112,11 @@ instances:
       only its name. What is independent of a mixer MODEL is a bare clock
       number; what gates
       the class is this announce-plus-scene pair.
-      44.1 kHz has NO distinct value on either field — both are binary — so
-      it maps to 0x00
-      and the box runs 48 kHz; 44.1 is a graph/RME rate, not a REAC-wire
-      rate.
+      RULED (operator, 2026-09-13): the field is the pace code, not a desk
+      family. An M-200
+      at 44.1 kHz writes 0x02 on all four carriers; "V-Mixer"/"OHRCA" were
+      only the names
+      of 0x00 and 0x01 while no desk had been captured at 44.1 kHz.
         [RIG-VERIFIED (2026-08-27): emitting 0x00 ran the live box at 48 kHz
         and 0x01 at 96 kHz,
       with a warm follow on a live change; box frames stayed byte-identical
@@ -138,10 +143,17 @@ instances:
       class, not merely the console generation. Operator ruling
       (2026-08-27): only OHRCA
       drives 96 kHz; V-Mixer is 48 kHz-limited (M-300 @ 96 k impossible).
-      The 44.1 kHz mapping
-      is DERIVED from both fields being binary, NOT wire-captured — no desk
-      has been captured
-      at 44.1 kHz.
+      WIRE-CAPTURED (2026-09-13, reac-captures m200-enrol-441k-2026-09-13
+      and
+      m200-enrol-s4000-441k-2026-09-13): an M-200 at 44.1 kHz (3675 fps
+      measured) enrolling an
+      S-1608 and an S-4000S emits cfea[19]=0x02 (46 announces), scene
+      `revision`=0x0002 (three
+      bodies, byte-identical), chanmap marker flags 0x02 (6 sweeps) and
+      ENROLL[8]=0x02 — the
+      same M-200 at 48 kHz writes 0x00 on every one of them, the eleven
+      other map bytes
+      identical. Both boxes paced 44.1 kHz.
       ]
   bytes_per_channel:
     value: 36
@@ -149,11 +161,10 @@ instances:
       12 samples x 3 bytes, per channel, at EVERY sample rate. The 36 in `52
       + n*36`. [EVIDENCED (corpus) at 48k and 96k; RATE-INVARIANT BY
       CONSTRUCTION (12 x 3).
-      44.1k is DERIVED, not observed: measuring pps straight from the pcap
-      timestamps puts
-      NOTHING in the 3675 band, while cleanly separating the 48k and 96k
-      files. The earlier
-      wording claimed corpus evidence across 44.1k and did not have it.
+      EVIDENCED (corpus) at 44.1k since 2026-09-13: the M-200 sessions in
+      m200-enrol-441k-2026-09-13 and m200-enrol-s4000-441k-2026-09-13
+      measure 3675 fps from the
+      pcap timestamps, with the same 52 + n*36 frame length.
       ]
   samples_per_pkt:
     value: 12
@@ -813,10 +824,10 @@ instances:
   scene_revision_off:
     value: 0x014
     doc: |
-      The generation byte — 0 on a V-Mixer desk, 1 on an M-5000. One of only
-      two fields an emitter fills in. [EVIDENCED (corpus) — 8 of 8904 bytes
-      vary across 27 real-desk bodies over three desk generations and four
-      box models.]
+      The pace code (0 = 48 kHz, 1 = 96 kHz, 2 = 44.1 kHz), the same value
+      as cfea[19]; see CONSOLE_FIELD_GATES_RATE. One of only two fields an
+      emitter fills in. [EVIDENCED (corpus) — 8 of 8904 bytes vary across 27
+      real-desk bodies over three desk generations and four box models.]
   scene_slots_off:
     value: 0x01a
     doc: |
