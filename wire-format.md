@@ -200,13 +200,17 @@ byte, marks the terminator.
 
 Other states stuff the interface MAC, a `0xc0 0xa8` (= 192.168) address prefix
 repeated twice, and the ASCII tag `SYSP` (`53 59 53 50`) into `data[]`. A further
-tag, `XVSCEN` (`58 56 53 43 45 4e`), is named in earlier notes but not verified on
-the wire — a search of the first 50 bytes of every frame in a large corpus found no
-instance; it would need to be sought in a reassembled scene body, which runs well
-past that window. This region is incompletely understood; treat `data[5..30]` of
-CONTROL frames as partial beyond the 5-byte prefix and the channel-info block. (The
-`0xc0 0xa8` bytes are a protocol fact — what a master stuffs into CONTROL frames —
-not anyone's network address.)
+tag, `XVSCEN` (`58 56 53 43 45 4e`), is named in earlier notes and is **not on the
+wire**. Three complete 8904-byte scene bodies reassembled from an M-200 at 44.1 kHz
+(`reac-captures m200-enrol-441k-2026-09-13`, t = 542.135952 / 544.831563 /
+547.525979, 343 frames each, declared length = recovered length, all three
+byte-identical) carry exactly three ASCII runs of four or more printable bytes:
+`1234` at +0x000, `SYSP` at +0x368 and `SCEN` at +0x37c. There is no `XVSCEN`, no
+`SYSPARAM` and no `SCENE` — the three positives are the control for the negative.
+This region is incompletely understood; treat `data[5..30]` of CONTROL frames as
+partial beyond the 5-byte prefix and the channel-info block. (The `0xc0 0xa8` bytes
+are a protocol fact — what a master stuffs into CONTROL frames — not anyone's
+network address.)
 
 ## Sample rates and the audio clock
 
@@ -760,11 +764,15 @@ establishment and conforms to the head-amp records once established.
 
 The head-amp push is **not on its own timer**. It follows a scene transfer (this document's name
 for the `cdea 01 00` bulk data bracketed by `01 01` start / `01 02` end markers) by exactly 4.4 s,
-with no drift. Whether an ASCII `SCENE` / `SYSPARAM` tag also sits inside that bulk data is not
-verified — the confirmed ASCII tag in this region is `SYSP`, at the start of the scene body itself
-(see above), not in the `01 01`/`01 02` markers. The console announces its own DSP state, waits
-4.4 s, then announces its box state (`04 03` records: the grant, the `05 00` records, and all 24
-head-amp records). One operation, two phases, locked.
+with no drift. The bulk data carries two four-byte ASCII tags and no longer ones: `SYSP` at body
+offset +0x368 and `SCEN` at +0x37c, neither of them in the `01 01`/`01 02` markers. `SCENE` and
+`SYSPARAM` are not on the wire. The console announces its own DSP state, waits 4.4 s, then
+announces its box state (`04 03` records: the grant, the `05 00` requests, and the head-amp
+sweep). One operation, two phases, locked.
+
+**The head-amp sweep is three records per input, so its length is the box's width.** An S-0808
+draws 24; an S-1608 draws **48** — 16 channels at base 0x20, params `0x00` phantom, `0x01` pad,
+`0x02` sens, measured record for record at both 44.1 kHz and 48 kHz from the same M-200.
 
 **What triggers a full assert is not known.** The interval between assertions is irregular and
 does not correlate with operator activity: consecutive scene transfers can recur every ~2.7 s for
