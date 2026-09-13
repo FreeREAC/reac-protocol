@@ -288,9 +288,9 @@ head-mark record, and that echo is the grant. A box on M can therefore be joined
 a slave, but it can never itself be enrolled by a console, since it never runs the
 cold-connect side of the exchange.
 
-A box on M holds no rate field of its own: with no uplink to recover a clock from,
-it free-runs at whatever rate it last locked to, and that persists across a power
-cycle. A box with an uplink instead re-drives the clock it recovers from that
+A box on M holds no rate field of its own and has no rate switch. An S-1608 in M
+mode paces 96 kHz: measured after it had run at 48 kHz as a desk's slave, and again
+after a power cycle, so its master-mode rate is not the rate it was last slaved at. A box with an uplink instead re-drives the clock it recovers from that
 uplink out through its own outputs — clock-slave on the uplink side, master on the
 output side — the mechanism the SP (split) position exists for: one box's I/O
 shared between two consoles.
