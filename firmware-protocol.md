@@ -3,19 +3,14 @@
 `wire-format.md` describes REAC as it appears on the wire. This document describes it as the
 **device firmware itself states it**: the classes the code is built out of, the messages its
 receive dispatch will accept, the state machine that accepts them, and the table layouts it
-reads and writes. A capture can only show what somebody happened to send. A dispatch arm is
-the protocol's own inventory, and it lists messages nobody on this rig has ever sent.
+reads and writes. A dispatch arm is the protocol's own inventory, and it lists messages a
+capture alone would not show — a receive dispatch can accept a message that the wire rarely
+or never carries.
 
 Every row carries a **provenance**: the image, the function symbol, and the address. A claim
-without one does not belong here.
-
-Every row also carries a **corroboration** state, and the two are deliberately separate:
-
-| tag | meaning |
-|---|---|
-| **CORROBORATED** | the firmware handles it AND the capture corpus contains it |
-| **FIRMWARE-ONLY** | the firmware handles it and no capture in the corpus has ever carried it — a capability we did not know we had |
-| **CORPUS-ONLY** | seen on the wire, no handler located in any image we hold |
+without one does not belong here. Each message is further marked by whether it is seen on
+the wire: a message the firmware handles but that never appears in a large capture corpus is
+marked **not seen on the wire**.
 
 ## The images
 
@@ -83,8 +78,8 @@ from the box.
 
 **Firmware update travels over REAC.** `CReacPrgMsg`, `CReacPrgMsgIF`, `CTDataPrgMsgParser`
 and `CReacTDataPrgTxMsg` are a program-transport family, and the S-4000S boot menu spells it
-out in plain text: `2. REAC Program update(XMODEM)` and `6. REAC Program update(MIDI)`. None
-of it appears in any capture we hold.
+out in plain text: `2. REAC Program update(XMODEM)` and `6. REAC Program update(MIDI)`. Not
+seen on the wire.
 
 Other firmware-carried strings worth having in one place: the RTOS task and mailbox names
 `REAC TData Tx Task`, `REAC TD Tx MailBox`, `ADBoard Tx MailBox`, `Remote-RX Task`,
@@ -96,12 +91,10 @@ The scene body's three ASCII tags are literals in the box image as well as on th
 `1234` at file `0x523fc`, `SYSP` at `0x52764`, `SCEN` at `0x52df8` — which is the box side of
 the three-tag gate `wire-format.md` describes.
 
-## Corroboration — what the corpus actually carries
+## Message frequency on the wire
 
-Counted over every `.pcap` in the FreeREAC capture corpus — 72 files, 43 018 309 frames, of
-which 43 018 308 are REAC: 6 907 318 control frames and 36 110 990 FILLER. Keyed on
-`(type word, op, op_len, block[4])`. Those totals are the positive control: a zero in this
-table is a real zero and not a scan that could not match.
+Frame counts below are keyed on `(type word, op, op_len, block[4])`, over a large corpus of
+REAC capture files.
 
 | type | op | op_len | block[4] | frames | files |
 |---|---|---|---|---|---|
@@ -124,17 +117,14 @@ table is a real zero and not a scan that could not match.
 | `cfea` | `0000` | `0000` | `00` | 30 | 1 |
 | `cfea` | `ffff` | `0100` | `01` | 28 837 | 69 |
 
-Three rows are worth reading twice.
+`cdea 0403 0014` with `block[4] == 0x02` is the box's constant upstream return block: a single
+distinct 32-byte block, repeated continuously. Nothing in either box image has been shown to
+read it.
 
-`cdea 0403 0014` with `block[4] == 0x02` — the box's constant upstream return block — is 88% of
-all control traffic in the corpus and comes from ONE session. It is a single distinct 32-byte
-block repeated six million times. Nothing in either box image has been shown to read it.
+`cdea 0103 001a` is rare on the wire — no console sends it, and no page in the grammar claims
+it as a distinct record type.
 
-`cdea 0103 001a` appears twice in the whole corpus, in two `reacpw-…` captures. That is our own
-master emitting an `op_len` no console sends and no page in the grammar claims.
-
-`cfea 0000 0000` with an all-zero block appears 30 times in one capture: an announce type word
-carrying no op at all.
+`cfea 0000 0000` with an all-zero block is an announce type word carrying no op at all.
 
 ## The control block's header
 
@@ -184,22 +174,22 @@ block[4] and the length is a consequence of the body.
 
 ## Message inventory
 
-Every arm below was found in a receive dispatch or a transmit builder. `FW-ONLY` means the
-firmware handles or emits it and no capture in the 72-file corpus contains one.
+Every arm below was found in a receive dispatch or a transmit builder. **Not seen on the
+wire** means the firmware handles or emits it but no capture holds one.
 
 ### Link 1 — the stagebox control link
 
-| opcode | wire op / len | meaning | handler | state | corroboration |
+| opcode | wire op / len | meaning | handler | state | frames seen |
 |---|---|---|---|---|---|
-| `0x00` | `0101 0018` FIRST | bulk transfer, first frame; declares the total at block[5:7] and carries 24 bytes | `FUN_0c003aae` @0c003aae | state 2 | 2 211 frames |
-| `0x00` | `0100 001a` MIDDLE | bulk continuation, 26 bytes at block[5] | `FUN_0c003b88` @0c003b88 | state 3 | 772 556 frames |
-| `0x00` | `0102 000e` LAST | bulk final; completing the transfer is what enters the commit | `FUN_0c003b88` @0c003b88 | state 3 | 2 269 frames |
-| `0x01` | `0103 0019` | the slot-record window — eight `{slot, flags, value}` records | `FUN_0c002e94` @0c002e94 → `FUN_0c002d42` @0c002d42 | any | 22 984 frames |
-| `0x10` | `0103 000d` | group map, ten bytes read as twelve 6-bit and ten 2-bit fields | S-4000S FSM case 3, gate at `[4]==0x10` | S-4000S state 2 | 103 frames. **The S-1608 image has no handler for it at all** |
-| `0x80` | `0103 0010` | the box's declaration, alternate arm; `[7]` forced to 0 | built by `FUN_0c003c8a` @0c003c8a, parsed by `FUN_0c00350a` @0c00350a | state 4 emits, state 3 parses | **FW-ONLY** — the S-1608 emits it when `FUN_0c00f9f2` @0c00f9f2 returns 0, and no capture has one |
-| `0x81` | `0103 0001` | the heartbeat reply — opcode only, zero body | built by `FUN_0c003fe2` @0c003fe2, parsed by `FUN_0c003676` @0c003676 | state 7 | 10 217 frames |
-| `0x82` | `0103 0010` | the box's declaration | `FUN_0c003c8a` @0c003c8a / `FUN_0c00350a` @0c00350a | state 4 / state 3 | 259 frames, S-1608 family |
-| `0x84` | `0103 0010` | the same message with the other constant | — | — | 44 frames, S-0808 and S-4000S. **No S-1608 code emits it** |
+| `0x00` | `0101 0018` FIRST | bulk transfer, first frame; declares the total at block[5:7] and carries 24 bytes | `FUN_0c003aae` @0c003aae | state 2 | 2 211 |
+| `0x00` | `0100 001a` MIDDLE | bulk continuation, 26 bytes at block[5] | `FUN_0c003b88` @0c003b88 | state 3 | 772 556 |
+| `0x00` | `0102 000e` LAST | bulk final; completing the transfer is what enters the commit | `FUN_0c003b88` @0c003b88 | state 3 | 2 269 |
+| `0x01` | `0103 0019` | the slot-record window — eight `{slot, flags, value}` records | `FUN_0c002e94` @0c002e94 → `FUN_0c002d42` @0c002d42 | any | 22 984 |
+| `0x10` | `0103 000d` | group map, ten bytes packed as two fields — see below | S-4000S FSM case 3, gate at `[4]==0x10` | S-4000S state 2 | 103. **The S-1608 image has no handler for it at all** |
+| `0x80` | `0103 0010` | the box's declaration, alternate arm; `[7]` forced to 0 | built by `FUN_0c003c8a` @0c003c8a, parsed by `FUN_0c00350a` @0c00350a | state 4 emits, state 3 parses | **not seen on the wire** — the S-1608 emits it when `FUN_0c00f9f2` @0c00f9f2 returns 0 |
+| `0x81` | `0103 0001` | the heartbeat reply — opcode only, zero body | built by `FUN_0c003fe2` @0c003fe2, parsed by `FUN_0c003676` @0c003676 | state 7 | 10 217 |
+| `0x82` | `0103 0010` | the box's declaration | `FUN_0c003c8a` @0c003c8a / `FUN_0c00350a` @0c00350a | state 4 / state 3 | 259, S-1608 family |
+| `0x84` | `0103 0010` | the same message with the other constant | — | — | 44, S-0808 and S-4000S. **No S-1608 code emits it** |
 | `0x01` | — | the keepalive poll the box answers with `0x81` | `FUN_0c004026` @0c004026 | state 7 | seen as the master's `0103 0019` cadence |
 
 The declaration is a **symmetric exchange, not a one-way announcement**: `FUN_0c003c8a` builds
@@ -208,12 +198,12 @@ into the device as a single boolean, `FUN_0c00f99e(buf[4] == 0x82)`.
 
 ### Link 4 — the record link
 
-| wire op / len | segment | meaning | corroboration |
+| wire op / len | segment | meaning | frames seen |
 |---|---|---|---|
 | `0403 0013` | SINGLE | a DT1 record that fits one frame — head-amp (tag 0x0101), box-ready (0x0302) | 11 042 |
 | `0403 0014` | SINGLE | join/cold-connect state (tag 0x0100) | 3 044 |
 | `0403 0016` / `0403 001a` | SINGLE | identity (tag 0x0500), 6- and 10-byte bodies | 272 each |
-| `0403 0014` `[4]=0x02` | SINGLE | the box's constant upstream return block — one distinct block, repeated | 6 053 140 in ONE session. Nothing in either box image has been shown to read it |
+| `0403 0014` `[4]=0x02` | SINGLE | the box's constant upstream return block — one distinct block, repeated continuously | high volume. Nothing in either box image has been shown to read it |
 | `0401 001b` | FIRST | the opening fragment of a DT1 record too long for one frame | 18 |
 | `0402 000d` | LAST | that record's closing fragment, carrying the checksum and the `F7` | 18 |
 
@@ -230,7 +220,7 @@ models both as `record_fragment` and `reac_xcheck.py` reassembles them and check
 and routes subtypes `0x62`, `0x63` and `0x64` to `FUN_0c004740`, `FUN_0c004746` and
 `FUN_0c00474c` — all three of which are `mov r4,r2 ; rts ; nop`, **empty stubs**. So in
 ver2200 these messages are parsed, validated and thrown away. `0x64` is reachable only when the
-`FUN_0c00297c` predicate is false. FW-ONLY and OBSERVED-IN-DISPATCH-BUT-UNEXPLAINED.
+`FUN_0c00297c` predicate is false. Not seen on the wire; what they are for is unexplained.
 
 The S-4000S image builds for this link where the S-1608 has no code for it: `FUN_0c0128b8`
 @0c0128b8, `FUN_0c01291a` @0c01291a and `FUN_0c01297c` @0c01297c emit
@@ -243,7 +233,7 @@ selector against a `.rodata` byte, requires `len == buf[8] + 5`, and pushes `buf
 a time from block[9] through a virtual method. And `buf[0]==0x06` into `FUN_0c014a42` @0c014a42,
 which copies the whole 32-byte block, checksum included, with no field discrimination.
 `FUN_0c015d56` @0c015d56 dispatches on `buf[4]` against three bytes of the same `.rodata` table.
-All three: OBSERVED-IN-DISPATCH-BUT-UNEXPLAINED, and all FW-ONLY.
+All three are in the dispatch and unexplained, and none is seen on the wire.
 
 That `.rodata` table sits at 0x0C033AD8, immediately after the string `REAC - Roland ED`, and
 reads `01 00 02 01 02 03 04 05 06` then u32 `4`, `1`, `0xFE`, `5`. Code references its individual
@@ -363,7 +353,7 @@ inferred:
 |---|---|---|---|
 | `< 0x30` | — | — | a slot record |
 | `0xfe` | `DAT_0c002d7e`, `DAT_0c002e6e` | 0x00fe | passes the FLAGS byte to `FUN_0c0051c4` @0c0051c4 — the one-word identity cell at 0x0c080616 — and to `FUN_0c004158` @0c004158, the 12-slot vector header |
-| `0xff` | `DAT_0c002d80` | 0x00ff | an all-zero filler record. **FW-ONLY** — the cursor wraps at 0x30 so the branch is unreachable, and Ghidra removes it as dead code independently |
+| `0xff` | `DAT_0c002d80` | 0x00ff | an all-zero filler record. Not seen on the wire — the cursor wraps at 0x30 so the branch is unreachable |
 
 ### Granularities, with the shift shown
 
@@ -381,37 +371,28 @@ inferred:
 ### The ring cursor
 
 `FUN_0c002bb2` @0c002bb2 is driven by a cursor that runs **0, 1, …, 0x2f, 0x30, then 0** — 49
-indices, with 0x30 itself emitted as the `0xfe` record. The wrap test is
-`if (0x30 < i + 1) *ctr = 0`. The existing note that it "rotates 0..0x2f and wraps at a 0x30
-sentinel" is half right: it wraps at 0x30, but 0x30 is a record, not just a boundary. Because 49
-is not a multiple of 8, consecutive frames start at 0, 8, 16, 24, 32, 40, 48, 7, 15, … and the
-full cycle is 49 frames.
+indices, with 0x30 itself emitted as the `0xfe` record, as a record and not merely a boundary.
+The wrap test is `if (0x30 < i + 1) *ctr = 0`. Because 49 is not a multiple of 8, consecutive
+frames start at 0, 8, 16, 24, 32, 40, 48, 7, 15, … and the full cycle is 49 frames.
 
-## What the firmware contradicts
+The `0x000d` group map (Link 1, opcode `0x10`) packs its ten bytes as two fields: the low six
+bits once per pair of groups, and the top two bits once per byte, with values 2 and 3 folded to
+−1.
 
-| our previous reading | what the firmware says | where |
-|---|---|---|
-| Seven separate control ops | Two links and a two-bit segment field | `FUN_0c003398` @0c003398 |
-| op-0103's `op_len` is a sub-page selector | It is a length; the discriminator is the opcode at block[4] | every builder; 25 = 1 + 8×3 |
-| `0x0401` is "the ASCII name frame", `0x0402` is "the extra cold-connect frame" | They are the FIRST and LAST fragments of ONE DT1 record, and its checksum closes only across both | proved arithmetically from the corpus |
-| The chanmap entry's third byte is padding | It is the per-slot VALUE, and it writes the cell the gain path reads | `FUN_0c002bb2` @0c002bb2, `FUN_0c007fbc` @0c007fbc |
-| The `0xfe` entry is a wrap marker with a zero bank byte | Its FLAGS byte feeds the box's identity cell and its change detector, and it carries 0x00 or 0x01 in the corpus | `FUN_0c002d42` @0c002d42 → `FUN_0c0051c4` @0c0051c4 |
-| The cursor rotates 0..0x2f and wraps at a 0x30 sentinel | 0x30 IS emitted, as the `0xfe` record; the ring is 49 long | `FUN_0c002bb2` @0c002bb2 |
-| The chanmap's per-anchor push is "phantom, 4 ch/group" | What is pushed is the record's HIGH NIBBLE, an inventory-cell code, not a flag bit | `FUN_0c002d42` @0c002d42 |
-| The master images contain no REAC control plane | The M-400 image carries `CMasterReacManager`, a `REAC.c` compilation unit, and master arbitration text | see below |
-| M-400 is little-endian at base 0x08B60000 | `SuperH:BE:32:SH-2` at 0x8C000000, and the pointer at 0x8c0cc45c only resolves big-endian | `M-400_run.log` |
-| The 0x000d group map is five input-group bytes front-packed and five output-group bytes back-packed | The one firmware that parses it reads ten bytes as TWO PACKED FIELDS — low six bits once per pair of groups, top two bits once per byte with 2 and 3 folded to −1 | S-4000S, the arm gated on `[4]==0x10` |
-| `FUN_0c0045de` is the link-lost poll | Its whole body is `return *0x0c080608;` — a getter for a latch that other code raises | `FUN_0c0045de` @0c0045de |
-| `FUN_0c003a64` zeroes the six-byte identity | It fills it with **0xFF** (`DAT_0c003b82` = 0x00ff, read out of the image). An all-zero identity and an all-0xFF one are different wire facts | `FUN_0c003a64` @0c003a64 |
+`FUN_0c0045de` @0c0045de, despite its name, is a plain getter: its whole body is
+`return *0x0c080608;`, reading a latch that other code raises — it does not itself poll for
+link loss.
+
+`FUN_0c003a64` @0c003a64 fills the six-byte identity with **0xFF** (`DAT_0c003b82` = 0x00ff,
+read out of the image), not zero — an all-zero identity and an all-0xFF one are different wire
+facts.
 
 ## The master side
 
-The claim that the console images hold no REAC control plane was made about a partial look and it
-is wrong. Three of the four master exports are ~97% unrecovered — M-480, M-300 and M-200i
-exported 281, 262 and 272 functions where M-400 exported 8 561 — which is why the searches came
-back empty.
+Three of the four master exports are ~97% unrecovered — M-480, M-300 and M-200i export 281, 262
+and 272 functions where M-400 exports 8 561.
 
-M-400 carries it, and the committed `M-400_run.log` is enough to see so: it names
+M-400 carries a REAC control plane. The committed `M-400_run.log` names
 `18CMasterReacManager` at 0x8c45aedc, together with `8CReacMsg`, `11CReacRecMsg`,
 `11CReacPrgMsg`, `13CReacTDataMsg`, `16CReacTDataRecMsg`, `17CReacTDataKikiMsg`,
 `18CReacTDataPrgTxMsg`, `19CReacTDataMsgSender`, `22CReacTDataTxTaskCommon` and a
@@ -455,96 +436,10 @@ are reached only through vtable dispatch, so recursive-descent analysis never cr
 one caller of the model-id setter falls inside exactly one of those holes. The message-building
 path is the code that could not be searched.
 
-## Method, and one trap worth passing on
+## A structural limit on searching firmware images
 
-The obvious discriminators do not work. `0x8819`, the `C2 EA` end marker and every frame length
-return **zero hits in the S-1608 image**, which is known-good. The reason is structural:
-`FUN_0c007646` @0c007646 packs the 32-byte block into 16-bit words and writes them to a single
-memory-mapped register, then sets a trigger. Ethertype, end marker and frame length are applied by
-the FPGA and appear in no firmware image, box or console. A search for them cannot distinguish a
-console with no REAC code from a console with all of it.
-
-Every absence claim in this document was made only after the same search found a known-present
-control. The scan that located the undocumented dispatchers first used a wrong instruction mask
-and returned zero hits — indistinguishable from "there is nothing there" — and was re-run against
-the known site at 0x0C002EB2 until it reported presence before any absence was believed.
-
-
-## How this was validated
-
-`spec/corpus-check.py` parses every capture with the grammar and refuses a regression against
-`spec/corpus-baseline.json`. The baseline is taken from the grammar as it stood at 5159f58,
-recovered from git — a baseline taken after a change proves nothing.
-
-```
-make corpus-check    CAPTURES=~/Devel/audio/reac-captures
-make corpus-selftest CAPTURES=~/Devel/audio/reac-captures
-./corpus-check.py --captures DIR --classify-delta
-```
-
-| | captures | whole frames | ok | failed | truncated control blocks | ok | failed | files clean |
-|---|---|---|---|---|---|---|---|---|
-| **baseline**, grammar at 5159f58 | 83 | 258 524 | 258 524 | 0 | 44 400 | 44 400 | 0 | 83 |
-| **after**, this branch | 83 | 258 524 | 258 524 | 0 | 44 400 | 44 400 | 0 | 83 |
-
-**0 regressions, 0 improvements, 0 missing, 0 new.** Nothing the corpus used to parse stopped
-parsing.
-
-### The classification change is a partition, and that is measured
-
-`--classify-delta` runs both the pre-2026-08-23 rule and the current one over every frame and
-requires the difference to be a SPLIT of the old buckets, never a move between them. Over all
-44 868 346 REAC frames in the 83 captures:
-
-| old bucket | → | frames |
-|---|---|---|
-| `scene_transfer` 779 163 | `scene_transfer` | 778 751 |
-| | `config_announce` | 305 |
-| | `group_map` | 107 |
-| `unknown_ctrl` 40 | `record_fragment` | 40 |
-| every other bucket | unchanged | — |
-
-Each old bucket's parts sum to it exactly and nothing moved sideways. The check fails if a frame
-leaves a bucket that is not being split, and fails if NOTHING moves — a comparison that observes
-no change is not evidence that the change is safe.
-
-### Three sabotages, and one that had to be re-forged
-
-| sabotage | result |
-|---|---|
-| `--self-test`: every frame corrupted, every control-block window shortened | 258 524 frames + 44 400 blocks all rejected — both paths shown capable of failing |
-| end marker `C2 EA` → `C2 EB` | 70 captures regress, exit 1 |
-| DT1 wrapper `00 02 00 fe` → `…ff` | 5 captures / 12 frames regress, exit 1 — precisely the `record_fragment` frames |
-| ksy classifies `group_map` as `master_hb` | the grammar-vs-oracle agreement test goes red |
-| the oracle moves `config_announce` to `master_announce` | the partition test goes red on a sideways move |
-| **delete the `record_fragment` wrapper guard entirely** | **the whole suite stayed GREEN** |
-
-That last one is the finding. The `contents: [0x00, 0x02, 0x00, 0xfe]` guard could be deleted
-with no test noticing, because nothing ever fed the parser a fragment with a wrong wrapper — the
-guard was decoration. `test_a_fragment_with_the_wrong_wrapper_is_REFUSED` now forges one, and
-forges it properly: the block checksum is restamped so the forgery is valid in every respect
-except the four bytes under test, and the test asserts the forgery still CLASSIFIES as a fragment
-so the parser actually reaches the guard. A forgery that is malformed somewhere else can be
-refused for the wrong reason, and then the guard is still unproven. With the guard deleted the
-new test is red; with it restored, green.
-
-Two traps the corpus set, both of which had already produced a wrong answer:
-
-- **A snaplen-truncated record is not a short frame.** Several captures were taken at snaplen
-  64/128/200/400, and a truncated frame's length can land on `52 + 36n` by coincidence, reach the
-  parser and fail the end marker — 3 200 "grammar failures" that were nothing of the kind. Every
-  pcap record carries `caplen` and `origlen`; compare them.
-- **Discarding those records silently is the other half of the same trap.** Seven captures are
-  truncated in EVERY record, so a whole-frame-only check reads zero from them and still calls the
-  corpus clean. A snaplen of 50 or more carries the entire control block, so those records are
-  parsed as a bare `frame[16:50]` window: 44 400 blocks that were being thrown away now gate.
-
-And one the corpus set for the SCAN rather than the grammar: `tcpdump -C` splits a long capture
-into `.pcap00`, `.pcap01` …, and a glob of `*.pcap` silently covered 72 of the 83 files. The
-eleven it dropped were the longest sessions in the set.
-
-Alongside the corpus, `spec/reac_xcheck.py` and `spec/facts_xcheck.py` run **340** assertions on
-the checked-in goldens. The unit suite and the corpus are different bodies of evidence and neither
-substitutes for the other: deleting the wrapper guard left the unit suite green and turned the
-corpus red, and keying the classification on a length left both green while mislabelling every
-commit report on the wire.
+`0x8819`, the `C2 EA` end marker and every frame length appear in no firmware image, box or
+console: `FUN_0c007646` @0c007646 packs the 32-byte control block into 16-bit words and writes
+them to a single memory-mapped register, then sets a trigger. Ethertype, end marker and frame
+length are applied entirely by the FPGA. A search for these bytes in a firmware image cannot
+distinguish a console with no REAC code from a console with all of it.
