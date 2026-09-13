@@ -113,7 +113,9 @@ interchangeable: the config-announce **inventory** (twelve cells of four, what t
 has), the chanmap **group-anchor** map (twelve entries the box derives at `slot >> 2`, describing
 the master's own fabric), and the **phantom groups** (twelve, indexed `ch >> 2`, though phantom
 itself is addressed per channel on the wire — see wire-format.md). The commit's twelve-iteration
-push is read out of the image but not tied to one of the three.
+push is read out of the image but not tied to one of the three. Settling it needs a commit whose
+scene body's twelve cells are made to differ from the box's own declared inventory, with the
+inventory read back afterwards to see which one moved.
 
 `01 00` is the continuation phase of an 8904-byte scene transfer, not a probe: every one of a
 sampled set of `01 00` payloads is a literal 26-byte slice of a recovered scene body. The ASCII
@@ -252,10 +254,11 @@ now expected feasible:
   to the sender, so the sender's rate becomes the system rate) — RT scheduling
   suffices. As **slave**, add a software clock servo disciplining TX to the recovered
   master clock. Target the master role first.
-- The remaining gate for the drive-a-stagebox path is **protocol acceptance**, not
-  timing: emit MASTER_ANNOUNCE + the replayed control cadence + a known tone in
-  correctly-justified audio frames into a standalone stagebox (no console, so nothing
-  live is at risk) and listen on its analog outs.
+- Protocol acceptance for the drive-a-stagebox path is verified: a software master
+  completes negotiation with a real box over the wire — announces, an enroll group map,
+  head-mark records, join grants and a full head-amp sweep, with the box answering by
+  unicast. What remains is listening on the box's own analog outputs to confirm the
+  audio arrives; that step is not verified here.
 
 ## Open items
 
@@ -263,7 +266,8 @@ now expected feasible:
   frequency per input).
 - `ce ea` / `c2 ea` **SPLIT_ANNOUNCE** byte sequences are not verified (need a real split
   device / topology).
-- **44.1 kHz on the wire** (3675 pps) is not verified directly.
+- **44.1 kHz on the wire** (3675 pps) is verified directly, both downstream and on a box's
+  own upstream return.
 - `RCQ`→`RCS` real-hardware format, and whether it is granular enough to observe a sync
   lock-flap, is not verified — likely only coarse.
 - Why a Wi-Fi-fed upstream port scrambles while a wired port stays clean is not known. The
