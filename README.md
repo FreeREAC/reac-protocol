@@ -18,6 +18,10 @@ Communications*.
 
 ## Documents
 
+- **[docs/mixer-protocol.md](docs/mixer-protocol.md)** — how a Roland console and a
+  stagebox talk to each other, master side first: the frame and its cadence, roles,
+  enrolment, head-amp control, the scene transfer and chanmap, trunk VLANs, a box on
+  M, and a table of every control-block kind by its two-byte tag.
 - **[spec/reac.ksy](spec/reac.ksy)** — the wire format as a **machine-checkable
   [Kaitai Struct](https://kaitai.io) grammar**: the `0x8819` frame family in both
   directions, the control multiplex, the `op 04 03` DT1 record container, the two
