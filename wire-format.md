@@ -194,15 +194,19 @@ de-interleave; s24le is the justification verified at 48 kHz.
 The master's CONTROL stream carries a channel-info block: one 3-byte record per
 channel `[channel#, type-flags, gain]`, packed 8 records per CONTROL frame, rotating
 channel numbers modulo 49. The block terminator is the channel-number byte `0xfe`
-written at the rotation index for channel 48 (paired with flag byte `0x01`) — i.e.
-`channel# = 0xfe` is the terminator, not "flag `0x01` = terminator".
+written at the rotation index for channel 48; its accompanying flag byte varies
+(most often `0x00`, sometimes `0x01` or `0x02`) — the channel number, not the flag
+byte, marks the terminator.
 
 Other states stuff the interface MAC, a `0xc0 0xa8` (= 192.168) address prefix
-repeated twice, and ASCII tags `SYSP` (`53 59 53 50`) and `XVSCEN`
-(`58 56 53 43 45 4e`) into `data[]`. This region is incompletely understood; treat
-`data[5..30]` of CONTROL frames as partial beyond the 5-byte prefix and the
-channel-info block. (The `0xc0 0xa8` bytes are a protocol fact — what a master stuffs
-into CONTROL frames — not anyone's network address.)
+repeated twice, and the ASCII tag `SYSP` (`53 59 53 50`) into `data[]`. A further
+tag, `XVSCEN` (`58 56 53 43 45 4e`), is named in earlier notes but not verified on
+the wire — a search of the first 50 bytes of every frame in a large corpus found no
+instance; it would need to be sought in a reassembled scene body, which runs well
+past that window. This region is incompletely understood; treat `data[5..30]` of
+CONTROL frames as partial beyond the 5-byte prefix and the channel-info block. (The
+`0xc0 0xa8` bytes are a protocol fact — what a master stuffs into CONTROL frames —
+not anyone's network address.)
 
 ## Sample rates and the audio clock
 
@@ -212,7 +216,7 @@ frame: `pps = rate / 12`, 12 samples per frame.
 
 | rate | pps (downstream) | slot period | on the wire | status |
 |---|---|---|---|---|
-| 44.1 kHz | 3675 | 272.1 µs | 44.6 Mbit/s | not verified |
+| 44.1 kHz | 3675 | 272.1 µs | 44.6 Mbit/s | verified |
 | 48 kHz | 4000 | 250.0 µs | 48.5 Mbit/s | verified |
 | 96 kHz | 8000 | 125.0 µs | 97.0 Mbit/s | verified |
 
@@ -231,7 +235,8 @@ At 96 kHz the stream runs ~8000 pps carrying the same 1492 B / 40-channel frame 
 not grow (the 48 kHz frame already fills ~99% of the 1500 MTU, so REAC adds packets
 rather than enlarging them). A "24 tracks @96k" figure occasionally seen in a Roland
 recorder manual is a storage limit, not a wire constraint. 44.1 kHz (3675 pps) follows
-the same model and is not verified directly on the wire.
+the same model, measured directly on the wire (272.12 µs slot, both downstream and a
+box's own upstream return).
 
 ### How the clock is set and recovered
 
@@ -454,9 +459,12 @@ with wrapper `02 00 fe 00` and **no** `f0 41` envelope. A genuine control record
 | `rec_len` | n (data bytes) | TAG | record | status |
 |---|---|---|---|---|
 | `0x0013` | 3 | `01 01` | **head-amp source control** | decoded below |
-| `0x0013` | 3 | `05 00` | — | 4 distinct values, state-push only, not decoded |
-| `0x0014` | 4 | `01 00` | **connect-grant** (`06 00 01 00`) | — |
-| `0x0014` | 4 | `00 00` | — (`03 00 00 00`) | state-push only, not decoded |
+| `0x0013` | 3 | `05 00` | **identity poll/reply** | decoded — an addressed page, see `identity_data` in [`spec/reac.ksy`](spec/reac.ksy) |
+| `0x0014` | 4 | `01 00` | **join grant** — master emits `06 00 01 00`; box-side echoes take other odd values while climbing | decoded — see `join_grant_data` in `spec/reac.ksy` |
+| `0x0014` | 4 | `00 00` | — (`03 00 00 00`, also `03 00 01 01` on masters only and `03 00 00 01` on the S-1608 only) | the low two bytes are a field, not padding; not decoded |
+
+TAG `05 00` also occurs at `rec_len 0x0016`, `0x001a` and `0x001b`, each carrying a different
+per-model page of the same identity record — see `identity_data`.
 
 > **Parsers must dispatch on TAG, not on the opcode.** Classifying every `04 03` as a grant means a
 > slave in the join phase reads an engineer's preamp knob-turn as its grant: a live M-200 emits 628
@@ -609,7 +617,10 @@ is still addressed at 32 — so the base is **not** collision-avoidance.
 
 Two boxes coexist at `0x00..0x07` + `0x20..0x2f`, contiguous and non-overlapping. `(box_index
 << 5)` is **refuted**: the 32-ch S-4000 bases at 0, like the 8-ch S-0808. Why the S-1608
-bases at 32 specifically is unknown.
+bases at 32 specifically is not verified — the three collinear carriers (width, the
+config-announce selector, `board_config_code`) cannot be separated by any establishment
+in the corpus; settling it needs a box-to-box enrolment (a pairing the corpus lacks
+entirely), since that is the only pairing observed to produce the selector's other arm.
 
 > **A master assigns the base from the box's declared WIDTH, not from a model-identity string.**
 > `CH = channel - 1` is correct for an S-0808 and addresses nothing on an S-1608. The width is
@@ -631,8 +642,8 @@ required.
 
 ### Open items
 
-- The TAG `05 00` model-identity record's payload is undecoded — it takes four distinct
-  values and appears to be state-push only (see the op-`0403` registry above). Not verified.
+- The TAG `05 00` identity page's `0x0600` capability-block payload is stable per model but
+  its field meaning is undecoded (see `identity_data` in `spec/reac.ksy`).
 - Whether a phantom-off assert sent to a box actually drops 48 V at the XLR pins is not
   verified independently of the wire bytes — that needs a physical meter across the pins,
   never a soft indicator.
@@ -747,15 +758,20 @@ establishment and conforms to the head-amp records once established.
 
 ### The full assert is ONE operation in two phases
 
-The head-amp push is **not on its own timer**. It follows a SCENE/SYSPARAM transfer by exactly
-4.4 s, with no drift. The console announces its **own DSP state** (SCENE/SYSPARAM, `cdea 01 00`
-bulk data bracketed by `01 01` start / `01 02` end markers, ASCII `SCENE` / `SYSPARAM` in the
-markers), waits 4.4 s, then announces its **box state** (`04 03` records: the grant, the `05 00`
-records, and all 24 head-amp records). One operation, two phases, locked.
+The head-amp push is **not on its own timer**. It follows a scene transfer (this document's name
+for the `cdea 01 00` bulk data bracketed by `01 01` start / `01 02` end markers) by exactly 4.4 s,
+with no drift. Whether an ASCII `SCENE` / `SYSPARAM` tag also sits inside that bulk data is not
+verified — the confirmed ASCII tag in this region is `SYSP`, at the start of the scene body itself
+(see above), not in the `01 01`/`01 02` markers. The console announces its own DSP state, waits
+4.4 s, then announces its box state (`04 03` records: the grant, the `05 00` records, and all 24
+head-amp records). One operation, two phases, locked.
 
 **What triggers a full assert is not known.** The interval between assertions is irregular and
-does not correlate with operator activity. It is not a simple timer, and no fixed cadence governs
-when one occurs — only its internal 4.4 s two-phase structure, once it starts.
+does not correlate with operator activity: consecutive scene transfers can recur every ~2.7 s for
+long stretches with no head-amp push following most of them, so a scene transfer does not itself
+guarantee one. It is not a simple timer, and no fixed cadence governs when one occurs — only its
+internal 4.4 s two-phase structure, once it starts. Isolating the trigger needs a session that
+varies one console-side action at a time against a continuous capture.
 
 > **Safety consequence for any master implementation.** Fire-and-forget loses a frame and the box is
 > wrong **forever**. The parameter where that bites is **phantom**: an engineer switches 48 V off to
@@ -886,9 +902,9 @@ simultaneous tones, one frequency per input. **The exact map is OPEN.**
 The scramble is rate-independent, and so is the frame: a 16-channel box returns 628 B at
 48 kHz exactly as at 96 kHz, at 4000 pps instead of 8000. The geometry is settled —
 it is the `52 + n × 36` law, corpus-evidenced across all three rates in
-`spec/protocol-facts.yaml`. What is UNVERIFIED is the upstream **packet rate** at 48 kHz
-specifically: it follows from 12 samples per frame at 48 kHz, but has not been counted
-directly. One 48 kHz upstream capture with a frame count over a known interval settles it.
+`spec/protocol-facts.yaml`. The upstream packet rate at 48 kHz is 4000 pps, matching
+downstream — measured directly on a box's unicast return (628 B frames over a known
+interval).
 
 Distinguishing source / direction from the wire alone: **source MAC** → which
 device/port (OUI `00:40:ab`); **dest MAC** → direction/role (mixer→box OUTPUT frames
