@@ -197,11 +197,12 @@ scale — not a gain, so it runs the opposite way from a gain control: the hotte
 setting is the most negative number.
 
 **The wire channel (`CH`) is not a console channel strip and not an audio-fabric
-slot.** It is `model_base + (box_input - 1)`, addressed in the head-amp/chanmap
+slot.** It is `base + (box_input - 1)`, addressed in the head-amp/chanmap
 space — 48 wide, 0x00..0x2f — which is a different, wider numbering than the 40-slot
-audio fabric a downstream frame actually carries. The base is per model, and it is
-negotiated session state rather than a field on the wire: an S-0808 or an S-4000S sits
-at base 0x00, an S-1608 at base 0x20.
+audio fabric a downstream frame actually carries. The base is the box's own
+config-announce `block[7]` × 0x10 — a GPIO chassis strap the box reads before its
+RTOS starts and announces, not session state a master negotiates: an S-0808 or an
+S-4000S straps 0x00, an S-1608 straps 0x02 (base 0x20).
 
 **Each change is one record, sent on the transient.** A single write of an absolute
 value self-commits — there is no separate commit message, and no acknowledgement

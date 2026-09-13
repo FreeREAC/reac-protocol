@@ -1462,32 +1462,31 @@
  */
 #define REAC_HEADAMP_PAD_CDB            2000
 
-/* ---- Head-amp base per declared width ------------------------------------------
- * A head-amp record's CH is base + (box_input - 1), and the base depends on
- * the box's declared INPUT width.
+/* ---- Head-amp base per declared width — derived, not the law -------------------
+ * A head-amp record's CH is base + (box_input - 1). The base is
+ * `HEADAMP_BASE_FROM_CONFIG_BYTE7 * HEADAMP_BASE_MULTIPLIER` (see the
+ * `head_amp` section above) — a wire field, the box's own config-announce
+ * `buf[7]`, a GPIO chassis strap read before the RTOS starts. It is not
+ * negotiated session state and a master cannot move it by granting
+ * differently.
  *
- * THIS IS NEGOTIATED SESSION STATE, NOT A WIRE FIELD, and that is why it
- * lives here rather than in the grammar: no byte in any frame carries it. A
- * 42-establishment, three-console, four-unit study killed every testable
- * candidate law and left three carriers — declared width, the config
- * selector, and unit_offset — perfectly collinear on every row. reac.ksy
- * parses the CARRIERS as typed fields and refuses to encode a base;
- * libreac's reac_headamp_base() returns the MEASURED table below and refuses
- * any width it has not seen, which is the same refusal expressed the other
- * way round. Both are right; neither may guess.
+ * The table below still reads correctly for the three chassis we own
+ * because declared width is collinear with the strap on all three; it is
+ * not the base's carrier. An 8-input and a 32-input box are both strapped
+ * (and so both based) at 0x00, which is what rules out width as the law.
  */
 #define REAC_PLACEMENT_ROWS 3
 /* { in_ch, base } rows: */
 #define REAC_PLACEMENT_TABLE { { 8, 0x00 }, { 16, 0x20 }, { 32, 0x00 } }
-/* 8 -> 0x00: S-0808. [EVIDENCED (corpus) — 42 grant sweeps across 82
- * captures.]
+/* 8 -> 0x00: S-0808, strap 0x00. [EVIDENCED (corpus) — 42 grant sweeps across
+ * 82 captures.]
  */
-/* 16 -> 0x20: S-1608. The one width that is not zero, and the reason a
- * 40-bounded table drops half the box. [EVIDENCED (corpus).]
+/* 16 -> 0x20: S-1608, strap 0x02. The one width that is not zero, and the
+ * reason a 40-bounded table drops half the box. [EVIDENCED (corpus).]
  */
-/* 32 -> 0x00: S-4000S. Wider than the S-1608 and still based at 0 — which is
- * what kills "lowest fit" and "top alignment" as candidate laws. [EVIDENCED
- * (corpus).]
+/* 32 -> 0x00: S-4000S, strap 0x00. Wider than the S-1608 and still based at 0
+ * — which is what kills "lowest fit" and "top alignment" as candidate laws.
+ * [EVIDENCED (corpus).]
  */
 
 /* ---- The config-announce port table --------------------------------------------
