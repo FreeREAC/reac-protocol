@@ -1536,15 +1536,27 @@ types:
       - id: console_field
         type: u1
         doc: |
-          Console generation, 0x00 V-Mixer / 0x01 OHRCA — the same value cfea
-          carries. Whether it also reaches 0x02 at 44.1 kHz is still not
-          verified, and the reason is now known: NO CONSOLE HAS EVER BEEN SEEN
-          TO SEND A GROUP MAP TO A 16-INPUT BOX. All 107 group maps in the
-          corpus are 8-wide or 32-wide; 22 captures whose only box is an
-          S-1608 — five of them full enrolments, including a 44.1 kHz one whose
-          whole 30 s after the box's commit report is on file — carry none.
-          The settling capture is an M-200 at 44.1 kHz enrolling an S-0808 or an
-          S-4000S; a 44.1 kHz session with an S-1608 will not produce one.
+          THE PACE CODE, not a console generation — the same rate class cfea
+          block[17], scene_body.revision and the chanmap 0xfe marker carry:
+          0x00 at 48 kHz, 0x01 at 96 kHz, 0x02 at 44.1 kHz.
+
+          The deciding pair is one console and one box class two bytes apart.
+          M-200 c9:cc:03 enrolling a 32-input box writes
+          `04 00 41 41 41 41 00 00 00 00 00 c3` at 48 kHz and
+          `04 02 41 41 41 41 00 00 00 00 00 c3` at 44.1 kHz — identical in
+          all eleven other bytes. 0x01 read as "OHRCA" only because the M-5000
+          is the desk that runs 96 kHz; it writes 0x01 over an 8-wide map and a
+          32-wide one alike. EVIDENCED (corpus, 2026-09-13:
+          `reac-captures m200-enrol-s4000-441k-2026-09-13`, t = 1789330642.379775,
+          one map 209.5 ms after the box's commit report; the 48 kHz rows are
+          `matrix-m200-s4000-2026-07-24` and `matrix-m200-s0808-2026-07-11`).
+
+          NO CONSOLE HAS BEEN SEEN TO SEND A GROUP MAP TO A 16-INPUT BOX. All
+          108 group maps in the corpus are 8-wide or 32-wide; 22 captures whose
+          only box is an S-1608 — five of them full enrolments, including a
+          44.1 kHz one whose whole 30 s after the box's commit report is on file
+          — carry none. The 2 x 0x41 row is a prediction of the width rule and
+          may describe a frame that is never sent.
       - id: input_groups
         type: u1
         repeat: expr
