@@ -742,14 +742,12 @@ types:
           paragraph above. One rule covers both: propose in the announce,
           record in the scene, stamp the record with `revision`.
 
-          RATE CLASS, NOT CONSOLE GENERATION: three values across three
-          consoles settle this. An OHRCA desk (M-5000) can run this byte at
-          0x00 by pacing its own box at 48 kHz, so the byte is not bound to
-          the V-Mixer/OHRCA family split; a V-Mixer desk (M-200) reaches
-          0x02 at 44.1 kHz, a value no console-generation reading could
-          produce. An M-5000 captured driving its own box at 48 kHz — the
-          one console/rate pairing not yet on file — would confirm the
-          family-independence of the 0x00 value directly.
+          THE BYTE TRACKS THE PACE, NOT THE CONSOLE MODEL: the same M-200
+          has been captured writing 0x00 at 48 kHz and 0x02 at 44.1 kHz, and
+          an M-5000 and an S-1608 acting as master both write 0x01 at
+          96 kHz — one console reaching two values, and two different
+          consoles reaching the same value, rules out reading this byte as
+          a console identifier.
       - id: box_count
         type: u2
         doc: Enrolled boxes. 0x0000 idle -> 0x0001 once a box is granted; a
@@ -974,12 +972,13 @@ types:
           0x0001 the box took 96 kHz and then LATCHED there - neither a console
           assertion back to 48 kHz nor a daemon cold boot at `--rate 48000`
           moved it, because the value never changed and the box never re-read.
-          Derived from the announced generation instead (0 for V-Mixer/48 kHz,
-          1 for OHRCA/96 kHz) the same box followed the console in both
+          Derived from the announced pace code instead (0x00 at 48 kHz,
+          0x01 at 96 kHz) the same box followed the console in both
           directions: 8004 pps against our 8004 at 96 kHz and 4002/4002 at
           48 kHz, no wire-pace mismatch, drift -3.6 ppm, zero discards.
 
-          IT IS A RATE CLASS, NOT ONLY A CONSOLE GENERATION: a real M-200
+          IT IS A RATE CLASS THAT TRACKS THE MASTER'S PACE, NOT THE CONSOLE
+          MODEL: a real M-200
           writes `revision = 0x0002` in a scene header captured while
           mastering at 44.1 kHz — the same M-200, same MAC, writes
           `revision = 0x0000` at 48 kHz in 1,550 other scene headers, and an
