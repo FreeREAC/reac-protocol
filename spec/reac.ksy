@@ -710,18 +710,17 @@ types:
         type: u1
         doc: |
           The PACE CODE the box follows - 0x00 = 48 kHz, 0x01 = 96 kHz,
-          0x02 = 44.1 kHz. Measured 2026-09-11 on one desk (M-200 c9:cc:03):
-          0x00 while mastering at 48 kHz, 0x02 while mastering at 44.1 kHz;
-          the M-5000 captures write 0x01 at 96 kHz. Until that day the byte was
-          read as the console generation (0x00 V-Mixer M-200/M-300, 0x01 OHRCA
-          M-5000) - a coincidence of a corpus in which every V-Mixer session
-          ran 48 kHz and every OHRCA session 96 kHz; a desk does not change
-          generation with its clock. A box obeys the BYTE, not the cadence: an
-          S-4000S driven at 3675 frames/s with this byte at 0x00 returned
-          4000 frames/s (48 kHz). The ENROLL console byte and the scene body's
-          `revision` (+0x14) still carry the 0/1 generation and were NOT
-          re-measured at 44.1 kHz; whether they follow the pace code too is
-          open (the 44.1 kHz M-200 enrolment of 2026-09-11 is on file).
+          0x02 = 44.1 kHz. Measured across three consoles: 0x00 on the M-200
+          and M-300 at 48 kHz (30+ files, hundreds of announces); 0x01 on
+          the M-5000 at 96 kHz and on an S-1608 in master mode pacing
+          96 kHz; 0x02 on the M-200 at 44.1 kHz (144 announces in one
+          session, one more in another). A box obeys the BYTE, not the
+          cadence: an S-4000S driven at 3675 frames/s with this byte at
+          0x00 returned 4000 frames/s (48 kHz). The ENROLL console byte
+          and the scene body's `revision` (+0x14) carry the same three
+          values — see `revision` in `scene_body` — though the ENROLL byte
+          has not itself been captured through a box enrolment at
+          44.1 kHz.
 
           THE ANNOUNCE PROPOSES; THE SCENE DECIDES. This byte is broadcast at
           1 Hz and a box may act on it, but it is not where a box's rate class
@@ -743,20 +742,14 @@ types:
           paragraph above. One rule covers both: propose in the announce,
           record in the scene, stamp the record with `revision`.
 
-          RATE CLASS, NOT (JUST) CONSOLE GENERATION: read naively this looks
-          like "console generation" and it correlates, because every desk in
-          the corpus ran one rate. But the V-Mixer family is HARDWARE-limited
-          to 48 kHz, so the only off-family rate a real desk can reach is an
-          M-5000 (OHRCA) running its own box at 48 kHz — and that answer is
-          forced: it requires this byte to read 0x00. Were the byte purely
-          "family", an M-5000 would always emit 0x01 and could never run its
-          box at 48 kHz. So the byte declares a rate class, and the family
-          names are what the two known classes are called; an M-5000 captured
-          at 48 kHz would confirm this directly, and has not yet been captured.
-
-          44.1 kHz has no distinct value on this byte — it is binary — so it
-          maps to 0x00 and the box runs 48 kHz; 44.1 is a graph/RME rate, not
-          a REAC-wire rate.
+          RATE CLASS, NOT CONSOLE GENERATION: three values across three
+          consoles settle this. An OHRCA desk (M-5000) can run this byte at
+          0x00 by pacing its own box at 48 kHz, so the byte is not bound to
+          the V-Mixer/OHRCA family split; a V-Mixer desk (M-200) reaches
+          0x02 at 44.1 kHz, a value no console-generation reading could
+          produce. An M-5000 captured driving its own box at 48 kHz — the
+          one console/rate pairing not yet on file — would confirm the
+          family-independence of the 0x00 value directly.
       - id: box_count
         type: u2
         doc: Enrolled boxes. 0x0000 idle -> 0x0001 once a box is granted; a
@@ -896,7 +889,8 @@ types:
       the 8904 bytes vary and 8896 are constant. Two of the four varying runs are
       fields; two are M-5000 padding that changes between that desk's own runs.
 
-        +0x014      1 B   `revision`, 0 on a V-Mixer desk and 1 on an M-5000
+        +0x014      1 B   `revision`, a rate class: 0 at 48 kHz, 1 at 96 kHz,
+                          2 at 44.1 kHz (n=1 for the 44.1 kHz reading)
         +0x343..345 3 B   the low half of `master_id`
         +0x366..367 2 B   M-5000 only, uninitialised
         +0x22c6..7  2 B   M-5000 only, uninitialised
@@ -971,8 +965,7 @@ types:
           +0x14. The box caches this and compares it before it will re-read the
           three sub-objects: a body whose revision differs is treated as changed
           without any further comparison. EVIDENCED both — the compare is in the
-          image, and it is one of only two non-padding bytes that differ between
-          a V-Mixer desk (0x0000) and an M-5000 (0x0001).
+          image, and it is one of the non-padding bytes that differ across desks.
 
           SO IT IS THE VERSION STAMP ON THE DESK'S RECORD, and the only way any
           scene change reaches a box that has already cached one. A master that
@@ -986,12 +979,15 @@ types:
           directions: 8004 pps against our 8004 at 96 kHz and 4002/4002 at
           48 kHz, no wire-pace mismatch, drift -3.6 ppm, zero discards.
 
-          A CONSEQUENCE WORTH STATING: because the field is binary, a rate class
-          outside {V-Mixer 48k, OHRCA 96k} has no expression here. 44.1 kHz
-          therefore cannot be declared by this route - a master asking for it
-          lands the box on 48 kHz - and where a real desk expresses 44.1 is
-          still unknown. INFERRED; the deciding capture is a real desk at
-          44.1 kHz (reac-captures/CAPTURE-PLAN-next.md).
+          IT IS A RATE CLASS, NOT ONLY A CONSOLE GENERATION: a real M-200
+          writes `revision = 0x0002` in a scene header captured while
+          mastering at 44.1 kHz — the same M-200, same MAC, writes
+          `revision = 0x0000` at 48 kHz in 1,550 other scene headers, and an
+          M-5000 writes `revision = 0x0001` at 96 kHz, as does an S-1608 in
+          master mode pacing 96 kHz. So `revision` reads 0 at 48 kHz, 1 at
+          96 kHz and 2 at 44.1 kHz — the caveat is n=1: the 44.1 kHz reading
+          comes from a single scene header, the only one captured at that
+          rate so far.
       - id: reserved_16
         size: 4
       - id: slots
@@ -1505,6 +1501,13 @@ types:
       identical across M-200 / M-300 / M-5000 but for `console_field`. It is also
       not a placement carrier for another reason: most real S-1608 captures
       contain no 0x000d frame at all, yet the box is still placed at 0x20.
+
+      MEASURED AT WIDTH 8 AND WIDTH 32 ONLY. Every group-map frame in a large
+      corpus (107 total) reduces to one of two shapes: one front-packed 0x41
+      input group, 8-wide (n=95), or four, 32-wide (n=6) — each also seen with
+      `console_field = 0x01` from the M-5000 (n=4, n=2). No 16-wide (S-1608)
+      group-map frame has been captured — a 16-wide row is a prediction of the
+      width rule above, not a measurement.
     seq:
       - id: selector
         type: u1
@@ -1515,7 +1518,9 @@ types:
       - id: console_field
         type: u1
         doc: Console generation, 0x00 V-Mixer / 0x01 OHRCA — the same value cfea
-          carries.
+          carries. No group-map frame has been captured in a 44.1 kHz
+          session, so whether this byte also reaches 0x02 there is not
+          verified.
       - id: input_groups
         type: u1
         repeat: expr
@@ -2048,10 +2053,11 @@ types:
           box's own converter reference. The -10 at step 0 is inherited, not
           measured; the -65 is that plus the measured span.
   join_grant_data:
-    doc: TAG 0x0100 — the join grant. Observed as 06 00 XX 00 with XX the box's
-      join state, climbing 0x01 -> 0x09 over the establishment. The climb was
-      read as the box "locking to the probe rotation"; there is no probe and no
-      rotation, so what advances it is UNRESOLVED — it is not modelled here.
+    doc: TAG 0x0100 — the join grant. Observed as 06 00 XX 00 with XX odd-valued.
+      A master only ever emits XX = 0x01. Box-side echoes of this record also
+      carry 0x03, 0x05, 0x09, 0x0b and 0x0d — all odd, but wider than the
+      0x01..0x09 range once assumed, and 0x07 never occurs. What advances XX
+      between these box-side values is UNRESOLVED — it is not modelled here.
     seq:
       - id: body
         size-eos: true
