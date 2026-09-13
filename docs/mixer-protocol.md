@@ -298,10 +298,11 @@ A box on M sends no head-amp sweep, no identity requests and no group map to a s
 that joins it: the whole grant is the three records the slave declared, echoed back
 (`box-to-box-2026-09-13`, an S-1608 on M enrolling an S-4000S twice, against 56 or
 104 records from a console enrolling the same boxes). That is the purpose of the M
-position: a box whose head-amps were set beforehand runs a segment on its own, with
-no console on it, and any program on the wire takes the audio as it is. Head-amp
-control over a box on M does not exist on the wire, so a surface shows those controls
-as unavailable, never as broken.
+position: the box runs a segment on its own with no console on it, and its head-amps
+are configured out of band, through the box's serial port by Roland's remote-control
+software, while any program on the wire takes the audio as it is. Head-amp control
+over a box on M does not exist on the REAC wire, so a surface shows those controls as
+unavailable, never as broken.
 
 ## 10. Control-block kinds, by their two-byte tags
 
