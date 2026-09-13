@@ -55,9 +55,7 @@ single byte reading 0x00 for 48 kHz, 0x01 for 96 kHz, or 0x02 for 44.1 kHz. A bo
 follows this byte, but how strictly is firmware-dependent — one box family tracks the
 byte alone, another will not move until the scene transfer's own rate field agrees
 with it too (see §7's `revision` field, which is where a box's rate class actually
-settles, not the announce). 44.1 kHz has no distinct code of its own; the byte is
-binary, so 44.1 kHz operation on the box's own REAC segment reads as the 48 kHz
-value — 44.1 is a downstream studio rate, not a value this byte ever carries.
+settles, not the announce).
 
 ## 3. The master's downstream
 
@@ -237,10 +235,11 @@ deep in the body — and failing any one of them means the box promotes nothing 
 replies nothing, while the transfer still looks complete on the wire. Passing the
 three tags is enough for the box to commit even where the rest of the body is wrong,
 so the unchecked bytes are not free to get wrong either: they are read and acted on,
-just not validated. Among the fields the box reads is `revision` — 0 for the V-Mixer
-generation, 1 for the OHRCA (M-5000) generation — which is what actually settles a
-box's rate-class expectation; the `cf ea` pace code (§2) only proposes a rate, and a
-box whose firmware insists on agreement holds its prior rate until `revision` matches.
+just not validated. Among the fields the box reads is `revision` — the same pace
+code as the `cf ea` byte (0x00 at 48 kHz, 0x01 at 96 kHz, 0x02 at 44.1 kHz) — which
+is what actually settles a box's rate-class expectation; the `cf ea` pace code (§2)
+only proposes a rate, and a box whose firmware insists on agreement holds its prior
+rate until `revision` matches.
 
 The commit also has a real consequence for placement and for head-amp: it writes the
 same values into all eighty of the box's head-amp table slots in one pass, so a scene

@@ -139,10 +139,10 @@ instances:
       value never
       changed and the box never re-read.
       LOGIC: an M-5000 running its own box at 48 kHz must emit 0x00, so the
-      byte is the rate
-      class, not merely the console generation. Operator ruling
-      (2026-08-27): only OHRCA
-      drives 96 kHz; V-Mixer is 48 kHz-limited (M-300 @ 96 k impossible).
+      byte tracks the
+      pace chosen, not the console it came from — the M-200 already shows
+      this directly,
+      reaching 0x00 at 48 kHz and 0x02 at 44.1 kHz on the very same console.
       WIRE-CAPTURED (2026-09-13, reac-captures m200-enrol-441k-2026-09-13
       and
       m200-enrol-s4000-441k-2026-09-13): an M-200 at 44.1 kHz (3675 fps
