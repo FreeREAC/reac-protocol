@@ -131,6 +131,36 @@ Class `0x04` is the DT1 container; see [Source control](#source-control-head-amp
 
 `data[5..31]` carry the record body and the block checksum.
 
+#### The enroll group map (`0x10`)
+
+Twelve payload bytes, sent once about 210 ms after the box's commit report and before the grant
+burst:
+
+```
+cd ea 01 03 00 0d 10 | 04 PP 41×i 00×(5-i) 00×(5-o) c3×o | 00 … cksum
+```
+
+`04` is constant. **`PP` is the pace code** — the same rate class `cfea` block[17], the scene
+body's `revision` and the chanmap `0xfe` marker carry: `0x00` at 48 kHz, `0x01` at 96 kHz,
+`0x02` at 44.1 kHz. Then five input-group slots and five output-group slots, 5 × 8 = 40, the
+console's own fabric width: `0x41` front-packed, one per group of eight enrolled inputs, and
+`0xc3` back-packed in every slot that is not an input.
+
+| box | map bytes |
+|---|---|
+| 8 in | `04 PP 41 00 00 00 00 00 c3 c3 c3 c3` |
+| 32 in | `04 PP 41 41 41 41 00 00 00 00 00 c3` |
+
+The pace reading is settled by one console and one box class two bytes apart: M-200
+`00:40:ab:c9:cc:03` enrolling a 32-input box writes `04 00 41 41 41 41 …` at 48 kHz
+(`matrix-m200-s4000-2026-07-24`) and `04 02 41 41 41 41 …` at 44.1 kHz
+(`m200-enrol-s4000-441k-2026-09-13`, t = 1789330642.379775), identical in all eleven other
+bytes. `0x01` read as a console generation only because the M-5000 is the desk that runs 96 kHz.
+
+**A 16-input box is never sent one.** All 108 group maps in the corpus are 8-wide or 32-wide;
+22 captures whose only box is an S-1608, five of them full enrolments, carry none. The `2 × 41`
+row is a prediction of the width rule with no wire behind it.
+
 #### Reading the state-4 commit report and the link-check ack
 
 `01 03 00 10 82` is the box's **state-4 commit report** — the stagebox firmware
