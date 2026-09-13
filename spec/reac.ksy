@@ -1036,8 +1036,11 @@ types:
         size: 14
         doc: +0x35a. The value the commit passes on when `unit_map_select` is NOT
           1. EVIDENCED (image) that the commit reads here; its length is bounded
-          only by the next named field, and it is all zero on every capture, so
-          the SHAPE is INFERRED.
+          only by the next named field, and the SHAPE is INFERRED. It is all
+          zero on every CONSOLE capture; an S-1608 in master mode writes
+          `33 08` at +0x360 and `47 01` at +0x364, so the field is used and the
+          shape stays open (corpus, 2026-09-13,
+          `reac-captures box-to-box-2026-09-13`).
       - id: sysp
         type: scene_sysp
         doc: +0x368.
@@ -1102,6 +1105,17 @@ types:
         doc: +8. The other. EVIDENCED (image).
       - id: rest
         size: 11
+        doc: |
+          +9, 11 bytes. Zero on every console. ITS LAST TWO BYTES ARE WHERE
+          `XVSCEN` COMES FROM: at body +0x37a an S-1608 in master mode writes
+          `59 56`, and `scen.tag` begins at +0x37c, so an ASCII scan of that
+          body returns the six-character run `YVSCEN`. There is no six-byte tag
+          — the run is two bytes of this field abutting the four-byte `SCEN`,
+          and the box's commit gates on `SCEN` at +0x37c. The old notes'
+          `XVSCEN` (0x58 0x56 ...) is that run read one bit off, or the same
+          field carrying a different value on another device. EVIDENCED
+          (corpus, 2026-09-13, `reac-captures box-to-box-2026-09-13`, two
+          complete 8904-byte bodies, byte-identical).
   scene_scen:
     doc: |
       +0x37c to the end — the desk's SCENE sub-object, and the bulk of the body.
@@ -1286,12 +1300,19 @@ types:
       passes it to `FUN_0c007e6a` @0c007e6a, the SENS setter. The record and the
       head-amp DT1 record therefore reach one table by two routes.
 
-      CORROBORATED, and this is where the corpus and the firmware say different
-      things about USE rather than about layout: over 183 872 chanmap records in
-      72 captures the value byte is 0x00 every single time, and the flags byte
-      takes only 0x28 and 0x38 on real slots. So no console has ever been seen
-      to put a value in this record — the capability is in both box images and
-      nothing exercises it.
+      CORROBORATED: over 183 872 chanmap records in 72 captures the value byte
+      is 0x00 every single time and the flags byte takes only 0x28 and 0x38 on
+      real slots — but every one of those captures has a CONSOLE as the master.
+      No console has ever been seen to put a value in this record.
+
+      A BOX MASTER DOES. An S-1608 in M mode writes flags 0x18 (72), 0x28 (144),
+      0x30 (151) and 0x38 (72) on its own op-0x01 sweeps, with value 0x20 on 151
+      of 448 records, and the S-4000S enrolled to it echoes the same bytes back
+      in its op-0x81 replies. Control in the same pass: an M-200 driving that
+      same S-4000S writes 0x28/0x38 and value 0x00, 288 of 288. The capability
+      both box images carry is exercised — by a box master, never by a desk.
+      Note 0x30 clears bit 3, a combination no console emits. EVIDENCED
+      (corpus, 2026-09-13, `reac-captures box-to-box-2026-09-13`).
     seq:
       - id: slot
         type: u1
@@ -1447,10 +1468,23 @@ types:
           between two literal-pool bytes on a link-state test — S-1608 0x82
           (DAT_0c00401c) or 0x80 (DAT_0c00401e), S-4000 0x84 (DAT_0c013750) or
           0x83 (DAT_0c013752) — and the same branch decides `board_config_code`
-          below. So the corpus's clean 0x82-vs-0x84 split is the models' first
-          arms, and a box in the second arm would report a byte this schema
-          has never seen paired with its width. Read the cells for the width;
-          treat the selector as a hint. EVIDENCED (image + corpus).
+          below. The corpus's clean 0x82-vs-0x84 split is the models' first
+          arms. Read the cells for the width; treat the selector as a hint.
+          EVIDENCED (image + corpus).
+
+          THE SECOND ARM IS 0x80 ON BOTH MODELS, and 0x83 has never reached the
+          wire. An S-4000S (`00:40:ab:c4:06:80`) enrolling to an S-1608 in M
+          mode with no console on the segment declares selector 0x80, twice,
+          byte for byte. The SAME physical box declaring to an M-200 two hours
+          earlier declares 0x84, and the two blocks differ in exactly one byte
+          plus the checksum it drags (0x4c -> 0x50, the precise compensation):
+          `board_config_code` is 0x00 in both arms for this model and all twelve
+          cells are identical. So the second arm is one shared constant, not a
+          per-model pair, and this capture cannot speak to the zeroing (the byte
+          is already zero). EVIDENCED (corpus, 2026-09-13,
+          `reac-captures box-to-box-2026-09-13`, t = 1789331548.347566 and
+          1789331583.887980; the 0x84 row is `m200-enrol-s4000-441k-2026-09-13`
+          t = 1789330642.170256).
       - id: reserved
         size: 2
         doc: 00 00 on every capture.
