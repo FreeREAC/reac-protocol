@@ -697,8 +697,10 @@ types:
           NOT reuse a real desk's MAC here — it impersonates the console.
       - id: total_slots
         type: u1
-        doc: 0x28 = the 40-slot AUDIO fabric, on every console seen. Distinct from
-          the 48-slot head-amp channel space.
+        doc: 0x28 = the 40-slot AUDIO fabric, on every console seen (16 867
+          announces). Distinct from the 48-slot head-amp channel space. A BOX
+          IN MASTER MODE writes its own declared input width here instead —
+          0x10 on an S-1608, 0x20 on an S-4000S.
       - id: box_in_width
         type: u1
         doc: |
@@ -1436,26 +1438,31 @@ types:
       our wireshark dissector inherited the name, so a record that means "I have
       committed your scene" read as a record that means "hello, I exist".
 
-      PLACEMENT IS DELIBERATELY NOT IN THIS GRAMMAR. The per-model slot base
-      (an S-1608 is addressed at 0x20 while an S-0808 and an S-4000S are both at
-      0x00) is NEGOTIATED SESSION STATE, not a field: no byte in any frame
-      carries it. A 42-establishment, three-console, four-unit study killed every
-      candidate law that could be tested — lowest-fit, top-alignment, f(console),
-      f(enrolment order), f(box MAC), f(cell map), f(enroll map), f(chanmap) —
-      and left three carriers that the corpus cannot separate because they are
-      perfectly collinear across every row: the declared input WIDTH, the
-      `selector` byte, and `board_config_code` (for which `base == code * 0x10`
-      holds arithmetically on every row). Parse the carriers; do not encode a
-      base.
+      PLACEMENT IS IN THIS GRAMMAR: `base = board_config_code * 0x10`, a box's
+      own chassis strap, announced. Earlier passes here called it negotiated
+      session state carried by no byte, on a 42-establishment study that left
+      three carriers — declared input WIDTH, the `selector` byte and
+      `board_config_code` — collinear and unseparated. Two things separate them
+      now. The firmware traces `board_config_code` (`buf[7]`) to a single GPIO
+      read at `*0x0c080918`, taken before the RTOS starts — a hardware property
+      of the chassis, not something a master assigns. And the corpus has since
+      caught the tie-break directly: the same physical S-4000S
+      (`00:40:ab:c4:06:80`) declares `selector = 0x84` under a console and
+      `selector = 0x80` under a box master (see `selector` below) while
+      `board_config_code` stays `0x00` in both — the selector moves with the
+      peer, the strap does not. 35 corpus captures that join one box's config
+      announce to its own head-amp sweep confirm `base == board_config_code *
+      0x10` in all 35, across three box models and four consoles
+      (`reac-captures analysis/2026-09-13-announce-bytes-and-headamp-base.md`).
+      Declared WIDTH remains collinear with the strap on the three chassis we
+      own — an 8-input and a 32-input box both strap `0x00` — which is why a
+      width table looked law-shaped and is not one.
 
-      AND THE THIRD CARRIER IS NOW THE WEAKEST OF THE THREE, not the strongest.
-      It was called `unit_offset` and its arithmetic made it look like the law
-      in waiting. The image says it is a board-configuration code that also
-      selects which cell layout the box reports, so its collinearity with the
-      declared width is a mechanism and not a coincidence — which means it
-      carries no information the cells do not already carry, and cannot be the
-      base. See reac-pw docs/PLACEMENT-EVIDENCE.md for the corpus, the dead
-      candidates and the five-run experiment that would settle it.
+      `board_config_code` ALSO selects which cell layout the box reports (see
+      its own doc below), because both readings come off the same
+      board-presence GPIO. That shared origin is the mechanism behind the
+      collinearity, not evidence against the arithmetic: the byte that sizes
+      the cell table is the same byte the master multiplies by `0x10`.
     seq:
       - id: selector
         type: u1
@@ -1491,22 +1498,29 @@ types:
       - id: board_config_code
         type: u1
         doc: |
-          0x02 on the S-1608, 0x00 on the S-0808 and S-4000S. It was called
-          `unit_offset` and treated as the most law-shaped placement carrier,
-          because base == unit_offset * 0x10 holds on every observed row. THE
-          IMAGE SAYS IT IS NOT AN OFFSET.
+          0x02 on the S-1608, 0x00 on the S-0808 and S-4000S. Was called
+          `unit_offset`; it was renamed because a master does not assign it —
+          the box announces it — but the arithmetic that name pointed at
+          holds: `base = board_config_code * 0x10` is the head-amp CH base
+          (RESOLVED, see `commit_report_page` above and
+          `reac-captures analysis/2026-09-13-announce-bytes-and-headamp-base.md`).
 
           On the S-1608 it is FUN_0c00f6a8, which returns a cell set by
-          FUN_0c00f738 to 2 or 3 depending on a board-presence read; and that
+          FUN_0c00f738 to 2 or 3 depending on a board-presence read at
+          `*0x0c080918` — a GPIO strap taken before the RTOS starts; and that
           same cell is what FUN_0c00f7f8 consults to decide WHICH cell layout to
           install — 2 gives cells {2,2,2,2,1,1,3...} and anything else gives
-          {1,1,1,1,2,2,3...}. So this byte and the cells below are two views of
-          one board-configuration decision, which is exactly why they look
-          collinear with the width. It is also zeroed outright in the builder's
-          second arm, so it is not even a stable per-model value.
+          {1,1,1,1,2,2,3...}. So this byte and the cells below are two readings
+          of the SAME strap: it sizes the cell table and it is the head-amp
+          base's carrier, which is why it looks collinear with declared width
+          on every chassis we own rather than why it is coincidental. It is
+          zeroed outright in the builder's second arm (see `selector`'s
+          `0x84`-to-`0x80` capture) and stays zero there too — a stable
+          per-chassis strap, not a per-model value.
 
-          The arithmetic coincidence stands and the interpretation does not.
-          EVIDENCED (image, S-1608 FUN_0c003c8a + FUN_0c00f738 + FUN_0c00f7f8).
+          EVIDENCED (image, S-1608 FUN_0c003c8a + FUN_0c00f6a8 + FUN_0c00f738 +
+          FUN_0c00f7f8; corpus, 35 joined config-announce/head-amp-sweep
+          captures, three box models, four consoles, 2026-09-13).
       - id: cells
         type: u1
         enum: inventory_cell

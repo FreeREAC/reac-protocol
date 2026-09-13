@@ -189,20 +189,34 @@ The commit report's twelve inventory cells (`0x01` output, `0x02` analog input,
 
 ## MasterAnnouncePacket — type `0xcf 0xea`
 
-Overlaid on `data[]`: `{unknown1[9]; address[6]; inChannels; outChannels;
-unknown2[4]}`.
+Overlaid on `data[]`: `{op[2]; len[2]; header[5]; address[6]; totalSlots;
+upstreamWidth; paceCode; boxCount[2]; pad[11]; checksum}`. There are no unknown
+fields left in this block: all 32 bytes are named, and the block checksum verifies
+on all 35 distinct blocks in the corpus.
 
 | data | field | notes |
 |---|---|---|
-| 0..8 | unknown1[9] | master emits `ff ff 01 00 01 03 0d 01 04`. `data[6]` is the discriminator: `0x0d` = first/primary announce (carries channel counts); `0x0a` = the second announce confirming a split's identity (form `ff ff 01 00 01 03 0a 02 02`) |
-| 9..14 | address[6] | the master's MAC |
-| 15 | inChannels | master in-channel count |
-| 16 | outChannels | master out-channel count |
-| 17..20 | unknown2[4] | `01 <split?> 01 00`: `data[17]=0x01`; `data[18]=0x01` only immediately after a split-announce-response was just sent, else `0x00`; `data[19]=0x01`; `data[20]=0x00` |
+| 0..1 | op | `ff ff` = `control_op::announce`, the same slot `cd ea` uses for `01 03`. Constant on 17 025 of 17 025 announces |
+| 2..3 | len | `01 00`. Constant |
+| 4..8 | header[5] | `01 03 0d 01 04`. `data[6]` is the **announce kind**: `0x0d` = primary announce (the only value ever captured — 17 025 of 17 025, across 4 console models, 2 boxes in master mode, 3 rates and 105 files); `0x0a` = the split-announce response, whose header form is `01 03 0a 02 02`. `0x0a` has **never** been captured. The three bytes `data[6..8]` move together as the kind tuple; `data[0..5]` is fixed |
+| 9..14 | address[6] | the announcing master's MAC. Equals the source MAC on every real device; only our own stack has ever announced a MAC it does not own |
+| 15 | totalSlots | `0x28` (40) — the whole downstream fabric, matching the 1492-byte 40-channel frame — on every console, 16 867 frames. A **box in master mode** writes its own declared input width instead: `0x10` on an S-1608, `0x20` on an S-4000S |
+| 16 | upstreamWidth | the upstream width **in force on the segment**: `0x08` / `0x10` / `0x20`, tracking the enrolled box, and falling back to `0x08` while `boxCount` is zero. It is the width actually being sent, not the box's declaration: in `reac-captures box-to-box-2026-09-13` an S-4000S that declares 32 inputs sends 340-byte (8-channel) upstream frames under a box master and the master announces `0x08` |
+| 17 | paceCode | the **rate class**: `0x00` = 48 kHz, `0x01` = 96 kHz, `0x02` = 44.1 kHz. The same carrier as the ENROLL group map's `block[6]` and the chanmap section marker's second byte |
+| 18..19 | boxCount | `u2` big-endian, enrolled boxes. `0x0000` → `0x0001` when a box commits and back when it drops; 43 corpus files carry both values from one talker. The high byte has never been non-zero |
+| 20..30 | pad[11] | zero on 17 040 of 17 040. Unread; a value here has never been observed |
+| 31 | checksum | the block's 8-bit modular checksum (see the `data[32]` section) |
 
-A receiver recovers the master from `data[6]==0x0D` (master announce),
-MAC = `data[9..14]`, in = `data[15]`, out = `data[16]`. A master also connected to a
-slave doubles the advertised channel counts.
+A receiver recovers the master from `data[6]==0x0d`, MAC = `data[9..14]`,
+fabric = `data[15]`, upstream width = `data[16]`, rate class = `data[17]`, and
+whether a box is enrolled from `data[18:20]`.
+
+**The pace code is measured, not inferred from a filename.** One M-200
+(`00:40:ab:c9:cc:03`) writes `0x00` at a measured 4000 pps and `0x02` at a measured
+3675 pps; at a measured 8005 pps an S-1608 and an S-4000S — neither of them a
+console — both write `0x01`. Corpus totals: `0x00` x15 315, `0x01` x1 487,
+`0x02` x238 over 17 040 announces in 105 files
+(`reac-captures analysis/2026-09-13-announce-bytes-and-headamp-base.md`).
 
 ## Audio de-interleave — one layout, every generation
 
@@ -645,45 +659,52 @@ TAG contributes a constant `0x02` — but that shortcut is a special case, not t
 > correct **outer** sum wrapped around a **garbage inner** one, and the box rejects a frame that looks
 > perfect on the wire. Set the Roland DT1 (inner) checksum **first**, then the REAC block (outer) one.
 
-### CH carries a BASE keyed on the box's DECLARED WIDTH
+### CH carries a BASE the box ANNOUNCES: config-announce `block[7]` x `0x10`
 
 ```
 CH = base + (box_input - 1)
+base = config-announce block[7] * 0x10
 
- 8 inputs  (S-0808)   base  0  ->  0x00..0x07
-16 inputs  (S-1608)   base 32  ->  0x20..0x2f     <- not 0x00..0x0f
-32 inputs  (S-4000S)  base  0  ->  0x00..0x1f
+ S-0808   8 in   block[7] = 0x00  ->  base 0x00  ->  0x00..0x07
+ S-1608  16 in   block[7] = 0x02  ->  base 0x20  ->  0x20..0x2f
+ S-4000S 32 in   block[7] = 0x00  ->  base 0x00  ->  0x00..0x1f
 ```
 
-**No byte on the wire carries this.** It is negotiated session state: the box declares its
-width in the cold-connect escalation and the master picks the base. So a parser cannot read
-it out of a frame — `spec/reac.ksy` deliberately does not encode it, and parses the
-carriers as typed fields and stops there. A base-lookup implementation must refuse any width
-it has not seen rather than guess.
+**A byte on the wire does carry this**, and it is the box's own property, not
+negotiated session state. `block[7]` of the config announce (`01 03 00 10`) is a
+GPIO chassis strap the box reads before its RTOS starts — S-1608 firmware
+`FUN_0c003c8a` writes `buf[7]` from the strap at `*0x0c080918` and
+`FUN_0c007fbc(bank, group)` applies it — so a master cannot move where a head-amp
+write lands by granting differently.
 
-**What exactly keys the base assignment is not fully separated** from two other carriers
-present at the same time (the config-announce selector and `unit_offset`), which are
-collinear with declared width on every establishment observed so far. Width is the one
-named here because it is isolated from box identity (see below); it is not isolated from
-the other two.
+Measured on 35 corpus captures that carry exactly one box's config announce and a
+head-amp sweep: the sweep's lowest channel equals `block[7] * 0x10` in all 35, over
+three box models and four consoles, at 44.1, 48 and 96 kHz.
 
-The base value is **stable per width**: two different physical S-1608 units base at 32 and
-emit byte-identical TAG `05 00` records; three different consoles (M-200 / M-300 / M-5000)
-address an S-1608 at 32; and an S-1608 alone on an empty segment, with `0..7` entirely free,
-is still addressed at 32 — so the base is **not** collision-avoidance.
+**A per-width table is wrong even though it agrees here.** The retired mapping
+(8 -> 0, 16 -> 32, 32 -> 0) matches every chassis we own only because width and strap
+are collinear across those three. An 8-input box and a 32-input box are **both**
+addressed at `0x00`, so a width cannot be what selects a base; the first box that
+breaks the collinearity would have its preamps addressed 32 slots off with every
+gate still green. `(box_index << 5)` is refuted the same way.
 
-Two boxes coexist at `0x00..0x07` + `0x20..0x2f`, contiguous and non-overlapping. `(box_index
-<< 5)` is **refuted**: the 32-ch S-4000 bases at 0, like the 8-ch S-0808. Why the S-1608
-bases at 32 specifically is not verified — the three collinear carriers (width, the
-config-announce selector, `board_config_code`) cannot be separated by any establishment
-in the corpus; settling it needs a box-to-box enrolment (a pairing the corpus lacks
-entirely), since that is the only pairing observed to produce the selector's other arm.
+**The ENROLL group map does not assign it either.** Every group map in the corpus is
+front-packed from the first input-group slot, so a 1x`0x41` map and a 4x`0x41` map
+both describe a box at base `0x00` and the map cannot separate them. Decisively, the
+one box whose base is **not** zero never receives a group map at all: no console in
+the corpus sends one to a 16-input declarer.
 
-> **A master assigns the base from the box's declared WIDTH, not from a model-identity string.**
-> `CH = channel - 1` is correct for an S-0808 and addresses nothing on an S-1608. The width is
-> carried by the escalating cold-connect (`0014 → 0013 → 0016 → 001a`); the master allocates
-> width-many contiguous fabric slots (see the grant-sweep note): 8-in → base 0, 16-in → base 32,
-> 32-in → base 0 (a 32-in box cannot base at 32 — `0x20+31 = 0x3f` runs past the `0x2f` ceiling).
+**The selector and the strap are still collinear, and the strap is the better-founded
+of the two.** Every `0x82` declarer straps `0x02` and every `0x84`/`0x80` declarer
+straps `0x00`, so no head-amp measurement separates them. But one S-4000S
+(`00:40:ab:c4:06:80`) has now been captured emitting `block[4] = 0x84` under a console
+and `block[4] = 0x80` under a box master, with `block[7] = 0x00` and all twelve
+inventory cells unchanged: the selector follows the peer, the strap does not, and a
+base that followed the peer would be absurd for a GPIO strap.
+
+An implementation reads the base from the announce, once, when the announce parses.
+It does not derive it from a width and it has no sentinel for "not known yet": a box
+that has not announced has nothing to address.
 
 Everything else in the head-amp record is **model-independent**: the same three params in the same
 order, the same `0x7e` invariant, the same linear SENS law, verified on both an S-0808 and an S-1608.
@@ -906,6 +927,26 @@ The master accepts a split by capturing the split's MAC from `data[9..14]` and
 replying inside a `MASTER_ANNOUNCE` with a split-announce response: `data[6]=0x0a`,
 `data[9..14]` = the split's MAC, `data[15]=0x00`, `data[16]=0x60` (the assigned split
 identifier the split later echoes in its `data[2]`; "0x04 and up seems to be fine").
+
+**None of this has ever been on the wire.** The handshake above is source-derived
+from `per-gron/reacdriver` by way of reac-aes67's `REAC-PROTOCOL.md` §6; there is no
+capture and no decompiled firmware behind it. Measured against the whole corpus —
+111 files, 6 450 414 REAC frames — there are **zero** `0xceea` and **zero** `0xc2ea`
+frames at the type word, against 17 040 `0xcfea` and 470 535 `0xcdea` found by the
+same scan. A byte-pattern sweep of `frame[0:52]` finds `ce ea` 95 times and `c2 ea`
+97 times and every one is the free-running counter at offset 14 or a single audio
+byte at offset 50; none is a type word.
+
+The four announce bytes this handshake would move are all pinned to their non-split
+values across the corpus: `data[6]` is `0x0d` on 17 025 of 17 025, `data[15]` is
+never `0x00` except in an all-zero block, `data[16]` is never `0x60`, and `data[18]`
+is `0x00` on 17 040 of 17 040 — `data[18]` is the high byte of the enrolled-box
+count, not a split flag.
+
+Capturing it needs an S-4000 series box with its REAC Mode switch set to **SP** and
+power-cycled (the switch is read at boot and never re-read), one port on a VLAN to a
+console and the other on a VLAN to a second master, and one mirror port carrying both
+VLANs.
 
 ### Slave handshake (partial in the driver)
 

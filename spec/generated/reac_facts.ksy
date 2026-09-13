@@ -1172,22 +1172,23 @@ instances:
       one number in this group whose absolute value the loopback DOES
       measure. [EVIDENCED (rig) — 20.12 and 20.20 dB by A/B/A at steps 0x37
       and 0x28, against pad-off controls of 0.11 and 0.16 dB.]
-  # ---- Head-amp base per declared width ----
+  # ---- Head-amp base per declared width — derived, not the law ----
   placement_base_in8:
     value: 0x00
     doc: |
-      S-0808. [EVIDENCED (corpus) — 42 grant sweeps across 82 captures.]
+      S-0808, strap 0x00. [EVIDENCED (corpus) — 42 grant sweeps across 82
+      captures.]
   placement_base_in16:
     value: 0x20
     doc: |
-      S-1608. The one width that is not zero, and the reason a 40-bounded
-      table drops half the box. [EVIDENCED (corpus).]
+      S-1608, strap 0x02. The one width that is not zero, and the reason a
+      40-bounded table drops half the box. [EVIDENCED (corpus).]
   placement_base_in32:
     value: 0x00
     doc: |
-      S-4000S. Wider than the S-1608 and still based at 0 — which is what
-      kills "lowest fit" and "top alignment" as candidate laws. [EVIDENCED
-      (corpus).]
+      S-4000S, strap 0x00. Wider than the S-1608 and still based at 0 —
+      which is what kills "lowest fit" and "top alignment" as candidate
+      laws. [EVIDENCED (corpus).]
   # ---- The config-announce port table ----
   ports_table_off:
     value: 8
