@@ -985,9 +985,15 @@ types:
           `revision = 0x0000` at 48 kHz in 1,550 other scene headers, and an
           M-5000 writes `revision = 0x0001` at 96 kHz, as does an S-1608 in
           master mode pacing 96 kHz. So `revision` reads 0 at 48 kHz, 1 at
-          96 kHz and 2 at 44.1 kHz — the caveat is n=1: the 44.1 kHz reading
-          comes from a single scene header, the only one captured at that
-          rate so far.
+          96 kHz and 2 at 44.1 kHz.
+
+          THE n=1 CAVEAT IS LIFTED. Three complete 8904-byte bodies recovered
+          from an M-200 mastering at 44.1 kHz all read `revision = 0x0002` and
+          are byte-identical to each other; diffed against a body from the SAME
+          console MAC at 48 kHz they differ in exactly ONE byte of 8904, and it
+          is this one. Everything else — `master_id`, both tag blocks, all 880
+          records — is the same at both rates. EVIDENCED (corpus, 2026-09-13,
+          `reac-captures m200-enrol-441k-2026-09-13/analysis.md`).
       - id: reserved_16
         size: 4
       - id: slots
@@ -1366,9 +1372,21 @@ types:
           the getter, 0x0c0046c4 -> 0x0c0051c4 the setter).
 
           Reading the byte as "the master's identity" is INFERRED from that
-          mechanism; the firmware names nothing. CORROBORATED: 3 804 such
-          records in the corpus, carrying flags 0x00 (3 586) and 0x01 (218),
-          value always 0.
+          mechanism; the firmware names nothing. CORROBORATED: such records
+          appear in every session, value always 0.
+
+          THE FLAGS BYTE IS THE PACE CODE — the same three-valued rate class
+          `cfea` block[17] and `scene_body.revision` carry. Per talker over
+          108 captures / 5 295 229 REAC frames, every real device is collinear:
+          M-200 `c9:cc:03` writes 0x00 in 3 178 sweeps at 48 kHz and 0x02 in 24
+          at 44.1 kHz, against `cfea` pace 0x00 / 0x02 on the same MAC; M-200i,
+          M-300 and two more desks write 0x00 with pace 0x00; two M-5000s write
+          0x01 with pace 0x01; and an S-1608 and an S-4000S in master mode at
+          96 kHz write 0x01 too — neither is an OHRCA console, which is what
+          rules out a console-generation reading. Only our own stack breaks the
+          line (reac-pw emits pace 0x01 with marker 0x00 in 11 sweeps), and that
+          is a defect on our side. EVIDENCED (corpus, 2026-09-13,
+          `reac-captures m200-enrol-441k-2026-09-13/analysis.md`).
       is_filler_record:
         value: 'slot == 0xff'
         doc: |
@@ -1517,10 +1535,16 @@ types:
         doc: 0x04.
       - id: console_field
         type: u1
-        doc: Console generation, 0x00 V-Mixer / 0x01 OHRCA — the same value cfea
-          carries. No group-map frame has been captured in a 44.1 kHz
-          session, so whether this byte also reaches 0x02 there is not
-          verified.
+        doc: |
+          Console generation, 0x00 V-Mixer / 0x01 OHRCA — the same value cfea
+          carries. Whether it also reaches 0x02 at 44.1 kHz is still not
+          verified, and the reason is now known: NO CONSOLE HAS EVER BEEN SEEN
+          TO SEND A GROUP MAP TO A 16-INPUT BOX. All 107 group maps in the
+          corpus are 8-wide or 32-wide; 22 captures whose only box is an
+          S-1608 — five of them full enrolments, including a 44.1 kHz one whose
+          whole 30 s after the box's commit report is on file — carry none.
+          The settling capture is an M-200 at 44.1 kHz enrolling an S-0808 or an
+          S-4000S; a 44.1 kHz session with an S-1608 will not produce one.
       - id: input_groups
         type: u1
         repeat: expr
