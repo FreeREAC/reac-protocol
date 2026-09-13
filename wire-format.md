@@ -893,6 +893,11 @@ claim of a fixed cadence would be wrong.
 
 ## Handshakes [S]
 
+> **Narrative companion.** [`docs/mixer-protocol.md`](docs/mixer-protocol.md) walks
+> this whole control plane end to end — the master's downstream cadence, enrolment,
+> head-amp control, the scene transfer, trunk VLANs and a box on M — as one
+> continuous account rather than a field-by-field reference.
+
 Audio is a continuous broadcast stream (no per-packet request/response). Connection
 setup is a call/answer exchange in `data[32]`, driven by the periodic
 `MASTER_ANNOUNCE` (re-announced ~once/second).
