@@ -32,14 +32,11 @@ LAN / access port, **never over the same Wi-Fi hop you are measuring**.
 
 ## Decode audio
 
-De-interleave the 1440 B audio region into planar 24-bit LE PCM:
-
-- **M-5000-class:** plain sample-major — channel `ch`, sample `s` at
-  `(s*n_channels + ch)*3`.
-- **obs-h8819-class:** the even/odd braid (see [wire-format.md](wire-format.md)).
-
-Output is planar (channel 0's samples, then channel 1's, …), 3 bytes per sample.
-Decode returns samples-per-channel (12) per frame.
+De-interleave the 1440 B audio region into planar 24-bit LE PCM using the even/odd
+braid — the one layout REAC uses, at every device generation (see
+[wire-format.md](wire-format.md) for the byte-level rule). Output is planar
+(channel 0's samples, then channel 1's, …), 3 bytes per sample. Decode returns
+samples-per-channel (12) per frame.
 
 ## Sanity-check the rate
 
