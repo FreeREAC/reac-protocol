@@ -9,12 +9,11 @@ Part of [FreeREAC](https://github.com/FreeREAC) — *REAC Exposed Audio
 Communications*.
 
 > This is **not** official Roland documentation. REAC is a Roland trademark; this is
-> an independent reference derived from our own packet captures, from GPL-licensed
-> open-source reverse-engineering projects, and from a reverse-engineering pass on
-> console firmware — all **re-expressed in our own words and tables**. No Roland
-> binaries, symbols, or disassembly listings are reproduced. Reverse engineering for
-> interoperability is permitted and protocol interfaces are not copyrightable.
-> *(Not legal advice.)*
+> an independent reference, re-expressed in original words and tables from packet
+> captures, GPL-licensed open-source reverse-engineering projects, and a
+> reverse-engineering pass on console firmware. No Roland binaries, symbols, or
+> disassembly listings are reproduced. Reverse engineering for interoperability is
+> permitted and protocol interfaces are not copyrightable. *(Not legal advice.)*
 
 ## Documents
 
@@ -25,11 +24,8 @@ Communications*.
 - **[spec/reac.ksy](spec/reac.ksy)** — the wire format as a **machine-checkable
   [Kaitai Struct](https://kaitai.io) grammar**: the `0x8819` frame family in both
   directions, the control multiplex, the `op 04 03` DT1 record container, the two
-  nested checksums, and the audio region described structurally. The prose below is
-  the readable rendering of the same facts; this is the one a machine can check.
-  [`spec/README.md`](spec/README.md) explains the three roles — libreac is the
-  executable C oracle, the `.ksy` is the formal spec, and the parser generated from it
-  is the referee that cross-validates the two against checked-in golden captures.
+  nested checksums, and the audio region described structurally. The prose in this
+  reference is the readable rendering of the same facts.
 - **[wire-format.md](wire-format.md)** — the wire-format reference: frame geometry,
   the sequence counter, roles and addressing, the frame-type registry, the CONTROL
   checksum, audio de-interleave, sample rates, clocking, the connection handshakes,
@@ -39,47 +35,32 @@ Communications*.
   declarative, DMX-style periodic re-assert of the whole console state) with a full
   connection-lifecycle state diagram.
 - **[spec/protocol-facts.yaml](spec/protocol-facts.yaml)** — the constants the grammar
-  and libreac each used to spell independently, written once: frame geometry, the scene
-  transfer, the tags the box validates, both checksum rules, the op codes and sub-page
-  selectors, and the three head-amp granularities. `spec/gen-facts.py` writes libreac's
-  `#define` block, an importable Kaitai type and a block of `_Static_assert`s from it;
-  `spec/facts_xcheck.py` holds the grammar to it and `spec/xcheck_ctrl_oracle.py` makes
-  libreac build frames the generated parser has to read back.
-- **[firmware-protocol.md](firmware-protocol.md)** — the protocol as the DEVICE FIRMWARE
-  states it, rather than as the wire shows it: the class names the images still carry, the
-  message inventory read out of the receive dispatch (including the arms nobody has ever
-  sent us), the box state machine with its failure edges, the struct layouts and every
-  indexing shift as a granularity fact. Each row carries a firmware function and address,
-  and each is marked CORROBORATED against the capture corpus or FIRMWARE-ONLY. Its last
-  section is the one to read first: what the firmware CONTRADICTS in the documents above.
-- **[capturing.md](capturing.md)** — how to capture and decode REAC yourself: the
-  raw socket / tcpdump filter, frame validation, de-interleave, rate sanity-checks,
-  and the traps (VLAN tags, level correctness).
+  and libreac each need, written once: frame geometry, the scene transfer, the tags
+  the box validates, both checksum rules, the op codes and sub-page selectors, and
+  the three head-amp granularities.
+- **[firmware-protocol.md](firmware-protocol.md)** — the protocol as the device
+  firmware states it, rather than as the wire shows it: the class names the images
+  carry, the message inventory in the receive dispatch (including arms not seen on
+  the wire), the box state machine with its failure edges, the struct layouts and
+  every indexing shift as a granularity fact.
+- **[capturing.md](capturing.md)** — how to capture and decode REAC: the raw socket /
+  tcpdump filter, frame validation, de-interleave, rate sanity-checks, and the traps
+  (VLAN tags, level correctness).
 - **[firmware-findings.md](firmware-findings.md)** — device behaviour derived from
-  firmware RE and live-hardware observation, re-expressed: on-rig verification,
-  slave establishment, the **head-amp commit model** (what actually arms a channel,
-  and the staging-vs-active theory that was falsified), the AES/EBU crossbar, the
-  remote-control (RCP) command surface, and bidirectional-TX feasibility. Its final
-  section goes source-level: the M-300/S-1608 connection engine as the Ghidra
-  decompile shows it — function map, the three master FSMs, the box FSM, and a
-  point-by-point reconciliation against the wire.
-
-## Status tags
-
-Facts are tagged by provenance:
-
-- **[V]** verified on our own captures
-- **[S]** from an upstream open-source RE codebase
-- **[?]** inferred or pending live confirmation
+  firmware reverse-engineering and live-hardware observation: on-rig verification of
+  the wire spec, slave establishment, the head-amp commit model (what arms a
+  channel), the AES/EBU crossbar, the remote-control (RCP) command surface, and
+  bidirectional-TX feasibility. Its final section goes source-level: the M-300 /
+  S-1608 connection engine — function map, the master FSMs, the box FSM, and the
+  wire-level signature of each phase.
 
 ## Sources
 
-Derived from packet captures plus three GPL-3.0 reverse-engineered codebases
-(`per-gron/reacdriver`, `norihiro/obs-h8819-source`, `norihiro/reaccapture`), our
-own decoder, and re-expressed firmware findings. The raw working material the
-reference is distilled from lives in
-[reac-lab](https://github.com/FreeREAC/reac-lab); tools to capture and analyse REAC
-are in the [reac-tools](https://github.com/FreeREAC) and
+Derived from packet captures, three GPL-3.0 reverse-engineered codebases
+(`per-gron/reacdriver`, `norihiro/obs-h8819-source`, `norihiro/reaccapture`), an
+independent decoder, and a reverse-engineering pass on console and stagebox
+firmware. Tools to capture and analyse REAC are in the
+[reac-tools](https://github.com/FreeREAC) and
 [reac-aes67](https://github.com/FreeREAC) repos.
 
 ## License
