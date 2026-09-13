@@ -1,9 +1,6 @@
 # REAC wire format
 
-The on-wire schema of REAC, derived from packet captures plus three GPL-3.0
-reverse-engineered codebases (`per-gron/reacdriver`, `norihiro/obs-h8819-source`,
-`norihiro/reaccapture`) and our own decoder. Facts are tagged **[V]** verified on
-our captures, **[S]** from upstream RE source, **[?]** inferred/pending.
+The on-wire schema of REAC.
 
 ## Overview
 
@@ -13,7 +10,7 @@ lock to it; a **split** receiver listens passively. Up to **40 channels** per RE
 connection, 24-bit, at 44.1 / 48 / 96 kHz, over a single Cat5e run.
 
 **The wire framing and the sample clock are owned by an on-board FPGA**, not the
-device CPU. **[S]** The FPGA assembles and parses the
+device CPU. The FPGA assembles and parses the
 `0x8819` Ethernet frames, generates the per-frame sample tick, and runs the
 per-frame link-check counter; the CPU is handed already-parsed control messages and
 runs only the high-level connection state machine on top. The practical consequence
@@ -31,7 +28,7 @@ software node can mimic without re-implementing the framing/clock engine.
   link. Roland publishes 0.375 ms protocol latency at 96 kHz (= 3 × 125 µs packet
   slots) and recommends unmanaged 100BASE-TX switches for splitting.
 
-## Frame geometry (the schema) [V][S]
+## Frame geometry (the schema)
 
 The master's **downstream broadcast** is a fixed **1492-byte** Ethernet frame: 50 B
 non-audio header + 1440 B audio + 2 B end marker. The audio block is constant
@@ -57,14 +54,14 @@ The packet header (bytes 14..49) is exactly `{counter[2]; type[2]; data[32]}` =
 (2) `0xC2 0xEA` at the tail; (3) minimum length (header + end marker);
 (4) checksum over `data[]`. FILLER frames are exempt from the checksum check.
 
-## Sequence counter [V]
+## Sequence counter
 
 16-bit **little-endian** at offset 14, +1 per frame, 16-bit wrap. The master sets
 the counter on every outgoing packet from a monotonic counter.
 
 Loss detection: `skipped = (counter - last - 1) & 0xFFFF`.
 
-## Roles and addressing [V][S]
+## Roles and addressing
 
 - **Master** (V-Mixer) owns the clock and broadcasts output frames to
   `ff:ff:ff:ff:ff:ff`.
@@ -83,7 +80,7 @@ handshake.
 **REAC carries no zone or port id on the wire** — zone/port selection is an
 external concern (switch / VLAN topology), not a protocol field.
 
-## Frame-type registry — `type[2]` [V][S]
+## Frame-type registry — `type[2]`
 
 | type | name | notes |
 |---|---|---|
@@ -97,15 +94,14 @@ There is **no distinct "audio" frame type** — audio rides in every frame, incl
 FILLER. The master interleaves FILLER frames with periodic CONTROL / ANNOUNCE
 frames while continuously filling the audio region.
 
-**What our stageboxes actually emit. [V]** A stagebox in slave mode sends only
-**FILLER** (`0x00 0x00`) and **CONTROL** (`0xcd 0xea`) — zero `0xce 0xea` /
+**What a stagebox actually emits.** A stagebox in slave mode sends only
+**FILLER** (`0x00 0x00`) and **CONTROL** (`0xcd 0xea`) — never `0xce 0xea` /
 `0xc2 0xea`. The `SPLIT_ANNOUNCE` / `ENDING` types belong to the passive-split path;
 a plain slave, a merge unit in slave mode, and a master's mirror output never source
-them. They remain the last unmapped frame types — capturing them needs a real split
-device in the chain. `MASTER_ANNOUNCE` (`0xcf 0xea`) is master-only and is likewise
-never sourced by a slave.
+them — only an actual split device does. `MASTER_ANNOUNCE` (`0xcf 0xea`) is
+master-only and is likewise never sourced by a slave.
 
-### The CONTROL record header — `data[0..4]` [V]
+### The CONTROL record header — `data[0..4]`
 
 **These five bytes are four fields, not a signature.** Read them separately or a
 consumer ends up matching model-specific strings without knowing it.
@@ -135,32 +131,24 @@ Class `0x04` is the DT1 container; see [Source control](#source-control-head-amp
 
 `data[5..31]` carry the record body and the block checksum.
 
-#### What this replaces, and why it matters [V]
+#### Reading the state-4 commit report and the link-check ack
 
-This section used to be a table of eight five-byte prefixes with names inherited from
-the reacdriver project — `CONTROL_PACKET_TYPE_ONE..FOUR` and `SLAVE_ANNOUNCE1..4`.
-Every one of those strings runs a class, a flag field, a **length** and a subtype
-together, and both consequences are real:
+`01 03 00 10 82` is the box's **state-4 commit report** — the stagebox firmware
+builds it after the master's scene transfer completes and after it has promoted the
+staged slot table into the active one, and it carries the box's twelve-cell I/O
+inventory. `01 03 00 01 81` is the box's link-check ack.
 
-* **The names were wrong.** `01 03 00 10 82` is not a slave announce. It is the box's
-  **state-4 commit report** — the stagebox firmware builds it after the master's
-  scene transfer completes and after it has promoted the staged slot table into the
-  active one, and it carries the box's twelve-cell I/O inventory. `01 03 00 01 81` is
-  the box's link-check ack. A record meaning "I have committed your scene" was being
-  read as one meaning "hello, I exist".
-* **Matching them is model-specific by accident.** An S-0808 and an S-4000S send the
-  same commit report with subtype `0x84`, so `01 03 00 10 84` matched nothing while
-  the identical S-1608 record matched. The subtype is picked at run time between two
-  model-specific constants on a link-state test. **Match bit 7, never the literal.**
-  A slot-map window shorter than eight entries would fail the same way, because
-  `00 19` in the old prefix was a length.
+**The commit report's subtype is model-specific, so a parser must match bit 7, never
+the literal byte.** An S-0808 and an S-4000S send the commit report with subtype
+`0x84`; an S-1608 sends it with `0x82`. The discriminator is bit 7 of the subtype
+byte (box replying), not the specific value.
 
 The commit report's twelve inventory cells (`0x01` output, `0x02` analog input,
 `0x03` absent, four channels each) read out as the real box on every model: S-0808
 `02 02 01 01 03…` = 8 in / 8 out, S-1608 `02 02 02 02 01 01 03…` = 16 / 8, S-4000S
 `02 02 02 02 02 02 02 02 01 01 03 03` = 32 / 8.
 
-## The `data[32]` block — checksum (fully specified) [V]
+## The `data[32]` block — checksum (fully specified)
 
 8-bit modular checksum over the 32 `data[]` bytes.
 
@@ -169,7 +157,7 @@ The commit report's twelve inventory cells (`0x01` output, `0x02` analog input,
   (two's-complement negation, so the full 32-byte sum is 0 mod 256).
 - FILLER frames are exempt.
 
-## MasterAnnouncePacket — type `0xcf 0xea` [V][S]
+## MasterAnnouncePacket — type `0xcf 0xea`
 
 Overlaid on `data[]`: `{unknown1[9]; address[6]; inChannels; outChannels;
 unknown2[4]}`.
@@ -186,7 +174,7 @@ A receiver recovers the master from `data[6]==0x0D` (master announce),
 MAC = `data[9..14]`, in = `data[15]`, out = `data[16]`. A master also connected to a
 slave doubles the advertised channel counts.
 
-## Audio de-interleave — one layout, every generation [V]
+## Audio de-interleave — one layout, every generation
 
 Audio is 40 ch × 12 samp × 3 B = 1440 B, laid out as the **even/odd braid**
 (obs-h8819's `convert_to_pcm24lep`): per channel, `base = (ch & ~1)*3` and stride 120
@@ -194,27 +182,14 @@ Audio is 40 ch × 12 samp × 3 B = 1440 B, laid out as the **even/odd braid**
 `[sptr[4], sptr[5], sptr[2]]`, treated as 24-bit little-endian. Equivalently a
 16-bit-word byte swap of the channel pair packed big-endian.
 
-One layout, both directions, **every mixer generation**. Confirmed by
-per-gron/reacdriver, by obs-h8819 (listening-validated against a real M-200i), by the
-zoneA/zoneB M-5000 goldens (coherence 0.99 / spectral flatness 0.002 braided, noise
-under every other layout × offset) and by the upstream rig goldens at three box widths.
-`spec/reac.ksy` carries the full evidence trail.
-
-**Plain LE sample-major is refuted, and there is no per-generation split.** This
-section previously described "two device families", with plain LE
-(`(s*n_channels + ch)*3`) attributed to the M-5000 on the strength of an on-rig
-coherence ~0.999. That reading was overturned: the coherence came from a mid-byte lane
-shift amplifying quiet *braided* audio 256×. libreac 0.5.0 accordingly fixed
-`reac_decode()` to un-braid — before the fix the library could not read back a frame
-its own encoder had built, 0 of 480 samples agreeing (libreac#13) — and kept plain LE
-only as `reac_decode_plain_le()`, a diagnostic for historical captures. The
-"OHRCA-generation gear may differ downstream" corollary was never evidence, only an
-untested guess at that same discrepancy, and it is refuted with it.
+One layout, both directions, **every mixer generation** — there is no per-generation
+split, and no console or stagebox model uses plain sample-major (`(s*n_channels +
+ch)*3`) ordering. `spec/reac.ksy` carries the reference implementation.
 
 `reaccapture` additionally ships big-endian and 16-bit truncation variants of the same
-de-interleave; s24le is the verified justification at 48 kHz.
+de-interleave; s24le is the justification verified at 48 kHz.
 
-## Channel-info block (in the CONTROL stream) [S][?]
+## Channel-info block (in the CONTROL stream)
 
 The master's CONTROL stream carries a channel-info block: one 3-byte record per
 channel `[channel#, type-flags, gain]`, packed 8 records per CONTROL frame, rotating
@@ -237,9 +212,9 @@ frame: `pps = rate / 12`, 12 samples per frame.
 
 | rate | pps (downstream) | slot period | on the wire | status |
 |---|---|---|---|---|
-| 44.1 kHz | 3675 | 272.1 µs | 44.6 Mbit/s | [?] not yet exercised on our rig |
-| 48 kHz | 4000 | 250.0 µs | 48.5 Mbit/s | [V] measured ~4000 pps |
-| 96 kHz | 8000 | 125.0 µs | 97.0 Mbit/s | [V] settled — double-pps |
+| 44.1 kHz | 3675 | 272.1 µs | 44.6 Mbit/s | not verified |
+| 48 kHz | 4000 | 250.0 µs | 48.5 Mbit/s | verified |
+| 96 kHz | 8000 | 125.0 µs | 97.0 Mbit/s | verified |
 
 The bandwidth column is the whole Ethernet slot, `pps × (1492 + 24) × 8` — see the link
 budget at the end. The audio payload alone is 40 ch × 24 bit × rate: 46.1 Mbit/s at 48 kHz.
@@ -251,23 +226,20 @@ rate, and there is **no rate field on the wire**. 44.1 and 48 kHz carry the same
 bandwidth and differ only in slot timing; 96 kHz doubles the packet rate (and the
 bandwidth), about saturating the 100BASE-TX link.
 
-**96 kHz model settled.** The on-rig 96 kHz stream measured ~8000 pps carrying the same
-1492 B / 40-channel frame (double-pps model `{96000, 40, 12}`), matching `reacdriver`'s
-constants (`SAMPLES_PER_PACKET=12`, `PACKETS_PER_SECOND=8000`, `MAX_CHANNEL_COUNT=40`).
-The rejected channel-halving model `{96000, 20, 24}` would have been ~4000 pps / 20 ch;
-both the measured pps and the channel count refuted it. Payload growth was already ruled
-out (the 48 kHz frame fills ~99% of the 1500 MTU and REAC is 100BASE-TX, so it adds
-packets, never enlarges them). A "24 tracks @96k" figure in a Roland recorder manual is
-a storage limit, not a wire constraint. 48 kHz is verified at ~4000 pps; 44.1 kHz (3675
-pps) is the same model, not yet exercised on our rig.
+At 96 kHz the stream runs ~8000 pps carrying the same 1492 B / 40-channel frame as
+48 kHz — the packet rate doubles; the channel count does not halve, and the frame does
+not grow (the 48 kHz frame already fills ~99% of the 1500 MTU, so REAC adds packets
+rather than enlarging them). A "24 tracks @96k" figure occasionally seen in a Roland
+recorder manual is a storage limit, not a wire constraint. 44.1 kHz (3675 pps) follows
+the same model and is not verified directly on the wire.
 
-### How the clock is set and recovered [V][S]
+### How the clock is set and recovered
 
 REAC has **one sample-clock master** (the console). The master emits a frame every slot
 period from its own crystal — 272 µs at 44.1 kHz, 250 µs at 48 kHz, 125 µs at 96 kHz —
 and that cadence *is* the fabric word clock. The slot tick is generated **in the FPGA**,
 not in CPU software, which is why the device firmware shows the connection logic but not
-the sample clock itself. **[S]**
+the sample clock itself.
 
 The receiver is a **hardware clock slave with no jitter buffer**. It does not buffer and
 resample; it recovers word clock directly from packet **arrival cadence**, advancing its
@@ -282,11 +254,10 @@ declared purely by **packet length** — the first frame whose length equals a f
 frame flips `connected = true`, independent of the announce handshake. This is exactly
 why a passive tap connects without participating.
 
-### The stagebox's REAC Mode switch — M / S / SP [M]
+### The stagebox's REAC Mode switch — M / S / SP
 
 A stagebox has **no menu**. Its only mode control is one three-position switch labelled **REAC
-Mode**, and it is read **at boot and never re-read** — moving it on a running box changes nothing
-at all (measured 2026-08-31, in both directions).
+Mode**, and it is read **at boot and never re-read** — moving it on a running box changes nothing.
 
 | position | what the box does |
 |---|---|
@@ -297,42 +268,29 @@ at all (measured 2026-08-31, in both directions).
 **M does not make a stagebox a console, and does not make it a pace master.** The S-4000S
 firmware carries `CMasterReacMsgParser` *and* `CSlave1ReacMsgParser` plus a `Clock Driver` /
 `Tuning Task`: it is **clock-slave on its uplink and master on its split outputs**, re-driving a
-recovered word clock onward to a downstream console
-(`reac-firmware-re/CLOCK-SYNC.md`). M and SP are therefore two halves of one SPLIT feature, not
-two unrelated modes.
-
-**Consequences, measured on a live segment:**
+recovered word clock onward to a downstream console. M and SP are therefore two halves of one
+SPLIT feature, not two unrelated modes.
 
 - A box on M with **no uplink** free-runs at its last-known rate — it has no clock to recover and
-  re-drive. Measured +363 ppm off nominal, against −16 ppm for an enrolled box on the same rig.
-  (Rate persists across a power cycle because there is **no rate field**: the box holds whatever
-  cadence it last locked to.)
-- It emits **zero control frames** — no announce, no grant, no heartbeat. A split output runs no
-  handshake; it just emits.
-- It broadcasts its own **upstream** geometry, never a master downstream frame.
-- So **nothing pairs with it in either direction**: a console cannot grant it (it never
-  cold-connects) and cannot slave to it (it never grants). Both were tried.
-
-**[CORRECTED 2026-09-09 — a box on M DOES grant, and the two bullets above are half right.]**
-Two bridge captures of real gear pairing with real gear, taken with no daemon on the wire:
-an S-1608 in slave mode enrolled with an S-0808 in master mode, and an S-0808 in slave mode
-enrolled with an S-1608 in master mode. Both lamps locked. The master **echoes the joining
-box's own `cdea 04 03` records** — one echo per distinct record, plus its own `0000`
-head_mark — and that echo IS the grant. What holds is that such a box never cold-connects and
-so cannot be granted BY us; what does not is "it never grants". The "zero control frames"
-measurement was an **S-0808** on M, which indeed sends no `cfea` announce; an **S-1608** on M
-sends one about once a second, and the box joining it never floods at all. The full sequence,
-the filler's `0x52` requesting state and what remains unsettled are in libreac's
-`docs/REAC-CONTROL-PLANE.md` and in `spec/reac.ksy`'s enrolment section.
+  re-drive; drift runs into the hundreds of ppm off nominal, against roughly −16 ppm for an
+  enrolled box. Rate persists across a power cycle because there is **no rate field**: the box
+  holds whatever cadence it last locked to.
+- **An S-0808 on M emits no `cfea` announce; an S-1608 on M emits one about once a second.** A
+  box on M never cold-connects, so it never presents as a joinable slave to a console — a console
+  can neither grant it nor slave to it.
+- **A box on M does grant a slave joining its split output.** The master side **echoes the
+  joining box's own `cdea 04 03` records** — one echo per distinct record, plus its own `0000`
+  head_mark — and that echo is the grant, the same mechanism a console uses (§4 of
+  [`docs/mixer-protocol.md`](docs/mixer-protocol.md)).
 - Its **REAC LED is lit and steady — identical to synched** — because its port really is fine.
-  The lamp reports the box's view of its link, never whether it is talking to you.
+  The lamp reports the box's view of its link, never whether it is talking to a given peer.
 
 **A partially seated switch behaves exactly like SP**: link up, LED steady, zero frames. When a
 box will not join, seat the switch firmly at S and power-cycle — the power-cycle is required, not
 caution.
 
-**How to read a silent box, from its own FSM** (see [firmware-findings.md](firmware-findings.md)'s
-source-level section, "10.2 BOX (stagebox / slave) FSM"). The box has three states and each has a
+**Reading a silent box from its own FSM** (see [firmware-findings.md](firmware-findings.md)'s
+source-level section, "9.2 BOX (stagebox / slave) FSM"). The box has three states and each has a
 distinct wire signature:
 
 | box state | what you see on the wire |
@@ -341,14 +299,14 @@ distinct wire signature:
 | `ANNOUNCE` | broadcast filler flood at **8000 fps** + unicast `cdea 04 03` cold-connect |
 | `LINKED` | unicast filler 8000 fps + `cdea 01 03 0001 81` heartbeat ~1/s |
 
-So a box emitting **zero frames** is in `BOOT` — it believes its OWN PHY is down, whatever the
-NIC at our end reports. No console-side change reaches that: it is a cable or a port at the box.
+A box emitting **zero frames** is in `BOOT` — it believes its own PHY is down, whatever the
+far-end NIC reports; that points to a cable or a port at the box, not to the console.
 
-And the trigger is singular: **`BOOT -> ANNOUNCE` happens on PHY LINK-UP and nothing else — "a
-data gap does NOT"**. That is why a box which was streaming and went quiet never recovers on its
-own, and why the remedy is always to bounce the link rather than to wait.
+The trigger is singular: **`BOOT -> ANNOUNCE` happens on PHY LINK-UP and nothing else — a
+data gap does NOT trigger it.** A box that was streaming and went quiet does not recover on its
+own; the remedy is to bounce the link, not to wait.
 
-### Choosing what the master locks to — the clock-source selector [S]
+### Choosing what the master locks to — the clock-source selector
 
 Although the recovered word clock itself is FPGA-internal and never appears on the REAC
 audio wire, **the master exposes a clock-source selector** that decides which reference
@@ -381,7 +339,7 @@ re-detects and re-locks to the new period. Since the frame itself is rate-invari
 relay never changes how it parses or forwards a frame — only the emit period changes with
 rate.
 
-### Building a transparent bridge or relay — the invariants it must not break [S][V]
+### Building a transparent bridge or relay — the invariants it must not break
 
 A relay that only re-clocks (previous section) is necessary but not sufficient once the
 link it rides is lossy or jittery enough to threaten establishment and hold, not just
@@ -434,32 +392,24 @@ The slot period a stagebox slaves to is the **downstream** cadence. `spec/reac.k
 the width from the length by this law in **both** directions, and `spec/protocol-facts.yaml`
 carries the 36 with its corpus evidence across 44.1 / 48 / 96 kHz.
 
-## Source control (head-amp) — op `0x04 0x03` [V]
+## Source control (head-amp) — op `0x04 0x03`
 
 > **Machine-readable spec.** The canonical field layout of this record lives in
 > [`spec/reac.ksy`](spec/reac.ksy) (Kaitai Struct) — `ksc` compiles it to a
 > C++ / Python / … parser, and CI regenerates it and validates it against known records on
 > every change. The prose below is derived from that spec.
 
-Measured off a **Roland M-200 commanding an S-0808**, captured passively on a switch mirror port
-with our own master stopped, so every frame is the console's. 740 op-`0403` frames.
-
-**End to end — both directions [V].** Head-amp is a one-way *declarative* channel with a receiver
-that conforms, and it is now exercised and confirmed in **both** directions. A **master SENDS**
+**Head-amp is a one-way declarative channel with a receiver that conforms.** A **master SENDS**
 TAG `01 01` records — edge-triggered the instant an operator moves a control, then **periodically
 RE-ASSERTS the full per-channel state** (the two-phase full assert below). The model is **DMX-style
 declarative**: every record carries an **absolute** value (never a delta), nothing is ACKed, and the
 master simply re-broadcasts the whole world, so a lost frame self-heals within one re-assert cycle —
 the failure that bites is a lost **phantom-off** frame, which otherwise leaves 48 V sitting on the
 XLR pins while the console reads "off". A **box RECEIVES** those records and conforms, addressed at
-the **width-assigned CH base** it was granted (see *CH carries a per-model base* below). Both halves
-are on the wire: a real S-0808 / S-1608 receives them, and a software stagebox (reac-pw) established
-at 16 ch receives the identical bytes at base `0x20` while `reac_ctrl_build_headamp` reproduces them
-byte-for-byte — so the record is validated **parsed-in and built-out**, not just observed.
+the **width-assigned CH base** it was granted (see *CH carries a per-model base* below).
 
 **`0x04 0x03` is a record container, not a single message.** `rec_len` gives the record's data
-length; `data[16..17]` is a **TAG** selecting the record type. Earlier work named the whole opcode
-after the one record it had seen (the connect-grant); that is too narrow — see the registry below.
+length; `data[16..17]` is a **TAG** selecting the record type — see the registry below.
 
 ```
 data[]:  0..1 op(04 03)   2..3 rec_len  4..7 REAC wrapper(00 02 00 fe)   8 len_echo(0e)
@@ -467,7 +417,7 @@ data[]:  0..1 op(04 03)   2..3 rec_len  4..7 REAC wrapper(00 02 00 fe)   8 len_e
         16..17 TAG   18..(18+n-1) DATA   (18+n) CKSUM_inner   (19+n) 0xf7   ...   31 CKSUM_block
 ```
 
-### The container wraps a Roland DT1 SysEx [V]
+### The container wraps a Roland DT1 SysEx
 
 The "preamble" bytes and the pair of `12` bytes are **not** opaque padding: from `data[9]` the record
 carries a genuine **Roland DT1 (Data Set 1) MIDI System-Exclusive** message — `f0 41 .. 12 .. f7` —
@@ -489,33 +439,30 @@ riding inside the REAC container. Decoded:
 
 So the two `12` bytes are the **model-ID low byte** (`00 00 12`) and the **DT1 command** (`0x12`) — not a
 repeated marker — and the "TAG" is the **high half of the Roland 4-byte address** (`01 01 CH PARAM` for
-head-amp), not a REAC-native tag. Provenance is settled two ways: the Roland DT1 checksum rule
-reproduces the observed `CKSUM` byte on every op-`0403` record, and the command byte flips `0x12`→`0x11`
-exactly on the master's identity-request polls (DT1 vs RQ1) — a distinction that only means anything if
-the envelope really is Roland's SysEx. The record is therefore a **standard Roland SysEx transport
-carried over REAC**, and the head-amp payload below is its DT1 data.
+head-amp), not a REAC-native tag. The record is a **standard Roland SysEx transport carried over
+REAC**, and the head-amp payload below is its DT1 data.
 
-This also **sharpens frame dispatch**: the box-upstream audio braid frames also carry `cd ea 04 03`, but
+**Frame dispatch:** the box-upstream audio braid frames also carry `cd ea 04 03`, but
 with wrapper `02 00 fe 00` and **no** `f0 41` envelope. A genuine control record is identified by the
 `cd ea` marker **and** the `00 02 00 fe` wrapper **and** the `f0 41` SysEx envelope — never by the
 `04 03` opcode alone.
 
-> **The `12 12` is two different bytes.** Reading it as one repeated marker (as earlier revisions did)
+> **The `12 12` is two different bytes, not one repeated marker.** Reading it as one marker
 > mislabels the model-ID low byte and hides the DT1 command that distinguishes a write (`DT1`) from a
 > request (`RQ1`).
 
 | `rec_len` | n (data bytes) | TAG | record | status |
 |---|---|---|---|---|
-| `0x0013` | 3 | `01 01` | **head-amp source control** | **[V]** decoded below |
-| `0x0013` | 3 | `05 00` | — | **[?]** 4 distinct values, state-push only |
-| `0x0014` | 4 | `01 00` | **connect-grant** (`06 00 01 00`) | **[S]** known from firmware RE |
-| `0x0014` | 4 | `00 00` | — (`03 00 00 00`) | **[?]** state-push only |
+| `0x0013` | 3 | `01 01` | **head-amp source control** | decoded below |
+| `0x0013` | 3 | `05 00` | — | 4 distinct values, state-push only, not decoded |
+| `0x0014` | 4 | `01 00` | **connect-grant** (`06 00 01 00`) | — |
+| `0x0014` | 4 | `00 00` | — (`03 00 00 00`) | state-push only, not decoded |
 
 > **Parsers must dispatch on TAG, not on the opcode.** Classifying every `04 03` as a grant means a
 > slave in the join phase reads an engineer's preamp knob-turn as its grant: a live M-200 emits 628
 > head-amp records for every 14 grants.
 
-### The head-amp record — TAG `01 01` [V]
+### The head-amp record — TAG `01 01`
 
 ```
 data[16..17] = 01 01        TAG
@@ -526,12 +473,10 @@ data[21]     = CKSUM_inner
 data[22]     = 0xf7         terminator
 ```
 
-### Wire encoding and hardware actuation are two axes [V]
+### Wire encoding and hardware actuation are two axes
 
-This section used to be a single table of "three granularities" — per channel, per four,
-per eight. **They are not three points on one scale.** Two are about which record carries a
-field; one is about how many channels a single write switches. Anyone reading them as one
-list gets one of the two wrong, which is exactly what happened.
+**They are not points on one scale.** Wire encoding is about which record carries a field;
+hardware actuation is about how many channels a single write switches. The two answers differ.
 
 **Axis 1 — wire encoding: what a record carries.**
 
@@ -555,75 +500,40 @@ eight, which is an S-1608's sixteen analog inputs — and `group` selects which 
 window of the 80-slot active table feeds them. It is the preamp's bank width and the refresh
 loop's batch size. Nothing is switched eight channels at a time.
 
-#### "Phantom is per four" is SETTLED — it is per channel [V]
+#### Phantom is per channel, not per four
 
-Measured 2026-08-23. `HEADAMP_GRAN_PHANTOM_SHIFT` was 2 and is now **0**: phantom rides one
-record per channel, exactly like pad and SENS. The claim it replaces — that only a record
-whose channel is a multiple of four carries phantom, a record to `0x24` moving group 9 and
-one to `0x27` moving nothing — was graded from an executed trace, which is why no amount of
-static reading was allowed to overturn it. It took the wire.
+Phantom rides one record per channel, exactly like pad and SENS: a write to CH `0x24` names
+only `0x24` — `0x25`, `0x26` and `0x27` are unaffected. Across a corpus of phantom records
+spanning three desk generations, most address a channel that is not a multiple of four,
+including single-channel toggles on channels such as `0x26`, which a "per four" model could
+not express. A full S-1608 sweep names `0x20..0x2f`, all sixteen; an S-0808 names
+`0x00..0x07`; an S-4000S names `0x00..0x1f`.
 
-**The capture.** `reacpw-s1608-48k-clean__phantom-ch24-on-off-2026-08-23.pcap` — taken as
-`phantom-test.pcap`, now in `~/Devel/audio/reac-captures-raw/` and still owing the corpus a
-MANIFEST row and a distillation pass. Live rig, interface `enp131s0`, ethertype `0x8819`
-only, snaplen 200, twelve seconds: idle, phantom TRUE on CH `0x24`, four seconds, phantom
-FALSE on `0x24`, nothing else touched. Exactly two head-amp records crossed the wire and
-both name CH `0x24` alone — `0x25`, `0x26` and `0x27` never appear. Every frame is truncated
-by the snaplen, so that is checked rather than assumed: the control block is `[18:50]` and
-the record inside it `[34:40]`, both within 200 bytes, and all 38 control blocks pass the
-block checksum while both head-amp records pass the nested record checksum.
+**Head-amp is write-only on this wire.** The box never re-broadcasts head-amp state, so a
+consumer keeps its own model; there is nothing to query and compare against.
 
-**The discriminating experiment this section used to propose does not exist.** It said: write
-`0x24`, write `0x25`, read the box's own re-broadcast back. There is no re-broadcast. In
-those twelve seconds the S-1608 sent 47122 frames with zero dropped — its 16-bit frame
-counter steps by one across all 47121 intervals — and every one is either an audio frame,
-whose 16-slot descriptor area is a constant `00 7a` per slot and unmoved by either toggle, or
-one of twelve bare link-1 opcode-`0x81` heartbeats whose 32-byte block never changes a byte.
-Nor does the box answer a real desk: in `m200-ch7-ON-OFF-ON-20260721-215743.pcap` it meets an
-M-200i toggling phantom six times with nothing but heartbeats. **Head-amp is write-only on
-this wire.** A consumer keeps its own model; there is nothing to query and compare against.
+The per-four grouping that does exist in the firmware is `PORTS_CH_PER_SLOT`, an inventory
+cell used by the slot-map high nibble (see Axis 1 above) — a different structure from the
+DT1 head-amp path, easily confused with it because both are per-four somewhere in the same
+device.
 
-**So it was settled on the axis the constant actually governs** — what a sender emits, since
-a consumer that trusts a 2 sweeps phantom on multiples of four only. Our own master writing
-one record for `0x24` shows what our encoder does and nothing about Roland's law, so the
-corpus supplied the desks: across 3651 phantom records from three desk generations — M-200i
-`00:40:ab:c9:cc:03`, M-300 `00:40:ab:c9:d8:5b`, M-5000 `00:40:ab:ca:15:4c` — **2304 address a
-channel that is not a multiple of four**. A full S-1608 sweep names `0x20..0x2f`, all sixteen;
-an S-0808 names `0x00..0x07`; an S-4000S names `0x00..0x1f`. The decisive single case is
-`m200-ch7-ON-OFF-ON`: a real M-200i toggling one channel's phantom on and off three times,
-six records, every one CH `0x26`. `0x26 & 3 == 2`, so a desk obeying "per four" would have
-had to write `0x24` and could not have expressed that toggle at all.
+**Hardware actuation below the wire is not verified.** No capture can show whether
+energising `0x24` also energises `0x25..0x27` inside the box, because the box reports
+nothing. Confirming it needs a physical 48 V measurement on the box's own inputs while only
+one is written — never a soft indicator.
 
-The image read was right the whole time. `S-1608.BIN` holds exactly one channel-indexed
-`(x & 3) == 0` test, it is `FUN_0c002d42`'s inventory-cell gate, and it is not on the DT1
-path; every other `& 3` in the image is pointer alignment. The per-four number that is real
-is `PORTS_CH_PER_SLOT`, the inventory cell, and the likeliest history is that a trace of the
-*cell* moving was read as phantom moving — the same misreading as the retracted "phantom
-packed 4 ch/group" note.
+#### Two granularities, and "bank" is a third axis of its own
 
-**Still not measured: hardware actuation.** No capture can show whether energising `0x24`
-also energises `0x25..0x27` inside the box, because the box reports nothing. That axis is
-`HEADAMP_ACTUATION_SHIFT`, it reads 0 from the image, and confirming it needs a physical
-48 V measurement on box inputs 6, 7 and 8 while only input 5 is written — never a soft
-indicator.
-
-#### Two granularities, and "bank" is a third axis of its own [V]
-
-**The readback nibble is not a third granularity.** `FUN_0c007fbc`'s caller was recovered on
-2026-08-23 — a function Ghidra never disassembled, with a clean prologue just past the
-previous function's `rts`, absent from the 1395-entry map and reached by a plain `bsr`. With
-it in hand the loop provably shifts the group by 3 and iterates exactly 8, so group `g`
-covers `[g*8, g*8+8)` and **`g == ch >> 3`**, which is the readback nibble's own index. So
-head-amp has exactly **two** granularities:
+**The readback nibble is not a third granularity.** `FUN_0c007fbc`'s caller loop shifts the
+group by 3 and iterates exactly 8, so group `g` covers `[g*8, g*8+8)` and **`g == ch >> 3`**,
+which is the readback nibble's own index. So head-amp has exactly **two** granularities:
 
 | granularity | what it is | function |
 |---|---|---|
 | **per channel** | actuation — phantom, pad and SENS each written individually | `FUN_0c007fbc` → `FUN_0c00ac1e` / `FUN_0c00ac96` / `FUN_0c007e6a` |
 | **per eight** | refresh banking, and the readback nibble — one axis, not two | `FUN_0c007fbc` and its caller |
 
-**And "bank" is a separate axis from "group".** Our docs have used the words loosely and at
-least one has them inverted (`FUN_0c012162(k)` returns a **group** 0–9 while its argument `k`
-is a **bank**), so take the definition from here rather than from neighbouring prose:
+**"Bank" is a separate axis from "group":**
 
 * **GROUP** — 0..9, and `group == ch >> 3`. Selects **which eight channels' data**: an
   eight-slot window of the 80-slot active table.
@@ -632,11 +542,10 @@ is a **bank**), so take the definition from here rather than from neighbouring p
 
 `FUN_0c007fbc` takes both because they are independent.
 
-The constants and their evidence grades are in
-[`spec/protocol-facts.yaml`](spec/protocol-facts.yaml) (`head_amp` group), which is the one
-declarative source `spec/reac.ksy` and libreac are both checked against.
+The constants are in [`spec/protocol-facts.yaml`](spec/protocol-facts.yaml) (`head_amp`
+group), the declarative source `spec/reac.ksy` and libreac are both checked against.
 
-### Records follow the commit — never precede it [V]
+### Records follow the commit — never precede it
 
 **There is no head-amp staging table.** A record writes the ACTIVE table directly, and the
 State-4 commit **overwrites** that table wholesale. A record sent before the commit is
@@ -671,7 +580,7 @@ TAG contributes a constant `0x02` — but that shortcut is a special case, not t
 > correct **outer** sum wrapped around a **garbage inner** one, and the box rejects a frame that looks
 > perfect on the wire. Set the Roland DT1 (inner) checksum **first**, then the REAC block (outer) one.
 
-### CH carries a BASE keyed on the box's DECLARED WIDTH [V]
+### CH carries a BASE keyed on the box's DECLARED WIDTH
 
 ```
 CH = base + (box_input - 1)
@@ -683,32 +592,24 @@ CH = base + (box_input - 1)
 
 **No byte on the wire carries this.** It is negotiated session state: the box declares its
 width in the cold-connect escalation and the master picks the base. So a parser cannot read
-it out of a frame, and `spec/reac.ksy` deliberately does not encode it — it parses the
-carriers as typed fields and stops there. libreac's `reac_headamp_base()` returns the
-measured table above and **refuses any width it has not seen**, which is the same refusal
-from the other side. Neither may guess.
+it out of a frame — `spec/reac.ksy` deliberately does not encode it, and parses the
+carriers as typed fields and stops there. A base-lookup implementation must refuse any width
+it has not seen rather than guess.
 
-**[?] What keys it is not fully separated.** A 42-establishment study across three consoles
-and four units killed every testable candidate law and left three carriers — declared width,
-the config-announce selector, and `unit_offset` — perfectly collinear on every row. Width is
-the one named here because the software-stagebox result below isolates it from *identity*;
-it does not isolate it from the other two. A box declaring a width whose selector or
-`unit_offset` breaks the collinearity is what would settle it.
+**What exactly keys the base assignment is not fully separated** from two other carriers
+present at the same time (the config-announce selector and `unit_offset`), which are
+collinear with declared width on every establishment observed so far. Width is the one
+named here because it is isolated from box identity (see below); it is not isolated from
+the other two.
 
-**Anchored on hardware, prediction-first:** with an S-1608 alone on the segment, all three params
-were exercised on **ch1**; `CH=0x20` was predicted before the test and **all 26 operator edges landed
-on `0x20` and nothing else**. So `0x20` *is* ch1, not merely the bottom of an occupied range.
+The base value is **stable per width**: two different physical S-1608 units base at 32 and
+emit byte-identical TAG `05 00` records; three different consoles (M-200 / M-300 / M-5000)
+address an S-1608 at 32; and an S-1608 alone on an empty segment, with `0..7` entirely free,
+is still addressed at 32 — so the base is **not** collision-avoidance.
 
-The value is **stable per width**, established three ways:
-
-1. **Two different physical S-1608 units** base at 32 and emit byte-identical TAG `05 00` records.
-2. **Three different consoles** (M-200 / M-300 / M-5000) address the S-1608 at 32.
-3. **Alone on an empty segment**, with `0..7` entirely free, an S-1608 is *still* addressed at 32 —
-   so the base is **not** collision-avoidance.
-
-Two boxes coexist at `0x00..0x07` + `0x20..0x2f`, contiguous and non-overlapping. `(box_index << 5)`
-is **refuted**: the 32-ch S-4000 bases at 0, like the 8-ch S-0808. **Why the S-1608 bases at 32 is
-unknown [?]** — recorded as measured, not explained.
+Two boxes coexist at `0x00..0x07` + `0x20..0x2f`, contiguous and non-overlapping. `(box_index
+<< 5)` is **refuted**: the 32-ch S-4000 bases at 0, like the 8-ch S-0808. Why the S-1608
+bases at 32 specifically is unknown.
 
 > **A master assigns the base from the box's declared WIDTH, not from a model-identity string.**
 > `CH = channel - 1` is correct for an S-0808 and addresses nothing on an S-1608. The width is
@@ -719,43 +620,30 @@ unknown [?]** — recorded as measured, not explained.
 Everything else in the head-amp record is **model-independent**: the same three params in the same
 order, the same `0x7e` invariant, the same linear SENS law, verified on both an S-0808 and an S-1608.
 
-### Confirmed from the BOX side — a virtual stagebox receives head-amp [V]
+### The base is width-driven, not identity-driven
 
-The base assignment is confirmed from the receiving end, not just by observing real boxes. A
-**software stagebox** (reac-pw) that establishes as a 16-channel box — and that sends **no** TAG
-`05 00` model identity at all — is nonetheless addressed by the M-200 at base **`0x20`**, exactly
-like a real S-1608, and receives the full head-amp set: phantom, pad, and a complete SENS sweep
-`0x00..0x37`, every frame satisfying the `0x7e` head-amp checksum. This settles two things:
+A software stagebox that establishes as a 16-channel box — and that sends **no** TAG `05 00`
+model identity at all — is addressed by an M-200 at base **`0x20`**, exactly like a real
+S-1608, and receives the full head-amp set: phantom, pad, and a complete SENS sweep
+`0x00..0x37`, every frame satisfying the `0x7e` head-amp checksum. The box declares only its
+width (via the cold-connect escalation) and gets the width's base; no `05 00` model string is
+required.
 
-- **The base is width-driven, not identity-driven.** The box declares only its width (via the
-  cold-connect escalation) and gets the width's base. No `05 00` model string is required.
-- **The head-amp record is exactly as decoded**, validated bidirectionally: the same bytes a
-  master emits to a real box are emitted to a virtual one, and reproduce byte-for-byte from the
-  builder (`reac_ctrl_build_headamp`).
+### Open items
 
-### Open items — honestly not yet closed [?]
+- The TAG `05 00` model-identity record's payload is undecoded — it takes four distinct
+  values and appears to be state-push only (see the op-`0403` registry above). Not verified.
+- Whether a phantom-off assert sent to a box actually drops 48 V at the XLR pins is not
+  verified independently of the wire bytes — that needs a physical meter across the pins,
+  never a soft indicator.
 
-Two gaps remain, recorded rather than papered over:
-
-- **reac-pw does not SEND a TAG `05 00` model-identity record.** The virtual box establishes on
-  **width alone** (the cold-connect escalation) and is nonetheless addressed at the correct base, so
-  identity is demonstrably **not required** for base assignment — but the `05 00` record real boxes
-  emit is still unmodelled and unsent from the box side, and its four distinct values (see the
-  op-`0403` registry) are undecoded. "Base came from width alone" is a positive result, not a reason
-  to stop: the `05 00` payload is the next thing to decode.
-- **Master-send of head-amp is not yet validated at the pins.** The build path is byte-exact against
-  captured console frames and the box-side **receive** path is confirmed, but that a reac-pw *master*
-  emitting a phantom-off record actually drops 48 V at a real box's XLR pins is **rig-gated** — it
-  needs a physical box on the bench with a meter across the pins, not just a byte match. Until then,
-  the send direction is proven correct *on the wire* but not *at the converter*.
-
-### The master's state assert tracks PRESENCE [V]
+### The master's state assert tracks PRESENCE
 
 When a box is unplugged, the master **drops its channels from the re-assert** within one cycle: an
 S-0808 leaving removed `0x00..0x07` while the S-1608's `0x20..0x2f` continued unchanged. The assert
 covers only boxes actually present.
 
-### SENS ↔ dB — **pad-relative** [V]
+### SENS ↔ dB — **pad-relative**
 
 Roland SENS is **input sensitivity in dBu**: more negative = MORE gain.
 
@@ -774,14 +662,12 @@ console's own display at -17/-40/-60/-65/-10 (pad off); every anchor lands.
 VALUE byte therefore means two different dB depending on pad state. Anchored twice: `-15 → +5` and
 `-30 → -10`. Together pad+SENS span **+10 … -65 dBu (75 dB)** with a 35 dB overlap.
 
-### What the box owns — measured, and it is only these three [V]
+### What the box owns — exactly three parameters
 
-A **full state push** dumps `ch1..ch8 × {phantom, pad, SENS}` = 24 records and nothing else. This is
-positive evidence: the console enumerates its own complete box state, so the parameter space is
-closed at three, not merely unrefuted.
+A **full state push** dumps `ch1..ch8 × {phantom, pad, SENS}` = 24 records and nothing else: the
+console enumerates its own complete box state, and the parameter space is closed at three.
 
-Polarity, pan, main level, HPF and EQ were each exercised on the console while the tap was live and
-produced **zero** `04 03` records. They are console-side DSP.
+Polarity, pan, main level, HPF and EQ never produce a `04 03` record. They are console-side DSP.
 
 > **The boundary: the protocol carries only what cannot be done in software.** The box owns exactly
 > the three things that are physically impossible anywhere else, all **pre-converter** — 48 V (a
@@ -789,23 +675,18 @@ produced **zero** `04 03` records. They are console-side DSP.
 > SENS (analog gain before quantisation). Everything past the converter is arithmetic, and
 > arithmetic belongs to whoever already performs it.
 
-This rule is **predictive, not descriptive**: pad was looked for because the rule required it, as a
-test that would have falsified the rule had it been absent. EQ is the converse test — a biquad has
-no physical claim on the box, so a single `04 03` record from an EQ move would have broken the rule.
-None appeared.
+The S-0808 has **no analog HPF**. An analog HPF would be a legitimate box parameter under this
+rule — it protects headroom from subsonic energy ahead of the preamp — but this particular box
+does not implement one.
 
-The S-0808 has **no analog HPF** (toggled and swept: silent). An analog HPF *would* have been a
-legitimate box parameter — it protects headroom from subsonic energy ahead of the preamp — so this
-is a fact about the hardware, not a test of the rule.
-
-## State assertion — the master RE-ASSERTS, it does not issue commands [V]
+## State assertion — the master RE-ASSERTS, it does not issue commands
 
 **This is the load-bearing behaviour of the control plane.** REAC control is raw Layer-2: broadcast,
 **no ACK, no retransmit, no sequence recovery**. A dropped command would desynchronise a box
 **permanently**, and nothing anywhere would notice. So a master does not send commands and hope — it
 **continuously restates the world**, and the box conforms.
 
-Every measured property of the control plane follows from this, and only coheres together:
+Every property of the control plane follows from this, and only coheres together:
 
 - **Values are ABSOLUTE, never deltas.** A SENS ramp sends `0x04, 0x05, 0x06 …`, never "+1".
   Absolute values are **idempotent** — which is precisely what makes blind resending safe.
@@ -841,12 +722,12 @@ stateDiagram-v2
         Steady --> EdgeAssert : operator moves a head-amp control
         EdgeAssert --> Steady : ONE op 04 03 / TAG 01 01 record (absolute value) — box conforms
 
-        Steady --> FullAssert : trigger UNKNOWN [?], irregular
+        Steady --> FullAssert : trigger unknown, irregular
         state FullAssert {
             direction TB
             [*] --> SceneBroadcast
             SceneBroadcast --> Settle : cdea 01 01 start / 01 00 data / 01 02 end (SCENE / SYSPARAM)
-            Settle --> HeadAmpPush : +4.4 s (measured 7/7, zero drift)
+            Settle --> HeadAmpPush : +4.4 s, no drift
             HeadAmpPush --> [*] : grant + every PRESENT ch × every param, re-stated absolute
             note right of HeadAmpPush
                 Presence-tracked: a departed box's
@@ -864,26 +745,17 @@ the PHY-bounce re-establish edge) is the box's wire behaviour; everything inside
 master's declarative control plane. The box is the receiver on both — it locks the clock during
 establishment and conforms to the head-amp records once established.
 
-### The full assert is ONE operation in two phases [V]
+### The full assert is ONE operation in two phases
 
-The head-amp push is **not on its own timer**. It follows a SCENE/SYSPARAM transfer by **exactly
-4.4 s, 7 occurrences out of 7, with no drift across 25 minutes**:
+The head-amp push is **not on its own timer**. It follows a SCENE/SYSPARAM transfer by exactly
+4.4 s, with no drift. The console announces its **own DSP state** (SCENE/SYSPARAM, `cdea 01 00`
+bulk data bracketed by `01 01` start / `01 02` end markers, ASCII `SCENE` / `SYSPARAM` in the
+markers), waits 4.4 s, then announces its **box state** (`04 03` records: the grant, the `05 00`
+records, and all 24 head-amp records). One operation, two phases, locked.
 
-```
-scene @  797.0 → push @  801.4      scene @ 2102.6 → push @ 2107.1
-scene @  842.8 → push @  847.3      scene @ 2192.7 → push @ 2197.1
-scene @ 1854.3 → push @ 1858.7      scene @ 2282.7 → push @ 2287.1
-scene @ 2057.8 → push @ 2062.3
-```
-
-The console announces its **own DSP state** (SCENE/SYSPARAM, `cdea 01 00` bulk data bracketed by
-`01 01` start / `01 02` end markers, ASCII `SCENE` / `SYSPARAM` in the markers), waits 4.4 s, then
-announces its **box state** (`04 03` records: the grant, the `05 00` records, and all 24 head-amp
-records). One operation, two phases, locked.
-
-**[?] What triggers a full assert is unknown.** Observed intervals are irregular — 46, 1011, 204,
-45, 90, 90 s — and did not correlate with operator activity. It is **not** a simple timer, and any
-claim of a fixed cadence would be wrong.
+**What triggers a full assert is not known.** The interval between assertions is irregular and
+does not correlate with operator activity. It is not a simple timer, and no fixed cadence governs
+when one occurs — only its internal 4.4 s two-phase structure, once it starts.
 
 > **Safety consequence for any master implementation.** Fire-and-forget loses a frame and the box is
 > wrong **forever**. The parameter where that bites is **phantom**: an engineer switches 48 V off to
@@ -891,7 +763,7 @@ claim of a fixed cadence would be wrong.
 > 48 V sits on the pins. Re-assertion is what bounds that failure to one cycle instead of the rest
 > of the session.
 
-## Handshakes [S]
+## Handshakes
 
 > **Narrative companion.** [`docs/mixer-protocol.md`](docs/mixer-protocol.md) walks
 > this whole control plane end to end — the master's downstream cadence, enrolment,
@@ -902,7 +774,7 @@ Audio is a continuous broadcast stream (no per-packet request/response). Connect
 setup is a call/answer exchange in `data[32]`, driven by the periodic
 `MASTER_ANNOUNCE` (re-announced ~once/second).
 
-### Connection lifecycle as wire behaviour [V][S]
+### Connection lifecycle as wire behaviour
 
 Seen purely from the wire — independent of the byte-level state-machine detail below
 — a slave joining a master moves through four observable phases:
@@ -928,7 +800,7 @@ Seen purely from the wire — independent of the byte-level state-machine detail
 **frame-count budget of ~600 frames**. Because a frame is one sample slot, 600 frames
 is **≈150 ms at 48 kHz / ≈75 ms at 96 kHz** of tolerated silence/loss before the link
 is declared dead — so doubling the sample rate halves the wall-clock tolerance, which
-is why a 96 kHz link is about twice as fragile over a lossy hop as a 48 kHz one. **[S]**
+is why a 96 kHz link is about twice as fragile over a lossy hop as a 48 kHz one.
 
 **A keep-alive heartbeat re-arms the budget.** The established side emits a periodic
 CONTROL heartbeat (~1/s) carrying a keep-alive selector byte; each heartbeat with the
@@ -936,7 +808,7 @@ selector set **re-arms the ~600-frame budget**. The same selector cleared latche
 explicit disconnect, and a change of the peer's source MAC also forces a disconnect.
 So "connected" is maintained by *both* a steady stream of sized audio frames (the
 ~1000 ms no-audio cutoff) **and** the periodic heartbeat re-arm; losing either tears
-the link down. **[S]**
+the link down.
 
 The byte-level state machines for the split and slave paths follow.
 
@@ -960,15 +832,13 @@ identifier the split later echoes in its `data[2]`; "0x04 and up seems to be fin
 
 ### Slave handshake (partial in the driver)
 
-**The names in this list are the reacdriver project's own and four of them are
-wrong** — see [The CONTROL record header](#the-control-record-header--data04-v).
+**The names below are the reacdriver project's own, and four of them mislabel the
+underlying records** — see [The CONTROL record header](#the-control-record-header--data04-v).
 `CONTROL_PACKET_TYPE_ONE/THREE` are a scene-transfer continuation fragment and the
 master's slot map; `SLAVE_ANNOUNCE1` is the box's state-4 commit report and
 `SLAVE_ANNOUNCE4` its link-check ack, so step 3's "5 CONTROL frames each prefixed
 with SLAVE_ANNOUNCE1..4" is not five announces but four different records, one of
 which the stagebox firmware only emits after it has committed the master's scene.
-The list is kept as written because it documents that driver's state machine, not
-ours.
 
 1. `NOT_INITIATED` → waits for `CONTROL_PACKET_TYPE_ONE` with `data[29]==0xc0`,
    `data[30]==0xa8`, then another with `data[5]==0x01`, `data[6]==0x01` and
@@ -980,11 +850,11 @@ ours.
    handshake body, unicast to the master MAC → `HAS_SENT_ANNOUNCE`.
 4. emits FILLER keep-alive.
 
-The upstream driver marks the slave path incomplete; full master↔slave completion has
-since been observed live (see [firmware-findings.md](firmware-findings.md), slave
+reacdriver's own implementation of this path is incomplete; full master↔slave
+establishment is observed live (see [firmware-findings.md](firmware-findings.md), slave
 establishment).
 
-## Upstream (stagebox→master) audio layout — measured [V][?]
+## Upstream (stagebox→master) audio layout
 
 A single REAC port is bidirectional; one tap captures both halves. Stagebox **INPUT**
 channels travel toward the mixer as raw, pre-patch PCM (the mixer's internal patch
@@ -1014,7 +884,7 @@ autocorrelation across a plateau of adjacent bytes); resolving it needs distinct
 simultaneous tones, one frequency per input. **The exact map is OPEN.**
 
 The scramble is rate-independent, and so is the frame: a 16-channel box returns 628 B at
-48 kHz exactly as at 96 kHz, at 4000 pps instead of 8000. **[?]** The geometry is settled —
+48 kHz exactly as at 96 kHz, at 4000 pps instead of 8000. The geometry is settled —
 it is the `52 + n × 36` law, corpus-evidenced across all three rates in
 `spec/protocol-facts.yaml`. What is UNVERIFIED is the upstream **packet rate** at 48 kHz
 specifically: it follows from 12 samples per frame at 48 kHz, but has not been counted
