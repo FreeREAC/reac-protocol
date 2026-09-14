@@ -795,16 +795,26 @@
  */
 #define REAC_IDENTITY_ADDR_FIRMWARE_VERSION 0x0000
 
-/* 8 bytes, constant per model and identical between the two units of
- * each model captured. S-0808 00 00 00 01 00 00 00 00; S-1608
- * 00 00 00 02 00 03 00 02; S-4000S 00 00 00 02 00 01 00 02. As four
- * u16be the second field tracks the REAC port count. The rest is
- * UNRESOLVED and is deliberately left as bytes — it is NOT a version in
- * the 0x0000 encoding, since the S-1608's boot version 2.200 would read
- * 02 02 00 00 and appears nowhere in it.
- *   [EVIDENCED (corpus) — 274 replies, 5 distinct boxes, 3 models.]
+/* The REAC PROTOCOL version the box speaks — 8 bytes, four u16be: a
+ * reserved word (0 everywhere, undecoded) then MAJOR, MINOR, PATCH. The
+ * console prints it `major.minorPP`, the patch zero-padded to two digits.
+ * S-0808 00 00 00 01 00 00 00 00 = (0,1,0,0) -> 1.000; S-1608
+ * 00 00 00 02 00 03 00 02 = (0,2,3,2) -> 2.302; S-4000S-3208
+ * 00 00 00 02 00 01 00 02 = (0,2,1,2) -> 2.102. It is a DIFFERENT number
+ * from the firmware version at 0x0000 and neither substitutes for the
+ * other: the S-1608 runs firmware 2.200 and speaks REAC 2.302.
+ *   [EVIDENCED (corpus + console display) — 274 replies, 5 distinct boxes,
+ * 3 models, constant per model. The operator read an M-200i's identity
+ * display on 2026-09-14: the S-1608 shows `REAC 2.302` beside `Firmware
+ * 2.200`, and the S-4000S-3208 (bench units 0040abc40680 and
+ * 0040abc408bc) shows `REAC 2.102` beside `Firmware 2.500`. The decode
+ * reproduces both strings from the captured bytes. The S-0808's 1.000 is
+ * PREDICTED — no display has been read for one. An earlier reading, that
+ * the second u16 tracked the REAC port count, is a coincidence of three
+ * models and is dropped.
+ * ]
  */
-#define REAC_IDENTITY_ADDR_CAPABILITY_BLOCK 0x0600
+#define REAC_IDENTITY_ADDR_REAC_VERSION 0x0600
 
 /* The model name: 1 byte name_kind (0x01 on every observation) then a
  * FIXED 16-byte NUL-padded ASCII field. 17 bytes of payload do not fit
