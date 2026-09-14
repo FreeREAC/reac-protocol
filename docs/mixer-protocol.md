@@ -347,7 +347,7 @@ register page:
 | 0x0100 | join_grant | the box's join declaration, echoed by the master as its grant (§4) |
 | 0x0101 | head_amp | `{CH, PARAM, VALUE}` — a preamp command (§6) |
 | 0x0302 | box_ready | the box's readiness declaration in a join burst (§4) |
-| 0x0500 | identity | an addressed poll/reply — firmware version, model name, capability block |
+| 0x0500 | identity | an addressed poll/reply — firmware version, model name, REAC protocol version |
 
 And a head-amp record's own PARAM byte:
 
