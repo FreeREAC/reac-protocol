@@ -1770,23 +1770,41 @@ types:
       announce's declared width. That is a real limit of this page, not a gap in
       the corpus.
 
-      # addr_lo 0x0600 — eight bytes, per-model constant, UNRESOLVED
+      # addr_lo 0x0600 — the REAC VERSION, four u16be
 
-      Stable per model and identical across the two units of each model we have
-      captured:
+      Eight bytes, stable per model and identical across the two units of each
+      model we have captured. Read as four u16be they are a RESERVED word then
+      MAJOR, MINOR and PATCH:
 
-        S-0808   00 00 00 01 00 00 00 00
-        S-1608   00 00 00 02 00 03 00 02
-        S-4000S  00 00 00 02 00 01 00 02
+        S-0808        00 00 00 01 00 00 00 00  = (0, 1, 0, 0)  -> "1.000"
+        S-1608        00 00 00 02 00 03 00 02  = (0, 2, 3, 2)  -> "2.302"
+        S-4000S-3208  00 00 00 02 00 01 00 02  = (0, 2, 1, 2)  -> "2.102"
 
-      Read as four u16be the fields are (0,1,0,0), (0,2,3,2) and (0,2,1,2). The
-      second field tracks the REAC port count (S-0808 one, the others two) and
-      the rest is unexplained. It is NOT a version in the 0x0000 encoding: the
-      S-1608's boot version is 2.200, which would be `02 02 00 00`, and that
-      appears nowhere here. The box's own boot menu names four versions — Main,
-      Boot, FPGA and REAC, string table at S-1608.BIN 0x9e32..0x9eaa — so a
-      further version living here is PLAUSIBLE and unproven. Left as bytes on
-      purpose.
+      The console prints it `major.minorPP` — minor and patch run together with
+      the patch zero-padded to two digits — which is why 2.302 is version 2.3.2.
+
+      EVIDENCE: the operator read an M-200i's own identity display on
+      2026-09-14. It shows the S-1608 as `REAC 2.302` beside `Firmware 2.200`,
+      and the S-4000S-3208 (32 in / 8 out; the two bench units `0040abc40680`
+      and `0040abc408bc`) as `REAC 2.102` beside `Firmware 2.500`. The console
+      displays BOTH numbers, from two different addresses, and its REAC string
+      is exactly what this block decodes to under the rule above — for two
+      models at once. This is the fourth version the box's own boot menu names
+      (Main, Boot, FPGA, REAC — string table at S-1608.BIN 0x9e32..0x9eaa).
+
+      The S-0808's "1.000" is what the rule PREDICTS; no display has been read
+      for an S-0808.
+
+      Two things stay open. The first u16 is 0 on all three models and is
+      undecoded, so a consumer keeps the raw bytes beside the numbers. And this
+      is NOT the 0x0000 encoding: the S-1608's firmware 2.200 would read
+      `02 02 00 00` and appears nowhere here — the two versions are independent
+      numbers and neither substitutes for the other.
+
+      An earlier reading of this block — that its second u16 tracked the box's
+      REAC port count (one on the S-0808, two on the others) — is a coincidence
+      of three models whose port counts happen to equal their REAC majors. It is
+      dropped.
 
       # The negative that matters
 
@@ -1825,8 +1843,38 @@ types:
         doc: |
           The four payload bytes are four DECIMAL DIGITS, most significant
           first, and Roland writes the result as D.DDD. 1003 is the S-0808's
-          1.003; 2200 the S-1608's 2.200; 2500 the S-4000S's 2.500. Each is the
-          version of the release package the image came from.
+          1.003; 2200 the S-1608's 2.200; 2500 the S-4000S-3208's 2.500. Each is
+          the version of the release package the image came from.
+      reac_version_reserved:
+        value: payload[0] * 256 + payload[1]
+        if: is_reply and addr_lo == identity_addr::reac_version and
+          payload.size >= 8
+        doc: |
+          The first u16be of the REAC-version record. 0 on every box captured,
+          and UNDECODED — named `reserved` for where it sits, not for a meaning
+          anyone has proven.
+      reac_version_major:
+        value: payload[2] * 256 + payload[3]
+        if: is_reply and addr_lo == identity_addr::reac_version and
+          payload.size >= 8
+        doc: |
+          The REAC protocol version's MAJOR field. 1 on the S-0808, 2 on the
+          S-1608 and the S-4000S-3208.
+      reac_version_minor:
+        value: payload[4] * 256 + payload[5]
+        if: is_reply and addr_lo == identity_addr::reac_version and
+          payload.size >= 8
+        doc: |
+          The MINOR field. 3 on the S-1608 (console: `REAC 2.302`), 1 on the
+          S-4000S-3208 (`REAC 2.102`), 0 on the S-0808.
+      reac_version_patch:
+        value: payload[6] * 256 + payload[7]
+        if: is_reply and addr_lo == identity_addr::reac_version and
+          payload.size >= 8
+        doc: |
+          The PATCH field, which the console prints as TWO DIGITS run together
+          with the minor: 2 on both the S-1608 and the S-4000S-3208, giving the
+          displayed `2.302` and `2.102`. 0 on the S-0808.
   record_fragment:
     doc: |
       op 0x0401 and op 0x0402 — link 4 with the segment field reading FIRST and
@@ -2233,7 +2281,7 @@ enums:
   # are named from the console's poll alone. See type `identity_data`.
   identity_addr:
     0x0000: firmware_version
-    0x0600: capability_block
+    0x0600: reac_version
     0x1000: model_name
     0x1011: model_name_ext
     0x1100: model_name_slot_b

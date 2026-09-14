@@ -537,6 +537,14 @@ with wrapper `02 00 fe 00` and **no** `f0 41` envelope. A genuine control record
 TAG `05 00` also occurs at `rec_len 0x0016`, `0x001a` and `0x001b`, each carrying a different
 per-model page of the same identity record — see `identity_data`.
 
+The page's `0x0600` record is the box's **REAC protocol version** — four u16be: a reserved
+word, then major, minor and patch. The console prints it `major.minorPP`, the patch
+zero-padded to two digits. An M-200i's identity display reads `REAC 2.302` for the S-1608
+(`00 00 00 02 00 03 00 02`) beside its firmware 2.200, and `REAC 2.102` for the
+S-4000S-3208 (`00 00 00 02 00 01 00 02`) beside its firmware 2.500 — two independent numbers
+off two addresses, and neither substitutes for the other. Read on the console's own display,
+2026-09-14.
+
 > **Parsers must dispatch on TAG, not on the opcode.** Classifying every `04 03` as a grant means a
 > slave in the join phase reads an engineer's preamp knob-turn as its grant: a live M-200 emits 628
 > head-amp records for every 14 grants.
@@ -720,8 +728,10 @@ required.
 
 ### Open items
 
-- The TAG `05 00` identity page's `0x0600` capability-block payload is stable per model but
-  its field meaning is undecoded (see `identity_data` in `spec/reac.ksy`).
+- The first u16 of the identity page's `0x0600` REAC-version record is 0 on every box
+  captured and is undecoded — a reader keeps the raw bytes beside the decoded version.
+- The S-0808's REAC version decodes to `1.000`, which is a PREDICTION: no console display
+  has been read for an S-0808, only for the S-1608 and the S-4000S-3208.
 - Whether a phantom-off assert sent to a box actually drops 48 V at the XLR pins is not
   verified independently of the wire bytes — that needs a physical meter across the pins,
   never a soft indicator.
