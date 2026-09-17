@@ -1529,9 +1529,19 @@ types:
         doc: |
           12 cells of 4 channels each = the 48-slot declaration space. Counts
           reproduce every real box exactly: S-0808 2 input + 2 output, S-1608 4 +
-          2, S-4000S 8 + 2 (all three have 8 outputs). The cells are an INVENTORY
-          IN DECLARATION ORDER, always starting at cell 0 — they are not a fabric
-          map, and the S-1608 declares cells 0..3 yet is placed at 0x20.
+          2, S-4000S 8 + 2, S-4000H (8 in / 32 out) 8 output + 2 `split_input` +
+          2 absent. The cells are an INVENTORY IN DECLARATION ORDER, always
+          starting at cell 0 — they are not a fabric map, and the S-1608
+          declares cells 0..3 yet is placed at 0x20.
+
+          `split_input` (0x00) is captured only on the S-4000H (box
+          00:40:ab:c4:25:80, m200-s4000h-coldboot.pcap /
+          m200-s4000h-replug.pcap): counted as input by libreac, same as
+          `analog_input`. What separates it from 0x02 is NOT decided — one
+          chassis, one capture. A cell carrying a code outside these four is
+          NOT a reason to refuse the table: it is four channels this grammar
+          cannot place, reported apart (libreac's `reac_ports_unknown`), while
+          the eleven understood cells still enrol the box at that width.
       - id: rest
         size-eos: true
     instances:
@@ -2297,6 +2307,7 @@ enums:
     0x01: pad_minus_20db
     0x02: sens
   inventory_cell:
+    0x00: split_input
     0x01: output
     0x02: analog_input
     0x03: absent
