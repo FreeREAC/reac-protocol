@@ -1519,10 +1519,40 @@
 /* A 4-input group. [EVIDENCED (corpus).] */
 #define REAC_PORT_SLOT_IN               0x02
 
-/* An empty cell. A code outside {01,02,03} is a table nobody has captured —
- * REFUSE, never guess. [EVIDENCED (corpus).]
- */
+/* An empty cell. [EVIDENCED (corpus).] */
 #define REAC_PORT_SLOT_EMPTY            0x03
+
+/* A 4-input group, as the S-4000H (8 in / 32 out) declares its inputs.
+ * Captured only on that chassis (MAC 00:40:ab:c4:25:80); a code this decoder
+ * used to REFUSE THE WHOLE TABLE on, which kept a fully declaring box off the
+ * graph for minutes (operator ruling 2026-09-17, "we should be able to enrol
+ * any stage box"). WHAT SEPARATES 0x00 FROM 0x02 IS NOT DECIDED — one
+ * chassis, one capture; a splitter's inputs may be marked apart from a
+ * head-amp-owned input, or this may be nothing but an alternate spelling of
+ * `analog_input`. [EVIDENCED (corpus, m200-s4000h-coldboot.pcap +
+ * m200-s4000h-replug.pcap, box 00:40:ab:c4:25:80, cells = 01x8 00x2 03x2).]
+ */
+#define REAC_PORT_SLOT_IN_SPLIT         0x00
+
+/* A cell carrying a code outside {00,01,02,03} is no longer a reason to
+ * refuse the table. A SLOT CODE SPEAKS FOR ITS OWN FOUR CHANNELS AND NO
+ * OTHERS — the box enrols at the width this decoder can read, and the unknown
+ * group is reported (`reac_ports_unknown`), never guessed into either role.
+ * No such code has been captured; this is the refusal rule for the day one
+ * arrives. [EVIDENCED (libreac reac_ports.c; no unknown code seen in the
+ * corpus).]
+ */
+#define REAC_PORT_SLOT_UNKNOWN_COST     True
+
+/* OPEN, not a law. The S-4000H straps board_config_code = 0x00 like the
+ * S-0808 and the S-4000S, predicting head-amp base CH 0x00 by `base =
+ * board_config_code * 0x10`. An M-200 has been observed addressing this box's
+ * preamps at CH 0x20–0x27 instead — a rig check, not a capture, and not yet
+ * reconciled with the strap law. Do not derive a base for a 0x00-coded box
+ * from the strap alone until this is resolved. [OPEN (rig observation,
+ * unreproduced in a capture).]
+ */
+#define REAC_PORT_SLOT_IN_SPLIT_HEADAMP_BASE True
 
 /* One per enrolled input group of 8, front-packed. [EVIDENCED (image +
  * corpus).]
