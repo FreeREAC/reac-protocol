@@ -127,13 +127,23 @@ def check_upstream(binary, R, rep):
     for fx, c in zip(fixtures, dumps):
         name = fx["name"]
         raw = bytes.fromhex(fx["hex"])
-        p = R.Reac(KaitaiStream(BytesIO(raw)))
-        rep.eq(f"{name}.raw_len", p.raw_len, c["raw_len"])
-        rep.eq(f"{name}.clean_len", p.clean_len, c["clean_len"])
+        # THE C ORACLE IS ALSO THE READER. libreac's reac_frame_clean_len() is
+        # ingest's rule for a capture path's +2, and the grammar has no such
+        # rule — it parses REAC frames. So the oracle's own clean_len is what
+        # decides how many bytes the parser is handed, and a raw residue buffer
+        # is checked to be REFUSED below rather than tolerated.
+        frame = raw[:c["clean_len"]]
+        p = R.Reac(KaitaiStream(BytesIO(frame)))
+        rep.eq(f"{name}.raw_len", p.raw_len, c["clean_len"])
         rep.eq(f"{name}.num_channels", p.num_channels, c["upstream_channels"])
         rep.eq(f"{name}.counter", p.counter, c["counter"])
-        rep.eq(f"{name}.has_fcs_residue", p.has_fcs_residue,
-               c["raw_len"] != c["clean_len"])
+        if c["raw_len"] != c["clean_len"]:
+            refused = False
+            try:
+                R.Reac(KaitaiStream(BytesIO(raw))).end_marker
+            except Exception:
+                refused = True
+            rep.eq(f"{name}.residue_buffer_refused", refused, True)
         rep.eq(f"{name}.len_audio", p.len_audio,
                c["upstream_channels"] * 36)
         rep.eq(f"{name}.samples", len(p.audio.time_samples),
@@ -141,8 +151,8 @@ def check_upstream(binary, R, rep):
         got = ksy_planar(p, c["upstream_channels"])
         rep.eq(f"{name}.pcm", got, c["upstream_pcm"])
         rep.samples += c["upstream_channels"] * SAMPLES_PER_PKT
-        # the frame's own end marker, and nothing claimed past it: the grammar
-        # stops at clean_len and leaves any FCS residue unread
+        # the frame's own end marker, at the end of the buffer: the grammar
+        # consumes the whole frame the reader handed it, and nothing else
         rep.eq(f"{name}.end_marker", bytes(p.end_marker), b"\xc2\xea")
         rep.eq(f"{name}.bytes_consumed", p._io.pos(), c["clean_len"])
 
@@ -165,11 +175,10 @@ def check_downstream(binary, R, rep):
     from kaitaistruct import BytesIO, KaitaiStream
     p = R.Reac(KaitaiStream(BytesIO(raw)))
     rep.eq("downstream.raw_len", p.raw_len, c["built_len"])
-    rep.eq("downstream.clean_len", p.clean_len, c["clean_len"])
+    rep.eq("downstream.built_len_is_clean", c["built_len"], c["clean_len"])
     rep.eq("downstream.num_channels", p.num_channels, MAX_CHANNELS)
     rep.eq("downstream.is_downstream_width", p.is_downstream_width, True)
     rep.eq("downstream.counter", p.counter, c["counter"])
-    rep.eq("downstream.has_fcs_residue", p.has_fcs_residue, False)
     rep.eq("downstream.end_marker", bytes(p.end_marker), b"\xc2\xea")
     rep.eq("downstream.eth_dst", bytes(p.eth_dst), b"\xff" * 6)
     rep.eq("downstream.type_word", p.control.type_word,
