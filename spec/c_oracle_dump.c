@@ -94,14 +94,21 @@ static int do_upstream(void)
 			fprintf(stderr, "c_oracle_dump: malformed hex line\n");
 			return 2;
 		}
-		int nch = reac_upstream_channels((size_t)len);
+		/* THE READER FIRST, THEN THE PARSER. reac_frame_clean_len() is
+		 * ingest's rule for a capture path's +2 (two of these goldens are
+		 * 1206 B as captured); reac_upstream_channels() and
+		 * reac_upstream_decode() are parsers and take the CLEAN length —
+		 * handed a residue length they refuse it, exactly as the grammar
+		 * does. Keeping the two roles apart here is the point. */
+		size_t clean = reac_frame_clean_len((size_t)len);
+		int nch = reac_upstream_channels(clean);
 		printf("{\"raw_len\":%d", len);
 		printf(",\"is_reac\":%d", reac_frame_is_reac(frame, (size_t)len));
-		printf(",\"clean_len\":%zu", reac_frame_clean_len((size_t)len));
+		printf(",\"clean_len\":%zu", clean);
 		printf(",\"upstream_channels\":%d", nch);
 		printf(",\"counter\":%u", (unsigned)reac_frame_counter(frame));
 		if (nch > 0) {
-			int ns = reac_upstream_decode(frame, (size_t)len, pcm);
+			int ns = reac_upstream_decode(frame, clean, pcm);
 			printf(",\"upstream_samples\":%d", ns);
 			if (ns > 0) {
 				printf(",\"upstream_pcm\":");
