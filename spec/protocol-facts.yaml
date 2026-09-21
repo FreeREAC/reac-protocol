@@ -71,9 +71,12 @@ groups:
       lets a parser recover the width from the size — REAC carries no width
       field in an audio frame.
 
-      The 52 is 50 bytes of header plus the 2-byte end marker. A capture may
-      carry two more bytes of Ethernet FCS residue; they are residue, not a
-      field, and are stripped before any of this arithmetic runs.
+      The 52 is 50 bytes of header plus the 2-byte end marker. A length that is
+      not 52 + n*36 is not a REAC frame. The `+2` a mirrored capture path leaves
+      on a frame belongs to the CAPTURE, not to the protocol — 0 such frames in
+      592,762 captured off a plain NIC (census, 2026-09-21) — so it is not a
+      protocol fact and is not stated here; stripping it is the capture reader's
+      job, in ingest, before any byte reaches a parser.
     facts:
       - name: ETHERTYPE
         libreac: REAC_ETHERTYPE
@@ -110,7 +113,7 @@ groups:
         why: The non-audio bytes of any frame — 50 header + 2 end marker. The
           52 in `52 + n*36`.
         evidence: EVIDENCED (corpus).
-        ksy: instances/has_fcs_residue/value
+        ksy: instances/len_audio/value
         ksy_as: substring
         ksy_value: "raw_len - 52"
       - name: PACE_IS_THE_MASTERS
@@ -224,18 +227,6 @@ groups:
         why: 40 ch x 12 samples x 3 B.
         evidence: EVIDENCED (corpus).
         derived: MAX_CHANNELS * BYTES_PER_CHANNEL
-      - name: FCS_RESIDUE
-        value: 2
-        why: |
-          The two bytes a mirrored/SPAN capture leaves on the end of a frame.
-          EXPLAINED, STRIPPED, NEVER MODELLED — and load-bearing twice: it is
-          how mirrored duplicates are told apart (by GEOMETRY, never by
-          comparing bytes), and a truncated capture whose residue happens to
-          fit makes a short frame look like a legal narrower one.
-        evidence: EVIDENCED (corpus).
-        ksy: instances/has_fcs_residue/value
-        ksy_as: substring
-        ksy_value: "% 36 == 2"
       - name: END_MARKER_0
         libreac: REAC_END_MARKER_0
         value: 0xC2

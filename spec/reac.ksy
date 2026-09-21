@@ -23,58 +23,66 @@ doc: |
       32 B control block                                  (offset 18..49)
        n_channels * 36 B braided s24 audio region         (offset 50)
        2 B 0xC2 0xEA end marker
-     [ 2 B FCS residue — not protocol, see below ]
 
-  so a frame is `52 + n_channels * 36` bytes:
+  so a frame is `52 + n_channels * 36` bytes, exactly:
 
-    | direction  | width | frame | as some captures store it |
-    |------------|-------|-------|---------------------------|
-    | downstream |    40 |  1492 |                      1494 |
-    | upstream   |     8 |   340 |                       342 |
-    | upstream   |    16 |   628 |                       630 |
-    | upstream   |    32 |  1204 |                      1206 |
+    | direction  | width | frame |
+    |------------|-------|-------|
+    | downstream |    40 |  1492 |
+    | upstream   |     8 |   340 |
+    | upstream   |    16 |   628 |
+    | upstream   |    32 |  1204 |
 
-  The right-hand column is NOT a second frame format. It is the same frame with
-  two bytes of the capture's own Ethernet FCS left on the end.
+  A buffer of any other length is not a REAC frame. The `+2` a mirrored capture
+  path hands back (1494 / 342 / 630 / 1206) is the CAPTURE's, not the wire's —
+  see below.
 
   The downstream broadcast is always 40 channels and rate-INVARIANT: 12 samples
   per frame at 44.1 / 48 / 96 kHz alike, the sample rate carried by the packet
   rate (pps = rate / 12 -> 3675 / 4000 / 8000). An upstream return is the same
   shape sized to the box's own input width.
 
-  # The +2 is Ethernet FCS residue — explained, stripped, NOT modelled
+  # The +2 is the CAPTURE PATH's, and it is not in this grammar at all
 
-  A length of `52 + n*36 + 2` carries two bytes past the end marker. They are
-  the low 16 bits of the frame's OWN Ethernet FCS (crc32 over the preceding
-  bytes, little-endian), left behind by the capture path. They are not a REAC
-  field, they carry no protocol meaning, and nothing may ever emit them.
+  A buffer of `52 + n*36 + 2` bytes carries two bytes past the end marker. They
+  are the low 16 bits of the frame's OWN Ethernet FCS (crc32 over the preceding
+  bytes, little-endian), left behind by the tap. They are not a REAC field, they
+  carry no protocol meaning, nothing may ever emit them — and they do not appear
+  on a REAC network.
 
-  The measurement and the reasoning live in libreac <reac/reac.h> (libreac#15);
-  the short form is that the identity holds for 100% of frames checked, in both
-  directions and across generations, which no genuine trailer could do, and that
-  the variable is the capture rig — mirroring RX and TX of one port, so a
-  transiting frame is seen twice, one copy clean and one with the residue. It is
-  NOT OHRCA-specific: it appears on non-OHRCA rigs and is absent on OHRCA ones.
-  It is not a VLAN tag either — every frame here reads 0x8819 at offset 12, and
-  a tag would sit four bytes BEFORE the ethertype, not two bytes after the end
+  Two measurements say so. The identity (those two bytes ARE the frame's own
+  FCS) holds for 100% of frames checked, in both directions and across
+  generations, which no genuine trailer could do — libreac <reac/reac.h>,
+  libreac#15. And the census over the whole FreeREAC corpus, 2026-09-21, 104
+  pcaps with the VLAN tag honoured: **0 residue-length frames in 592,762 frames
+  captured off a plain NIC**, across 25 captures; every residue frame in the
+  corpus sits in a mirrored or trunked capture, arriving as one clean copy and
+  one residue copy of the same transiting frame, because the tap mirrors RX and
+  TX of one port (libreac
+  docs/design/notes/2026-09-21-master-tx-doubling-refuted.md). It is NOT
+  OHRCA-specific: it appears on non-OHRCA rigs and is absent on OHRCA ones. It
+  is not a VLAN tag either — every frame here reads 0x8819 at offset 12, and a
+  tag would sit four bytes BEFORE the ethertype, not two bytes after the end
   marker.
 
-  ## How the grammar expresses that
+  ## How the grammar expresses that: it does not
 
-  By NOT declaring a field for it. The `seq` ends at `end_marker`, so a parse of
-  a residue-carrying capture consumes exactly the frame and leaves the two stray
-  bytes unread at the end of the stream — tolerated, ignored, and impossible to
-  emit from a serializer generated out of this grammar. A `size: 2` field, however
-  it were named, would say the opposite: that the bytes belong to the format.
+  There is no residue field, no residue predicate and no "clean length" here.
+  The `seq` ends at `end_marker` and the audio region spans everything between
+  the control block and it, so a buffer with stray bytes on the end is REFUSED:
+  the marker check lands on the stray bytes and fails. A `size: 2` field,
+  however it were named, would say the bytes belong to the format; a tolerated
+  `+2` says a REAC frame may be two bytes longer than its own law, which is the
+  opposite of what the wire shows.
 
-  What the grammar DOES keep is the length arithmetic, because every derived
-  quantity depends on it. `has_fcs_residue` is a statement about the CAPTURE, not
-  about the frame, and `clean_len` is libreac's one rule for both directions: a
-  length of `52 + n*36 + 2` comes back reduced by 2, anything else is returned
-  unchanged.
-
-  A residue-carrying frame and a clean one therefore parse identically, field for
-  field, and differ only in how many bytes are left over afterwards.
+  STRIPPING IS THE CAPTURE READER'S JOB, before any byte reaches a parser —
+  libreac's ingest (`reac_frame_clean_len()` in reac_rx / reac_tap, the same
+  geometry that recognises a mirror twin), and spec/corpus-check.py at the pcap
+  record. A reader that hands this grammar a residue-carrying buffer gets an
+  error naming the end marker, which is the correct answer: that buffer is a
+  capture artifact, not a frame.
+  RULED (operator, 2026-09-21): the residue provably does not appear on a normal
+  REAC network, so it is out of the grammar.
 
   # The audio region and the braid
 
@@ -336,37 +344,35 @@ seq:
   - id: end_marker
     contents: [0xC2, 0xEA]
     doc: |
-      The frame ENDS here. A capture that kept two bytes of the Ethernet FCS
-      leaves them past this point; the grammar deliberately declares no field for
-      them, so they are read by nothing and can be emitted by nothing. See "The
-      +2 is Ethernet FCS residue" in the top-level doc.
+      The frame ENDS here, and so does the buffer. Because `audio` spans
+      everything between the control block and these last two bytes, a buffer
+      carrying anything past the marker — a capture path's two bytes of Ethernet
+      FCS, say — puts those bytes here and is REFUSED. Stripping them is the
+      reader's job, not the grammar's. See "The +2 is the CAPTURE PATH's" in the
+      top-level doc.
 instances:
   raw_len:
     value: _io.size
-    doc: The size of the buffer handed to the parser — the frame plus whatever
-      the capture left on it.
-  has_fcs_residue:
-    value: (raw_len - 52) % 36 == 2
+    doc: The size of the buffer handed to the parser. For a REAC frame this is
+      the frame length, 52 + n*36, and nothing else parses.
+  len_audio:
+    value: raw_len - 52
     doc: |
-      True when the buffer is 2 bytes longer than any valid 52 + n*36 frame,
-      i.e. when the capture kept the low half of the Ethernet FCS. A statement
-      about the CAPTURE, not about the frame: it changes no field below, only
-      how many bytes go unread after end_marker.
-  clean_len:
-    value: 'has_fcs_residue ? raw_len - 2 : raw_len'
-    doc: libreac reac_frame_clean_len(). The actual frame length. Every length
-      that is not 52 + n*36 + 2 passes through unchanged.
+      The audio region: everything between the 50-byte header and the 2-byte end
+      marker, i.e. `raw_len - 52`. Taking it from the buffer rather than from
+      num_channels * 36 is what makes the end marker land on any stray trailing
+      byte and refuse it.
   num_channels:
-    value: (clean_len - 52) / 36
+    value: (raw_len - 52) / 36
     doc: |
       Channel width DERIVED from the frame size — REAC carries no width field in
       the audio frame. 40 is the downstream broadcast; an even 2..38 is a box's
       upstream return. This is the width the audio region is laid out at; it is
       NOT the head-amp channel space (48 slots, 0x00..0x2f), and conflating the
       two silently drops the top half of a 16-input box.
-  len_audio:
-    value: num_channels * 36
-    doc: 36 = 12 samples x 3 bytes, per channel, at every sample rate.
+
+      36 = 12 samples x 3 bytes, per channel, at every sample rate — so a REAC
+      frame's length carries its width, and only whole channels are legal.
   is_downstream_width:
     value: num_channels == 40
 types:
