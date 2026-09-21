@@ -58,12 +58,16 @@ REAC_MAX_CHANNELS = 40
 # --------------------------------------------------------------------------
 
 def oracle_clean_len(n):
-    """libreac reac_frame_clean_len(): strip the +2 FCS residue if present.
+    """libreac reac_frame_clean_len(): INGEST's strip of the capture's +2.
 
     A REAC frame is 52 + n*36 for some channel width n, so a length of
     52 + n*36 + 2 is a frame the capture left two bytes of its own Ethernet FCS
     on, and comes back reduced by 2. Every other length, including every clean
     one, is returned unchanged.
+
+    This is a rule about a CAPTURE PATH, not about the protocol: it lives in
+    libreac's ingest (reac_rx, reac_tap) and in this harness's capture_reader,
+    and deliberately nowhere in reac.ksy.
     """
     if n > REAC_UPSTREAM_OVERHEAD and (n - REAC_UPSTREAM_OVERHEAD) % REAC_UPSTREAM_BYTES_PER_CH == 2:
         return n - 2
@@ -73,11 +77,12 @@ def oracle_clean_len(n):
 def oracle_upstream_channels(n):
     """libreac reac_upstream_channels(): width from the frame size, or -1.
 
+    Takes a CLEAN length: a residue-carrying one is not 52 + n*36 and is
+    refused, like any other off-law length. The strip happened in the reader.
     Rejects an odd width (the braid packs channel pairs) and rejects the 40-ch
     solution, which is the downstream broadcast and never a box return.
     """
-    clean = oracle_clean_len(n)
-    rest = clean - REAC_UPSTREAM_OVERHEAD
+    rest = n - REAC_UPSTREAM_OVERHEAD
     if rest <= 0 or rest % REAC_UPSTREAM_BYTES_PER_CH:
         return -1
     nch = rest // REAC_UPSTREAM_BYTES_PER_CH
@@ -198,8 +203,25 @@ def s24le(lo, mid, hi):
 # helpers
 # --------------------------------------------------------------------------
 
+def capture_reader(buf):
+    """What a CAPTURE READER hands a parser: the frame, without the tap's +2.
+
+    The residue is the capture path's, never the protocol's, so stripping it
+    happens HERE — the same place libreac does it, in ingest
+    (reac_frame_clean_len(), reac_rx/reac_tap), and the same place
+    corpus-check.py does it, at the pcap record. The grammar below knows
+    nothing about it and refuses a buffer that still carries it.
+    """
+    return buf[:oracle_clean_len(len(buf))]
+
+
 def parse_frame(hexstr):
-    return R.Reac(KaitaiStream(BytesIO(bytes.fromhex(hexstr))))
+    return R.Reac(KaitaiStream(BytesIO(capture_reader(bytes.fromhex(hexstr)))))
+
+
+def parse_raw(buf):
+    """Straight to the grammar, no reader in front of it."""
+    return R.Reac(KaitaiStream(BytesIO(buf)))
 
 
 def parse_block(hexstr):
@@ -214,50 +236,69 @@ GRANT_CELLS = CONTROL["grant_sweep"]["head_amp_cells"]
 
 
 # --------------------------------------------------------------------------
-# frame geometry: clean_len, the +2 FCS residue, derived width
+# frame geometry: 52 + n*36 exactly, derived width, and the refusal of anything
+# past the end marker
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
 def test_frame_geometry_matches_oracle(name, fx):
     p = parse_frame(fx["hex"])
-    assert p.raw_len == fx["raw_len"]
-    assert p.clean_len == oracle_clean_len(fx["raw_len"])
-    assert p.num_channels == fx["channels"] == oracle_upstream_channels(fx["raw_len"])
-    assert p.has_fcs_residue == (fx["raw_len"] != p.clean_len)
+    assert p.raw_len == oracle_clean_len(fx["raw_len"])
+    assert p.raw_len == REAC_UPSTREAM_OVERHEAD + fx["channels"] * REAC_UPSTREAM_BYTES_PER_CH
+    assert p.num_channels == fx["channels"] == oracle_upstream_channels(p.raw_len)
     assert p.len_audio == p.num_channels * REAC_UPSTREAM_BYTES_PER_CH
     assert not p.is_downstream_width
 
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
-def test_fcs_residue_is_left_unread_not_modelled(name, fx):
-    """The grammar stops at the end marker and never claims the residue.
+def test_a_buffer_with_the_capture_residue_is_refused(name, fx):
+    """A residue-carrying buffer handed STRAIGHT to the grammar must go red.
 
-    This is the whole design of the +2 handling, so it is pinned as a test: the
-    parser consumes exactly `clean_len` bytes whether or not the capture kept
-    the FCS, no field is declared for the leftovers, and nothing generated from
-    this grammar can therefore emit them.
+    The +2 is a capture artifact, and the grammar models a REAC frame — so a
+    reader that forgets to strip gets an error, never a silently-accepted frame
+    two bytes longer than the protocol's own law. The goldens that carry the
+    residue (342 / 630 / 1206 B) are the positive side; the clean ones have
+    nothing to refuse and are skipped by name.
     """
-    p = parse_frame(fx["hex"])
-    assert p._io.pos() == p.clean_len
-    assert p._io.size() - p._io.pos() == (2 if p.has_fcs_residue else 0)
-    assert not hasattr(p, "ohrca_trailer")
-    assert not hasattr(p, "fcs_residue")
+    raw = bytes.fromhex(fx["hex"])
+    if len(raw) == oracle_clean_len(len(raw)):
+        pytest.skip("golden carries no residue")
+    with pytest.raises(Exception):
+        parse_raw(raw)
+    # and a clean frame with ANY two extra bytes is refused the same way — the
+    # refusal is about the geometry, not about those bytes being an FCS
+    with pytest.raises(Exception):
+        parse_raw(capture_reader(raw) + b"\x00\x00")
 
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
-def test_residue_changes_no_field(name, fx):
-    """A frame parses the same with the residue and with it stripped.
+def test_the_grammar_carries_no_capture_vocabulary(name, fx):
+    """No residue field and no residue INSTANCE — the ratchet on the ruling.
 
-    Residue is capture noise, so removing it must be a no-op on every field.
-    The 342/1206 B goldens exercise the "with" side; slicing gives the "without"
-    side of the very same frame.
+    `has_fcs_residue` and `clean_len` were computed here until 2026-09-21; they
+    are ingest's vocabulary and they are gone. A field for the bytes was never
+    declared, so nothing generated from this grammar can emit them.
     """
     p = parse_frame(fx["hex"])
-    if not p.has_fcs_residue:
+    assert p._io.pos() == p.raw_len == p._io.size()
+    for gone in ("fcs_residue", "ohrca_trailer", "has_fcs_residue", "clean_len"):
+        assert not hasattr(p, gone)
+
+
+@pytest.mark.parametrize("name,fx", UP_FRAMES)
+def test_the_reader_strip_changes_no_field(name, fx):
+    """The frame inside a residue-carrying capture parses to the same bytes.
+
+    Stripping is a no-op on every field, which is why it can live in the reader:
+    the 342/630/1206 B goldens go through capture_reader, and slicing the last
+    two bytes by hand gives the same parse, field for field.
+    """
+    raw = bytes.fromhex(fx["hex"])
+    if len(raw) == oracle_clean_len(len(raw)):
         pytest.skip("golden has no residue to strip")
-    stripped = parse_frame(bytes.fromhex(fx["hex"])[:-2].hex())
-    assert not stripped.has_fcs_residue
-    assert stripped.clean_len == p.clean_len
+    p = parse_frame(fx["hex"])
+    stripped = parse_raw(raw[:-2])
+    assert stripped.raw_len == p.raw_len
     assert stripped.num_channels == p.num_channels
     assert stripped.counter == p.counter
     assert stripped.len_audio == p.len_audio
@@ -266,8 +307,12 @@ def test_residue_changes_no_field(name, fx):
         == [[bytes(g) for g in ts.pair_groups] for ts in p.audio.time_samples]
 
 
-def test_clean_len_rule_over_the_whole_frame_family():
-    """Both directions, clean and residue-carrying, against the oracle's one rule."""
+def test_the_readers_strip_rule_over_the_whole_frame_family():
+    """Ingest's rule, both directions — libreac reac_frame_clean_len().
+
+    Transcribed here because this harness plays the reader; the grammar itself
+    has no opinion about it beyond refusing what the reader failed to strip.
+    """
     for width in (8, 16, 32, 40):
         clean = REAC_UPSTREAM_OVERHEAD + width * REAC_UPSTREAM_BYTES_PER_CH
         assert oracle_clean_len(clean) == clean
@@ -278,7 +323,10 @@ def test_clean_len_rule_over_the_whole_frame_family():
     assert (oracle_clean_len(340), oracle_clean_len(342)) == (340, 340)
     # the 40-ch solution is the downstream broadcast, never a box return
     assert oracle_upstream_channels(1492) == -1
-    assert oracle_upstream_channels(1494) == -1
+    # and a length the reader did not strip is off the law, so the PARSER side
+    # refuses it rather than quietly stripping it a second time
+    for residue in (342, 630, 1206, 1494):
+        assert oracle_upstream_channels(residue) == -1
 
 
 # --------------------------------------------------------------------------
