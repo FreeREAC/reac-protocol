@@ -98,6 +98,7 @@ ksc-help:
 	@echo '  unzip -q kaitai-struct-compiler-0.11.zip'
 	@echo '  export PATH="$$PWD/kaitai-struct-compiler-0.11/bin:$$PATH"'
 	@echo
-	@echo 'The harness also needs the Kaitai Python runtime and pytest:'
+	@echo 'The harness also needs the Kaitai Python runtime, pytest and PyYAML'
+	@echo '(gen-facts.py / facts_xcheck.py read protocol-facts.yaml):'
 	@echo
-	@echo '  pip install kaitaistruct pytest'
+	@echo '  pip install kaitaistruct pytest pyyaml'
