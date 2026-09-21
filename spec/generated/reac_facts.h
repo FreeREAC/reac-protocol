@@ -20,9 +20,12 @@
  * lets a parser recover the width from the size — REAC carries no width
  * field in an audio frame.
  *
- * The 52 is 50 bytes of header plus the 2-byte end marker. A capture may
- * carry two more bytes of Ethernet FCS residue; they are residue, not a
- * field, and are stripped before any of this arithmetic runs.
+ * The 52 is 50 bytes of header plus the 2-byte end marker. A length that is
+ * not 52 + n*36 is not a REAC frame. The `+2` a mirrored capture path leaves
+ * on a frame belongs to the CAPTURE, not to the protocol — 0 such frames in
+ * 592,762 captured off a plain NIC (census, 2026-09-21) — so it is not a
+ * protocol fact and is not stated here; stripping it is the capture reader's
+ * job, in ingest, before any byte reaches a parser.
  */
 /* REAC's registered non-IP EtherType. [EVIDENCED (corpus) — every frame in 72
  * captures.]
@@ -184,15 +187,6 @@
 
 /* 40 ch x 12 samples x 3 B. [EVIDENCED (corpus).] */
 #define REAC_AUDIO_BYTES                1440
-
-/* The two bytes a mirrored/SPAN capture leaves on the end of a frame.
- * EXPLAINED, STRIPPED, NEVER MODELLED — and load-bearing twice: it is
- * how mirrored duplicates are told apart (by GEOMETRY, never by
- * comparing bytes), and a truncated capture whose residue happens to
- * fit makes a short frame look like a legal narrower one.
- *   [EVIDENCED (corpus).]
- */
-#define REAC_FCS_RESIDUE                2
 
 /* First byte of the two-byte end marker. [EVIDENCED (corpus).] */
 #define REAC_END_MARKER_0               0xc2
