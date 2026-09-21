@@ -162,7 +162,7 @@ def exercise(frame, reac, kaitai):
     Kaitai defers `instances`, so a parse that never reads them proves only that
     the `seq` fits. Everything reachable is forced here on purpose."""
     f = reac.Reac(kaitai.KaitaiStream(kaitai.BytesIO(frame)))
-    _ = f.clean_len, f.num_channels, f.has_fcs_residue
+    _ = f.raw_len, f.num_channels, f.len_audio
     t = f.control
     _ = t.ctrl_kind, t.op_raw, t.op_len_raw, t.block_checksum
     block = t.block
@@ -260,7 +260,14 @@ def scan_file(path, reac, kaitai, per_file, corrupt, moves=None):
         if len(data) < 52 or struct.unpack(">H", data[12:14])[0] != ETHERTYPE:
             continue
         n = len(data)
-        if (n - 52) % 36 == 2:          # the capture kept two bytes of FCS
+        # THIS SCRIPT IS THE CAPTURE READER, and this is the only place the +2
+        # is handled. A mirrored/trunked tap leaves two bytes of the frame's own
+        # Ethernet FCS after the end marker; the grammar models a REAC frame and
+        # refuses a buffer carrying them (it has no residue vocabulary at all,
+        # since 2026-09-21), so a reader that skipped this line would file every
+        # mirrored frame as a grammar failure. libreac's ingest does the same
+        # thing in the same place — reac_frame_clean_len().
+        if (n - 52) % 36 == 2:
             data, n = data[:n - 2], n - 2
         if (n - 52) % 36 != 0:
             off_law += 1
