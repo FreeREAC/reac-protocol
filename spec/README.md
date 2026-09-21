@@ -32,9 +32,10 @@ breaks in the field. Here it is a red test.
 
 Kaitai has **no pure-C backend** — its C-family target is `cpp_stl` (C++ with the
 STL). More to the point, **libreac already is the C parser**, and it is the single
-layout oracle by design: the braid byte map, the `+2` handling and the s24/float pair
-each exist exactly once, in one header, because they were previously duplicated across
-three files and drifted. Generating a second C(++) decoder from the spec and shipping
+layout oracle by design: the braid byte map and the s24/float pair each exist exactly
+once, in one header, because they were previously duplicated across three files and
+drifted. (The `+2` handling lives there too — in libreac's INGEST, which is where a
+capture-path artifact belongs; this grammar has no vocabulary for it.) Generating a second C(++) decoder from the spec and shipping
 it would recreate precisely the duplication that consolidation removed.
 
 So: **Python is the generated target.** It fits where the referee has to run — test
@@ -181,10 +182,11 @@ on every change to `spec/**`.
 
 Everything it reads is committed beside it: no network, no capture files, no rig.
 
-- **frame geometry** — `clean_len` and the `+2` rule in both directions, the channel
-  width derived from the frame size (REAC carries no width field in an audio frame),
-  and that the parser stops at the end marker: a capture's FCS residue is left unread,
-  never claimed as a field, and changes no other value;
+- **frame geometry** — the `52 + n*36` law in both directions, the channel width
+  derived from the frame size (REAC carries no width field in an audio frame), and
+  the REFUSAL of anything past the end marker: a capture path's `+2` is stripped by
+  the harness's own `capture_reader()` — the reader's job, as in libreac's ingest —
+  and a residue-carrying buffer handed straight to the grammar goes red;
 - **the braid** — the audio region decoded through the spec's pair-group structure
   must reproduce, sample for sample, the planar s24 tables libreac's own
   `tests/test_upstream.c` asserts. The permutation itself is documented in the spec
@@ -263,7 +265,10 @@ adds to that, and neither should be cited as if it did.
 
 `fixtures/upstream.json` — real MAC-sanitized rig captures with their PCM truth
 tables, the same arrays libreac pins (`UP8` 340 B / `UP16` 628 B / `UP32A`, `UP32B`
-1206 B — 1204 B frames the capture left two bytes of Ethernet FCS on).
+1206 B — 1204 B frames the capture left two bytes of Ethernet FCS on). The two
+1206 B goldens are kept AS CAPTURED on purpose: the harness strips them in its
+`capture_reader()` before parsing, and also requires the grammar to refuse the
+unstripped buffer, which is the only way to keep the two roles apart.
 
 `fixtures/control.json` — 43 control blocks stored as `frame[16:50]` windows (the type
 word plus the checksummed block, which is the form the C goldens use), plus the full
