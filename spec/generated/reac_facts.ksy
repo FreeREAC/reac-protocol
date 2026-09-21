@@ -189,15 +189,6 @@ instances:
     value: 1440
     doc: |
       40 ch x 12 samples x 3 B. [EVIDENCED (corpus).]
-  fcs_residue:
-    value: 2
-    doc: |
-      The two bytes a mirrored/SPAN capture leaves on the end of a frame.
-      EXPLAINED, STRIPPED, NEVER MODELLED — and load-bearing twice: it is
-      how mirrored duplicates are told apart (by GEOMETRY, never by
-      comparing bytes), and a truncated capture whose residue happens to
-      fit makes a short frame look like a legal narrower one.
-        [EVIDENCED (corpus).]
   end_marker_0:
     value: 0xc2
     doc: |
