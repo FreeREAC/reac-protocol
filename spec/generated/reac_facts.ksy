@@ -1550,13 +1550,13 @@ instances:
       The narrowest box width in either direction, one braid pair. [derived
       — the braid pairs channels (BRAID_PAIR_CHANNELS).]
   box_max_channels:
-    value: 38
+    value: 40
     doc: |
-      The widest box width in either direction. A MAX_CHANNELS-wide frame is
-      the desk's downstream broadcast, so a box stops one pair short of it.
-      [derived — reac.ksy is_downstream_width (a 40-wide frame is the
-      downstream broadcast) and num_channels ("an even 2..38 is a box's
-      upstream return"); operator ruling 2026-09-25. Widest box in the
+      The widest box width in either direction — the whole audio fabric. A
+      box may be 40 wide either way; width is never what separates a box's
+      frame from the desk's. [derived — the audio fabric (MAX_CHANNELS);
+      operator ruling 2026-09-25 (BOX_MAX_CHANNELS = 40; S-4000S-3208 32/8,
+      S-2416 24/16, and an 8 in / 32 out box tested). Widest box in the
       corpus is 32.]
   # ---- What each box model declares ----
   box_s0808_in:
