@@ -1,0 +1,161 @@
+reac.ksy path	literal	fact it restates	bound (ratcheted) before this PR	bound after this PR
+seq/0/size	6	ETH_ADDR_BYTES	no	ETH_ADDR_BYTES
+seq/1/size	6	ETH_ADDR_BYTES	no	no
+seq/2/contents	88 19	ETHERTYPE	ETHERTYPE	ETHERTYPE
+seq/4/size	34	TYPED_BLOCK_LEN	TYPED_BLOCK_LEN	TYPED_BLOCK_LEN
+seq/6/contents	c2 ea	END_MARKER_0, END_MARKER_1	END_MARKER_0, END_MARKER_1	END_MARKER_0, END_MARKER_1
+instances/len_audio/value	raw_len - 52	FRAME_OVERHEAD	FRAME_OVERHEAD	FRAME_OVERHEAD
+instances/num_channels/value	(raw_len - 52) / 36	BYTES_PER_CHANNEL	BYTES_PER_CHANNEL	BYTES_PER_CHANNEL
+instances/is_downstream_width/value	num_channels == 40	MAX_CHANNELS	MAX_CHANNELS	MAX_CHANNELS
+types/typed_block/seq/1/size	32	CTRL_BLOCK_LEN	CTRL_BLOCK_LEN	CTRL_BLOCK_LEN
+types/typed_block/instances/raw_block/pos	2	TYPE_WORD_BYTES	no	TYPE_WORD_BYTES
+types/typed_block/instances/raw_block/size	32	CTRL_BLOCK_LEN	no	no
+types/typed_block/instances/block_checksum/pos	33	DERIVED:TYPE_WORD_BYTES + CTRL_CKSUM_OFF_IN_BLOCK	no	no
+types/typed_block/instances/op_raw/pos	2	DERIVED:TYPE_WORD_BYTES + HDR_LINK_OFF	no	no
+types/typed_block/instances/op_len_raw/pos	4	HDR_LEN_OFF	no	HDR_LEN_OFF
+types/typed_block/instances/link_raw/pos	2	DERIVED:TYPE_WORD_BYTES + HDR_LINK_OFF	no	no
+types/typed_block/instances/seg_raw/pos	3	DERIVED:TYPE_WORD_BYTES + HDR_SEG_OFF	no	no
+types/typed_block/instances/opcode_raw/pos	6	DERIVED:TYPE_WORD_BYTES + HDR_OPCODE_OFF	no	no
+types/typed_block/instances/dt1_model_lo/pos	16	DT1_MODEL_LO_OFF	no	DT1_MODEL_LO_OFF
+types/typed_block/instances/dt1_command/pos	17	DT1_CMD_OFF	no	DT1_CMD_OFF
+types/typed_block/instances/dt1_tag/pos	18	DT1_TAG_OFF	no	DT1_TAG_OFF
+types/typed_block/instances/ctrl_kind/value	type_word == frame_type::filler ? ctrl_kind::filler : type_word == fra	DT1_MODEL_ID_LO	no	DT1_MODEL_ID_LO
+types/filler_block/seq/0/repeat-expr	16	DERIVED:CTRL_BLOCK_LEN / 2 (the 16 filler descriptor words)	no	no
+types/control_block/seq/2/size	28	DERIVED:CTRL_BLOCK_LEN - HDR_OPCODE_OFF	no	no
+types/control_block/instances/block_checksum/pos	31	CTRL_CKSUM_OFF_IN_BLOCK	CTRL_CKSUM_OFF_IN_BLOCK	CTRL_CKSUM_OFF_IN_BLOCK
+types/control_block/instances/link/pos	0	HDR_LINK_OFF	no	HDR_LINK_OFF
+types/control_block/instances/seg/pos	1	HDR_SEG_OFF	no	HDR_SEG_OFF
+types/control_block/instances/seg_is_first/value	(seg & 1) != 0	SEG_FIRST_BIT	no	no
+types/control_block/instances/seg_is_last/value	(seg & 2) != 0	SEG_LAST_BIT	no	no
+types/control_block/instances/seg_kind/value	seg & 3	SEG_SINGLE (as mask)	no	no
+types/control_block/instances/opcode/pos	4	HDR_OPCODE_OFF	no	HDR_OPCODE_OFF
+types/cfea_payload/seq/0/contents	01 03 0d 01 04	ANNOUNCE_HEAD_BYTES (length only; the bytes 01 03 0d 01 04 are undeclared: 01 03 = OP_PAGE_0103, 0d = LEN_SUB_ENROLL_GROUP_MAP?, unverified)	no	no
+types/cfea_payload/seq/1/size	6	ETH_ADDR_BYTES	no	no
+types/scene_chunk_payload/seq/1/size	26	SCENE_CHUNK_BYTES	SCENE_CHUNK_BYTES	SCENE_CHUNK_BYTES
+types/scene_header_payload/seq/2/size	24	SCENE_HEAD_BYTES	SCENE_HEAD_BYTES	SCENE_HEAD_BYTES
+types/scene_body/seq/0/contents	31 32 33 34	SCENE_TAG_ID	no	SCENE_TAG_ID
+types/scene_body/seq/2/size	2	reserved run (walked)	no	no
+types/scene_body/seq/4/size	10	reserved run (walked)	no	no
+types/scene_body/seq/6/size	4	reserved run (walked)	no	no
+types/scene_body/seq/7/repeat-expr	80	SCENE_SLOT_COUNT	SCENE_SLOT_COUNT	SCENE_SLOT_COUNT
+types/scene_body/seq/8/size	6	reserved run (walked by facts_xcheck scene_body_offsets)	no	no
+types/scene_body/seq/9/size	6	ETH_ADDR_BYTES	no	no
+types/scene_body/seq/10/size	4	reserved run (walked)	no	no
+types/scene_body/seq/11/size	6	ETH_ADDR_BYTES	no	no
+types/scene_body/seq/12/size	4	reserved run (walked)	no	no
+types/scene_body/seq/13/size	6	ETH_ADDR_BYTES	no	no
+types/scene_body/seq/14/size	14	map_b (walked)	no	no
+types/scene_sysp/seq/0/contents	53 59 53 50	SCENE_TAG_SYSP	no	SCENE_TAG_SYSP
+types/scene_sysp/seq/4/size	11	NOT DECLARED — SYSP reserved 11 (walked, offset-checked)	no	no
+types/scene_scen/seq/0/contents	53 43 45 4e	SCENE_TAG_SCEN	no	SCENE_TAG_SCEN
+types/scene_scen/seq/3/repeat-expr	800	NOT DECLARED — SCEN table length 800 (see audit: open)	no	no
+types/scene_scen/seq/4/size	4	NOT DECLARED — SCEN trailer 4 (walked)	no	no
+types/page_0103/instances/subtype/pos	0	SUB_0103_OFF	SUB_0103_OFF	SUB_0103_OFF
+types/page_0103/instances/is_reply/value	(subtype & 0x80) != 0	SUB_REPLY_BIT	no	SUB_REPLY_BIT
+types/page_0103/instances/page_kind/value	subtype == 0x01 ? page_kind::chanmap : (subtype & 0xf0) == 0x80 and su	SUB_0103_SLOT_MAP, SUB_REPLY_BIT, SUB_0103_LINK_ACK, SUB_0103_ENROLL_GROUP_MAP + mask 0xf0 (NOT DECLARED: subtype class mask)	no	no
+types/chanmap_page/seq/1/repeat-expr	8	CHANMAP_RECS_PER_FRAME	no	CHANMAP_RECS_PER_FRAME
+types/chanmap_entry/instances/is_group_anchor/value	slot < 0x30 and (slot & 3) == 0	SLOT_SPACE (0x30) + PORTS_CH_PER_SLOT (as & 3)	no	no
+types/chanmap_entry/instances/group/value	slot >> 2	DERIVED:log2(PORTS_CH_PER_SLOT)	no	no
+types/chanmap_entry/instances/cell_type/value	cell_and_flags >> 4	CHANMAP_CELL_MASK (as >> 4)	no	no
+types/chanmap_entry/instances/flag_slot_4/value	(cell_and_flags >> 3) & 1	SLOT_CELL_FLAG_BIT3	no	no
+types/chanmap_entry/instances/flag_slot_8/value	(cell_and_flags >> 2) & 1	SLOT_CELL_FLAG_BIT2	no	no
+types/chanmap_entry/instances/flag_slot_6/value	(cell_and_flags >> 1) & 1	SLOT_CELL_FLAG_BIT1	no	no
+types/chanmap_entry/instances/is_identity_record/value	slot == 0xfe	CHANMAP_ID_IDENTITY	no	CHANMAP_ID_IDENTITY
+types/chanmap_entry/instances/is_filler_record/value	slot == 0xff	CHANMAP_ID_FILLER	no	CHANMAP_ID_FILLER
+types/commit_report_page/seq/1/size	2	DERIVED:PORTS_TABLE_OFF - ... (two zero bytes; not declared as a width)	no	no
+types/commit_report_page/seq/3/repeat-expr	12	PORTS_TABLE_SLOTS	PORTS_TABLE_SLOTS	PORTS_TABLE_SLOTS
+types/commit_report_page/instances/declared_in_channels/value	(cells[0].to_i == 2 ? 4 : 0) + (cells[1].to_i == 2 ? 4 : 0) + (cells[2	PORT_SLOT_IN, PORTS_CH_PER_SLOT	no	no
+types/commit_report_page/instances/declared_out_channels/value	(cells[0].to_i == 1 ? 4 : 0) + (cells[1].to_i == 1 ? 4 : 0) + (cells[2	PORT_SLOT_OUT, PORTS_CH_PER_SLOT	no	no
+types/enroll_group_map/seq/3/repeat-expr	5	ENROLL_GROUPS	ENROLL_GROUPS	ENROLL_GROUPS
+types/enroll_group_map/seq/4/repeat-expr	5	ENROLL_GROUPS	no	no
+types/enroll_group_map/instances/group_bytes/pos	3	DERIVED:ENROLL_IN_GROUPS_OFF - SUB_0103_OFF	no	no
+types/enroll_group_map/instances/group_bytes/size	10	DERIVED:2 * ENROLL_GROUPS	no	no
+types/enroll_group_map/instances/enrolled_in_channels/value	(input_groups[0] == 0x41 ? 8 : 0) + (input_groups[1] == 0x41 ? 8 : 0) 	ENROLL_GROUP_CHANNELS	no	ENROLL_GROUP_CHANNELS
+types/container_0403/instances/subtype/pos	0	SUB_0403_OFF	SUB_0403_OFF	SUB_0403_OFF
+types/identity_data/instances/request_size/value	payload[0]	index, not a fact	no	no
+types/identity_data/instances/firmware_version/value	payload[0] * 1000 + payload[1] * 100 + payload[2] * 10 + payload[3]	IDENTITY_FIRMWARE_BYTES (digit weights 1000/100/10/1)	no	no
+types/identity_data/instances/firmware_version/if	is_reply and addr_lo == identity_addr::firmware_version and payload.si	IDENTITY_FIRMWARE_BYTES	no	IDENTITY_FIRMWARE_BYTES
+types/identity_data/instances/reac_version_reserved/value	payload[0] * 256 + payload[1]	IDENTITY_REAC_VERSION_BYTES	no	no
+types/identity_data/instances/reac_version_reserved/if	is_reply and addr_lo == identity_addr::reac_version and payload.size >	IDENTITY_REAC_VERSION_BYTES	no	no
+types/identity_data/instances/reac_version_major/value	payload[2] * 256 + payload[3]	IDENTITY_REAC_VERSION_BYTES	no	no
+types/identity_data/instances/reac_version_major/if	is_reply and addr_lo == identity_addr::reac_version and payload.size >	IDENTITY_REAC_VERSION_BYTES	no	IDENTITY_REAC_VERSION_BYTES
+types/identity_data/instances/reac_version_minor/value	payload[4] * 256 + payload[5]	IDENTITY_REAC_VERSION_BYTES	no	no
+types/identity_data/instances/reac_version_minor/if	is_reply and addr_lo == identity_addr::reac_version and payload.size >	IDENTITY_REAC_VERSION_BYTES	no	no
+types/identity_data/instances/reac_version_patch/value	payload[6] * 256 + payload[7]	IDENTITY_REAC_VERSION_BYTES	no	no
+types/identity_data/instances/reac_version_patch/if	is_reply and addr_lo == identity_addr::reac_version and payload.size >	IDENTITY_REAC_VERSION_BYTES	no	no
+types/record_fragment/seq/0/contents	00 02 00 fe	DT1_WRAPPER	no	no
+types/box_return_block/seq/0/contents	02 00 fe	DT1_WRAPPER tail / SUB_0403_BOX_RETURN	no	no
+types/dt1_record/seq/0/contents	00 02 00 fe	DT1_WRAPPER	no	DT1_WRAPPER
+types/dt1_record/seq/2/contents	f0	SYSEX_START	no	SYSEX_START
+types/dt1_record/seq/3/contents	41	ROLAND_ID	no	ROLAND_ID
+types/dt1_record/seq/5/size	3	DT1_MODEL_ID_BYTES	no	DT1_MODEL_ID_BYTES
+types/dt1_record/seq/10/contents	f7	SYSEX_END	no	SYSEX_END
+types/dt1_record/instances/record_len/value	_parent._parent.rec_len - 0x0d	DT1_RECORD_OVERHEAD	no	DT1_RECORD_OVERHEAD
+types/dt1_record/instances/data_len/value	_parent._parent.rec_len - 0x10	DT1_DATA_OVERHEAD	no	DT1_DATA_OVERHEAD
+types/audio_region/seq/0/repeat-expr	12	SAMPLES_PER_PKT	no	no
+types/time_sample/seq/0/size	6	DERIVED:BRAID_PAIR_CHANNELS * RESOLUTION	no	no
+types/time_sample/seq/0/repeat-expr	_parent._parent.num_channels / 2	BRAID_PAIR_CHANNELS	no	BRAID_PAIR_CHANNELS
+enums/frame_type/0x0	0	TYPE_FILLER	TYPE_FILLER	TYPE_FILLER
+enums/frame_type/0xcdea	52714	TYPE_CONTROL	TYPE_CONTROL	TYPE_CONTROL
+enums/frame_type/0xcfea	53226	TYPE_ANNOUNCE	TYPE_ANNOUNCE	TYPE_ANNOUNCE
+enums/reac_link/0x1	1	LINK_CONTROL	no	LINK_CONTROL
+enums/reac_link/0x2	2	LINK_AUX_S4000S	no	LINK_AUX_S4000S
+enums/reac_link/0x4	4	LINK_RECORD	no	LINK_RECORD
+enums/reac_link/0xff	255	LINK_ANNOUNCE	no	LINK_ANNOUNCE
+enums/seg_state/0x0	0	SEG_MIDDLE	no	SEG_MIDDLE
+enums/seg_state/0x1	1	SEG_FIRST_BIT	no	SEG_FIRST_BIT
+enums/seg_state/0x2	2	SEG_LAST_BIT	no	SEG_LAST_BIT
+enums/seg_state/0x3	3	SEG_SINGLE	no	SEG_SINGLE
+enums/link1_opcode/0x0	0	SUB_0103_SCENE	no	SUB_0103_SCENE
+enums/link1_opcode/0x1	1	SUB_0103_SLOT_MAP	no	SUB_0103_SLOT_MAP
+enums/link1_opcode/0x10	16	SUB_0103_ENROLL_GROUP_MAP	no	SUB_0103_ENROLL_GROUP_MAP
+enums/link1_opcode/0x80	128	SUB_0103_DECLARATION_ALT	no	SUB_0103_DECLARATION_ALT
+enums/link1_opcode/0x81	129	SUB_0103_LINK_ACK	no	SUB_0103_LINK_ACK
+enums/link1_opcode/0x82	130	SUB_0103_COMMIT_REPORT	no	SUB_0103_COMMIT_REPORT
+enums/link1_opcode/0x84	132	SUB_0103_COMMIT_REPORT_84	no	SUB_0103_COMMIT_REPORT_84
+enums/control_op/0x100	256	OP_SCENE_CHUNK	OP_SCENE_CHUNK	OP_SCENE_CHUNK
+enums/control_op/0x101	257	OP_SCENE_HEADER	OP_SCENE_HEADER	OP_SCENE_HEADER
+enums/control_op/0x102	258	OP_SCENE_FINAL	OP_SCENE_FINAL	OP_SCENE_FINAL
+enums/control_op/0x103	259	OP_PAGE_0103	OP_PAGE_0103	OP_PAGE_0103
+enums/control_op/0x401	1025	OP_DT1_FIRST_FRAGMENT	OP_DT1_FIRST_FRAGMENT	OP_DT1_FIRST_FRAGMENT
+enums/control_op/0x402	1026	OP_DT1_LAST_FRAGMENT	OP_DT1_LAST_FRAGMENT	OP_DT1_LAST_FRAGMENT
+enums/control_op/0x403	1027	OP_DT1_CONTAINER	OP_DT1_CONTAINER	OP_DT1_CONTAINER
+enums/control_op/0xffff	65535	OP_ANNOUNCE	OP_ANNOUNCE	OP_ANNOUNCE
+enums/page_kind/0x0	0	parser-internal enum (not a wire value)	no	no
+enums/page_kind/0x1	1	parser-internal enum (not a wire value)	no	no
+enums/page_kind/0x2	2	parser-internal enum (not a wire value)	no	no
+enums/page_kind/0x3	3	parser-internal enum (not a wire value)	no	no
+enums/page_kind/0x4	4	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x0	0	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x1	1	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x2	2	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x3	3	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x4	4	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x5	5	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x6	6	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x7	7	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x8	8	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0x9	9	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0xa	10	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0xb	11	parser-internal enum (not a wire value)	no	no
+enums/ctrl_kind/0xc	12	parser-internal enum (not a wire value)	no	no
+enums/dt_command/0x11	17	DT_CMD_RQ1	no	DT_CMD_RQ1
+enums/dt_command/0x12	18	DT_CMD_DT1	no	DT_CMD_DT1
+enums/identity_addr/0x0	0	IDENTITY_ADDR_FIRMWARE_VERSION	no	IDENTITY_ADDR_FIRMWARE_VERSION
+enums/identity_addr/0x600	1536	IDENTITY_ADDR_REAC_VERSION	no	IDENTITY_ADDR_REAC_VERSION
+enums/identity_addr/0x1000	4096	IDENTITY_ADDR_MODEL_NAME	no	IDENTITY_ADDR_MODEL_NAME
+enums/identity_addr/0x1011	4113	IDENTITY_ADDR_MODEL_NAME_EXT	no	IDENTITY_ADDR_MODEL_NAME_EXT
+enums/identity_addr/0x1100	4352	IDENTITY_ADDR_MODEL_NAME_SLOT_B	no	IDENTITY_ADDR_MODEL_NAME_SLOT_B
+enums/identity_addr/0x1111	4369	IDENTITY_ADDR_MODEL_NAME_SLOT_B_EXT	no	IDENTITY_ADDR_MODEL_NAME_SLOT_B_EXT
+enums/reg_page/0x0	0	DT1_TAG_HEAD_MARK	DT1_TAG_HEAD_MARK	DT1_TAG_HEAD_MARK
+enums/reg_page/0x100	256	DT1_TAG_JOIN_GRANT	DT1_TAG_JOIN_GRANT	DT1_TAG_JOIN_GRANT
+enums/reg_page/0x101	257	DT1_TAG_HEAD_AMP	DT1_TAG_HEAD_AMP	DT1_TAG_HEAD_AMP
+enums/reg_page/0x302	770	DT1_TAG_BOX_READY	DT1_TAG_BOX_READY	DT1_TAG_BOX_READY
+enums/reg_page/0x500	1280	DT1_TAG_IDENTITY	DT1_TAG_IDENTITY	DT1_TAG_IDENTITY
+enums/head_amp_param/0x0	0	HEADAMP_PARAM_PHANTOM	no	HEADAMP_PARAM_PHANTOM
+enums/head_amp_param/0x1	1	HEADAMP_PARAM_PAD	no	HEADAMP_PARAM_PAD
+enums/head_amp_param/0x2	2	HEADAMP_PARAM_SENS	no	HEADAMP_PARAM_SENS
+enums/inventory_cell/0x0	0	PORT_SLOT_IN_SPLIT	PORT_SLOT_IN_SPLIT	PORT_SLOT_IN_SPLIT
+enums/inventory_cell/0x1	1	PORT_SLOT_OUT	PORT_SLOT_OUT	PORT_SLOT_OUT
+enums/inventory_cell/0x2	2	PORT_SLOT_IN	PORT_SLOT_IN	PORT_SLOT_IN
+enums/inventory_cell/0x3	3	PORT_SLOT_EMPTY	PORT_SLOT_EMPTY	PORT_SLOT_EMPTY
