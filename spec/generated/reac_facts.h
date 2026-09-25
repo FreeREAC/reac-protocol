@@ -1870,6 +1870,40 @@
  */
 #define REAC_SCENE_REVISION_BYTES       2
 
+/* ---- A box's width, either direction -------------------------------------------
+ * What channel counts a BOX may carry, in either direction: an even
+ * width from BOX_MIN_CHANNELS to BOX_MAX_CHANNELS. 0 in one direction
+ * means the box has no ports that way and is not a width.
+ *
+ * Two facts already declared fix it, so both rows are derived and add no
+ * new number. The braid carries channels in pairs (BRAID_PAIR_CHANNELS),
+ * so a width is even and the narrowest is one pair. A frame that is
+ * MAX_CHANNELS wide (1492 B) is the desk's downstream broadcast and only
+ * that: reac.ksy classifies by width alone (`is_downstream_width` is
+ * `num_channels == 40`), and its `num_channels` doc already reads "40 is
+ * the downstream broadcast; an even 2..38 is a box's upstream return". A
+ * 40-wide box frame would parse as the desk's. So the widest box is one
+ * pair short of it.
+ *
+ * The operator's ruling of 2026-09-25 says the same: "mixer sends 40ch,
+ * boxes have their size of ins and outs, always even." The widest box in
+ * the corpus is 32 (BOX_S4000S_3208_IN, BOX_S4000S_0832_OUT), inside the
+ * range. 34..38 are not observed; they are legal by this rule, not
+ * measured.
+ */
+/* The narrowest box width in either direction, one braid pair. [derived — the
+ * braid pairs channels (BRAID_PAIR_CHANNELS).]
+ */
+#define REAC_BOX_MIN_CHANNELS           2
+
+/* The widest box width in either direction. A MAX_CHANNELS-wide frame is the
+ * desk's downstream broadcast, so a box stops one pair short of it. [derived
+ * — reac.ksy is_downstream_width (a 40-wide frame is the downstream
+ * broadcast) and num_channels ("an even 2..38 is a box's upstream return");
+ * operator ruling 2026-09-25. Widest box in the corpus is 32.]
+ */
+#define REAC_BOX_MAX_CHANNELS           38
+
 /* ---- What each box model declares ----------------------------------------------
  * A box's geometry is READ FROM ITS DECLARATION (the inventory group) and
  * nothing may key behaviour on a model. But emulators, fixtures and tests

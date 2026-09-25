@@ -1543,6 +1543,21 @@ instances:
     doc: |
       The little-endian `revision` at SCENE_REVISION_OFF — the pace code's
       scene carrier. [EVIDENCED (corpus + rig).]
+  # ---- A box's width, either direction ----
+  box_min_channels:
+    value: 2
+    doc: |
+      The narrowest box width in either direction, one braid pair. [derived
+      — the braid pairs channels (BRAID_PAIR_CHANNELS).]
+  box_max_channels:
+    value: 38
+    doc: |
+      The widest box width in either direction. A MAX_CHANNELS-wide frame is
+      the desk's downstream broadcast, so a box stops one pair short of it.
+      [derived — reac.ksy is_downstream_width (a 40-wide frame is the
+      downstream broadcast) and num_channels ("an even 2..38 is a box's
+      upstream return"); operator ruling 2026-09-25. Widest box in the
+      corpus is 32.]
   # ---- What each box model declares ----
   box_s0808_in:
     value: 8
