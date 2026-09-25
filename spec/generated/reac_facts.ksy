@@ -1630,34 +1630,24 @@ instances:
       hunting. [EVIDENCED (rig) — one M-200i reboot measurement, 2026-07-11
       (heartbeat stops t=16.0 s, first probe t=22.47 s).]
   # ---- How soon a desk proves it is the desk ----
-  scene_repeat_period_ms:
-    value: 2695
-    doc: |
-      While a box stays silent a desk repeats its whole scene transfer at
-      this period. [EVIDENCED (corpus) —
-      m200i-s1608-48k-mirror__real-m200-s1608-coldboot 2026-07-11, "the
-      WHOLE TRANSFER AGAIN every 2.695 s" (reac.ksy enrolment timeline;
-      docs/mixer-protocol.md §7).]
-  master_only_cadence_ms:
-    value: 1000
-    doc: |
-      The shortest cadence at which a desk sends a master-only op — how long
-      a broadcast sender may be held before its silence proves it is not a
-      desk. [derived — the shorter of ANNOUNCE_PERIOD_MS (1 Hz cfea, which
-      does not slow with no box) and SCENE_REPEAT_PERIOD_MS.]
-  master_only_cadence_frames_44k1:
-    value: 3675
-    doc: |
-      MASTER_ONLY_CADENCE_MS in frames at 44.1 kHz. [derived — PKT_RATE_44K1
-      frames per second.]
   master_only_cadence_frames_48k:
     value: 4000
     doc: |
-      MASTER_ONLY_CADENCE_MS in frames at 48 kHz. [derived — PKT_RATE_48K
-      frames per second; the 1 Hz cfea is measured at this rate (see the
-      group doc).]
+      The shortest cadence, in frames at 48 kHz, at which a desk sends a
+      master-only op (the cfea announce) — how many of a broadcast sender's
+      own frames may pass before its silence proves it is not a desk.
+      [EVIDENCED (corpus) — m200i-s1608-48k-mirror__real-m200-s1608-coldboot
+      2026-07-11, one cfea announce every 4000 frames of the 48 kHz
+      downstream, with and without the box answering.]
+  master_only_cadence_frames_44k1:
+    value: 3675
+    doc: |
+      The master-only cadence in frames at 44.1 kHz. [INFERRED — the 48 kHz
+      count scaled by PKT_RATE_44K1 / PKT_RATE_48K; no 44.1 kHz capture
+      measures it yet.]
   master_only_cadence_frames_96k:
     value: 8000
     doc: |
-      MASTER_ONLY_CADENCE_MS in frames at 96 kHz. [derived — PKT_RATE_96K
-      frames per second.]
+      The master-only cadence in frames at 96 kHz. [INFERRED — the 48 kHz
+      count scaled by PKT_RATE_96K / PKT_RATE_48K; no 96 kHz capture
+      measures it yet.]
