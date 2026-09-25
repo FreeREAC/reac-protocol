@@ -1629,3 +1629,25 @@ instances:
       How long a desk rides through box silence before it reverts to
       hunting. [EVIDENCED (rig) — one M-200i reboot measurement, 2026-07-11
       (heartbeat stops t=16.0 s, first probe t=22.47 s).]
+  # ---- How soon a desk proves it is the desk ----
+  master_only_cadence_frames_48k:
+    value: 4000
+    doc: |
+      The shortest cadence, in frames at 48 kHz, at which a desk sends a
+      master-only op (the cfea announce) — how many of a broadcast sender's
+      own frames may pass before its silence proves it is not a desk.
+      [EVIDENCED (corpus) — m200i-s1608-48k-mirror__real-m200-s1608-coldboot
+      2026-07-11, one cfea announce every 4000 frames of the 48 kHz
+      downstream, with and without the box answering.]
+  master_only_cadence_frames_44k1:
+    value: 3675
+    doc: |
+      The master-only cadence in frames at 44.1 kHz. [INFERRED — the 48 kHz
+      count scaled by PKT_RATE_44K1 / PKT_RATE_48K; no 44.1 kHz capture
+      measures it yet.]
+  master_only_cadence_frames_96k:
+    value: 8000
+    doc: |
+      The master-only cadence in frames at 96 kHz. [INFERRED — the 48 kHz
+      count scaled by PKT_RATE_96K / PKT_RATE_48K; no 96 kHz capture
+      measures it yet.]
