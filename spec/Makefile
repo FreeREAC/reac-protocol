@@ -4,6 +4,14 @@
 #   make check    generate + run the cross-validation harness (includes the
 #                 protocol-facts ratchet)
 #   make facts    regenerate spec/generated/ from spec/protocol-facts.yaml
+#   make facts-fresh
+#                 regenerate into a scratch dir and require byte-identity with
+#                 the tracked generated/, with positive and sabotage controls
+#                 and the perturbation contract (facts_fresh_xcheck.py)
+#   make facts-perturb SEED=n OUT=dir
+#                 write a PERTURBED fact set to OUT: every free number moved
+#                 within its legal range. Build libreac / reac-pw against it
+#                 to find hand-written copies (docs/audits/2026-09-25-contract-copies.md)
 #   make facts-idempotent
 #                 generate twice and diff — a generator that varies between two
 #                 runs over one input regresses the file it maintains
@@ -40,7 +48,7 @@ KSY := reac.ksy
 LIBREAC ?= ../../libreac
 
 .PHONY: all parser check check-oracle check-ctrl-oracle facts \
-        facts-idempotent cpp clean ksc-help corpus-check corpus-selftest
+        facts-idempotent facts-fresh facts-perturb cpp clean ksc-help corpus-check corpus-selftest
 
 all: check
 
@@ -51,10 +59,18 @@ reac.py: $(KSY)
 	$(KSC) -t python --outdir . $(KSY)
 
 check: parser facts-idempotent
-	$(PYTHON) -m pytest reac_xcheck.py facts_xcheck.py -q
+	$(PYTHON) -m pytest reac_xcheck.py facts_xcheck.py facts_fresh_xcheck.py -q
 
 facts:
 	$(PYTHON) gen-facts.py
+
+facts-fresh:
+	$(PYTHON) -m pytest facts_fresh_xcheck.py -q
+
+SEED ?= 1
+OUT ?= out/facts-perturbed
+facts-perturb:
+	$(PYTHON) gen-facts.py --perturb $(SEED) --outdir $(OUT)
 
 # Generate into a scratch tree, generate again, diff. Nothing here reads the
 # clock or the environment, and this is what keeps it that way.
