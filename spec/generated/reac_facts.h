@@ -66,7 +66,7 @@
  * segment and no negotiation exchange.
  * ]
  */
-#define REAC_PACE_IS_THE_MASTERS        True
+#define REAC_PACE_IS_THE_MASTERS        1
 
 /* A clock rate is NOT a property of a mixer model. Any legal pace may run on
  * any desk,
@@ -84,7 +84,7 @@
  * any correlation the corpus appears to show.
  * ]
  */
-#define REAC_RATE_IS_INDEPENDENT_OF_MODEL True
+#define REAC_RATE_IS_INDEPENDENT_OF_MODEL 1
 
 /* The config-announce console_field byte (cfea[19]) PROPOSES the box's rate
  * CLASS; the
@@ -156,7 +156,7 @@
  * identical. Both boxes paced 44.1 kHz.
  * ]
  */
-#define REAC_CONSOLE_FIELD_GATES_RATE   True
+#define REAC_CONSOLE_FIELD_GATES_RATE   1
 
 /* 12 samples x 3 bytes, per channel, at EVERY sample rate. The 36 in `52 +
  * n*36`. [EVIDENCED (corpus) at 48k and 96k; RATE-INVARIANT BY CONSTRUCTION
@@ -1410,6 +1410,17 @@
  * 0 is carried over unchanged from every source that already agreed on it, and
  * -65 at 0x37 is what the measured span then makes it. Raw data:
  * reac-pw docs/measurements/sens-sweep-2026-08-23-*.csv.
+ *
+ * REMOVED 2026-09-25 as dead facts
+ * (docs/audits/2026-09-25-contract-copies.md):
+ * four rows describing the firmware's analog STAGES, read by no consumer,
+ * no grammar and no copy in any of the three repos. What they recorded:
+ * the step table selects between 4 coarse analog ranges, driven onto two
+ * GPIO pins per channel by FUN_0c00af2a (EVIDENCED image), whose first
+ * steps are 0x08, 0x18 and 0x28; those three breaks are the only places a
+ * uniform step could fail, and the rig measured all three at about a
+ * decibel (EVIDENCED image + rig) - which is what HEADAMP_SENS_STEP_CDB
+ * rests on. Restore them from git history if a consumer ever needs them.
  */
 /* Step 0x00 with the pad off, in hundredths of a dBu — the least sensitive
  * setting and the reference the whole travel hangs off. [INFERRED — agreed by
@@ -1440,23 +1451,6 @@
  * raw byte match, not a disassembly — there is no S-0808 decompilation).]
  */
 #define REAC_HEADAMP_SENS_STEPS         56
-
-/* Coarse analog ranges the table selects between, driven onto two GPIO pins
- * per channel by FUN_0c00af2a. [EVIDENCED (image).]
- */
-#define REAC_HEADAMP_SENS_STAGES        4
-
-/* First step of the second range. The three breaks are the only places a
- * uniform step could fail, and the rig measured all three at about a decibel.
- * [EVIDENCED (image + rig).]
- */
-#define REAC_HEADAMP_SENS_STAGE_BREAK_1 0x08
-
-/* First step of the third range. [EVIDENCED (image + rig).] */
-#define REAC_HEADAMP_SENS_STAGE_BREAK_2 0x18
-
-/* First step of the fourth range. [EVIDENCED (image + rig).] */
-#define REAC_HEADAMP_SENS_STAGE_BREAK_3 0x28
 
 /* The pad's 20 dB, in hundredths, added to the sensitivity when it is on.
  * Independent of the step, and it earns its place here by being the one
@@ -1536,7 +1530,7 @@
  * arrives. [EVIDENCED (libreac reac_ports.c; no unknown code seen in the
  * corpus).]
  */
-#define REAC_PORT_SLOT_UNKNOWN_COST     True
+#define REAC_PORT_SLOT_UNKNOWN_COST     1
 
 /* OPEN, not a law. The S-4000H straps board_config_code = 0x00 like the
  * S-0808 and the S-4000S, predicting head-amp base CH 0x00 by `base =
@@ -1546,7 +1540,7 @@
  * from the strap alone until this is resolved. [OPEN (rig observation,
  * unreproduced in a capture).]
  */
-#define REAC_PORT_SLOT_IN_SPLIT_HEADAMP_BASE True
+#define REAC_PORT_SLOT_IN_SPLIT_HEADAMP_BASE 1
 
 /* One per enrolled input group of 8, front-packed. [EVIDENCED (image +
  * corpus).]
@@ -1560,5 +1554,396 @@
  * corpus).]
  */
 #define REAC_ENROLL_GROUPS              5
+
+/* ---- Frame field widths the geometry is built from -----------------------------
+ * The widths the header offsets above are sums of. They were literals in
+ * the `derived:` expressions of this very file (`2 + CTRL_BLOCK_LEN`) and
+ * in every consumer that computed an offset (`frame + 16`, `50 + 2`), so
+ * the offsets are now derived from them and a perturbation moves them
+ * together.
+ */
+/* Frame offset of the EtherType, after the two 6-byte MAC addresses. libreac
+ * and reac-pw tools open-code `frame[12] == 0x88 && frame[13] == 0x19` rather
+ * than naming the position. [EVIDENCED (corpus) — every frame in 72 captures;
+ * reac.ksy seq/0..2 (6 + 6, then the contents).]
+ */
+#define REAC_ETHERTYPE_OFF              12
+
+/* A MAC address — the frame's destination and source, the scene's master_id
+ * and peer ids, and the config announce's master MAC. [EVIDENCED (corpus).]
+ */
+#define REAC_ETH_ADDR_BYTES             6
+
+/* Width of the little-endian frame counter at HDR_COUNTER_OFF. [EVIDENCED
+ * (corpus).]
+ */
+#define REAC_HDR_COUNTER_BYTES          2
+
+/* Width of the big-endian type word at TYPED_BLOCK_OFF, the 2 in
+ * TYPED_BLOCK_LEN = 2 + 32 and in every two-byte `pos` of typed_block.
+ * [EVIDENCED (corpus).]
+ */
+#define REAC_TYPE_WORD_BYTES            2
+
+/* The two end-marker bytes, END_MARKER_0 and END_MARKER_1 — the 2 in
+ * FRAME_OVERHEAD = 50 + 2. [EVIDENCED (corpus).]
+ */
+#define REAC_END_MARKER_BYTES           2
+
+/* The braid carries channels in PAIRS — one 6-byte pair group per two
+ * channels per sample time — so every legal audio width is even. The
+ * byte permutation inside a pair stays libreac's (see the header of
+ * this file); the pairing itself is spelled by reac.ksy's
+ * `num_channels / 2` and by every even-width check in libreac and
+ * reac-pw, so it is shared.
+ *   [EVIDENCED (corpus) — reac.ksy time_sample, validated against libreac's
+ *   upstream goldens by reac_xcheck.py.]
+ */
+#define REAC_BRAID_PAIR_CHANNELS        2
+
+/* Neither segment bit — a frame in the middle of a bulk transfer. [EVIDENCED
+ * (image) — FUN_0c003398 writes block[1] = 0 for a middle frame
+ * (control_header group doc).]
+ */
+#define REAC_SEG_MIDDLE                 0x00
+
+/* block[0] of a master announce (type word 0xcfea, op 0xffff). [EVIDENCED
+ * (corpus).]
+ */
+#define REAC_LINK_ANNOUNCE              0xff
+
+/* ---- Pace — packet rates, sample rates and the pace code -----------------------
+ * The master sets the pace (PACE_IS_THE_MASTERS) and there are exactly
+ * three. A packet carries SAMPLES_PER_PKT samples per channel, so the
+ * packet rate is the quantity on the wire and the sample rate is derived
+ * from it. The PACE CODE is the one byte by which the master declares and
+ * records the class, on four carriers (CONSOLE_FIELD_GATES_RATE):
+ * ANNOUNCE_PACE_OFF, SCENE_REVISION_OFF, the chanmap marker's flags and
+ * ENROLL_PACE_OFF.
+ *
+ * libreac (reac.c, reac_master.c, reac_cfg.h), reac-pw (reac_rate_cfg.c,
+ * main.c, reac_sink_node.c) and a dozen tools spelled 44100/48000/96000
+ * and 3675/4000/8000 and 0/1/2 themselves; this is the first place they
+ * are declared.
+ */
+/* Frames per second at 48 kHz. [EVIDENCED (corpus) — pcap timestamps, every
+ * 48 kHz capture.]
+ */
+#define REAC_PKT_RATE_48K               4000
+
+/* Frames per second at 96 kHz. [EVIDENCED (corpus + rig) — 96 kHz windows
+ * measured at 8000 fps (CONSOLE_FIELD_GATES_RATE evidence).]
+ */
+#define REAC_PKT_RATE_96K               8000
+
+/* Frames per second at 44.1 kHz. [EVIDENCED (corpus) —
+ * m200-enrol-441k-2026-09-13 and m200-enrol-s4000-441k-2026-09-13, 3675 fps
+ * from the pcap timestamps.]
+ */
+#define REAC_PKT_RATE_44K1              3675
+
+/* The 48 kHz class. [derived — 4000 frames x 12 samples.] */
+#define REAC_SAMPLE_RATE_48K            48000
+
+/* The 96 kHz class. [derived — 8000 frames x 12 samples.] */
+#define REAC_SAMPLE_RATE_96K            96000
+
+/* The 44.1 kHz class. [derived — 3675 frames x 12 samples.] */
+#define REAC_SAMPLE_RATE_44K1           44100
+
+/* ---- The pace code -------------------------------------------------------------
+ * The byte the four rate carriers hold (see the pace group).
+ */
+/* 48 kHz. Was called the V-Mixer family. [RIG-VERIFIED (2026-08-27) and
+ * WIRE-CAPTURED (2026-09-13) — see CONSOLE_FIELD_GATES_RATE.]
+ */
+#define REAC_PACE_CODE_48K              0x00
+
+/* 96 kHz. Was called the OHRCA family. [RIG-VERIFIED (2026-08-27) — see
+ * CONSOLE_FIELD_GATES_RATE.]
+ */
+#define REAC_PACE_CODE_96K              0x01
+
+/* 44.1 kHz. [WIRE-CAPTURED (2026-09-13) — an M-200 at 44.1 kHz writes 0x02 on
+ * all four carriers. RULED (operator, 2026-09-13).]
+ */
+#define REAC_PACE_CODE_44K1             0x02
+
+/* ---- The filler descriptor -----------------------------------------------------
+ * An upstream FILLER's 32-byte control area is not always zero: a box
+ * stamps `00 <desc>` sixteen times across it, and a real S-1608 REFUSES an
+ * enrolment whose filler window is zeroed. libreac's reac_link.h,
+ * reac_ctrlblk.c, reac_ctrl.c, reac_master.c and transport/reac_slave.c
+ * and reac-pw's pcap-variants.py each spelled the three values.
+ */
+/* Before the box has asked — the first frames after link-up. [EVIDENCED
+ * (corpus) — the granted S-0808 sent 48 zero frames first (wire,
+ * 2026-09-09).]
+ */
+#define REAC_FILLER_DESC_NONE           0x00
+
+/* Announce sent, grant not yet received. [EVIDENCED (corpus + replay) — 8691
+ * frames between the S-0808's announce and its grant (wire, 2026-09-09;
+ * box-to-box-enroll.pcap).]
+ */
+#define REAC_FILLER_DESC_REQUESTING     0x52
+
+/* Granted. Claiming it before the grant gets the enrolment refused.
+ * [EVIDENCED (corpus + replay) — from t=7.619 in box-to-box-enroll.pcap.]
+ */
+#define REAC_FILLER_DESC_ESTABLISHED    0x7a
+
+/* ---- The Roland DT1 record inside op-0403 --------------------------------------
+ * The link-4 container's record, byte for byte. reac.ksy spells it as
+ * `dt1_record` contents; libreac's reac_ctrlblk.c and reac_box_synth.c
+ * wrote the same bytes and block offsets as literals (`out[9] = 0xf0`,
+ * `blk[15] == 0x12`), and reac-pw's pcap-variants.py a third time. Block
+ * offsets are block-relative, like every offset in this file.
+ */
+/* The four bytes at block[4:8] ahead of every DT1 record and record fragment.
+ * Its tail `02 00 fe` is the box-return marker's too, which is why
+ * SUB_0403_OFF alone discriminates them. [EVIDENCED (corpus).]
+ */
+#define REAC_DT1_WRAPPER                0x000200fe
+
+/* Width of DT1_WRAPPER. [EVIDENCED (corpus).] */
+#define REAC_DT1_WRAPPER_BYTES          4
+
+/* Block offset of the SysEx length echo, right after the wrapper. [EVIDENCED
+ * (corpus).]
+ */
+#define REAC_DT1_LEN_ECHO_OFF           8
+
+/* Block offset of SYSEX_START. [EVIDENCED (corpus).] */
+#define REAC_DT1_SYSEX_OFF              9
+
+/* MIDI SysEx start. [EVIDENCED (corpus).] */
+#define REAC_SYSEX_START                0xf0
+
+/* Roland's SysEx manufacturer id. [EVIDENCED (corpus).] */
+#define REAC_ROLAND_ID                  0x41
+
+/* The device id byte every captured box-built record carries. [EVIDENCED
+ * (corpus) — the cold-connect records of matrix-m200-s1608 and
+ * matrix-m200-s0808 (2026-07-11). reac.ksy parses it as a free u1 and does
+ * not validate it.]
+ */
+#define REAC_DT1_DEVICE_ID              0x0a
+
+/* SYSEX_START, ROLAND_ID and the device id — the bytes before the model id.
+ * [EVIDENCED (corpus).]
+ */
+#define REAC_DT1_SYSEX_HEAD_BYTES       3
+
+/* The Roland model id, `00 00 12`. [EVIDENCED (corpus).] */
+#define REAC_DT1_MODEL_ID_BYTES         3
+
+/* The model id's low byte, which the classifier checks to tell a genuine DT1
+ * record from the look-alikes. [EVIDENCED (corpus).]
+ */
+#define REAC_DT1_MODEL_ID_LO            0x12
+
+/* Block offset of DT1_MODEL_ID_LO. [EVIDENCED (corpus).] */
+#define REAC_DT1_MODEL_LO_OFF           14
+
+/* Block offset of the command byte, DT_CMD_RQ1 or DT_CMD_DT1. [EVIDENCED
+ * (corpus).]
+ */
+#define REAC_DT1_CMD_OFF                15
+
+/* Block offset of the big-endian register-page tag (the dt1_tag group).
+ * [EVIDENCED (corpus).]
+ */
+#define REAC_DT1_TAG_OFF                16
+
+/* Roland RQ1 — a read request (the identity poll). [EVIDENCED (corpus).] */
+#define REAC_DT_CMD_RQ1                 0x11
+
+/* Roland DT1 — data set. [EVIDENCED (corpus).] */
+#define REAC_DT_CMD_DT1                 0x12
+
+/* MIDI SysEx end, after the inner checksum. [EVIDENCED (corpus).] */
+#define REAC_SYSEX_END                  0xf7
+
+/* rec_len minus the SysEx record's own length. [EVIDENCED (corpus).] */
+#define REAC_DT1_RECORD_OVERHEAD        0x0d
+
+/* rec_len minus the record's data bytes. [EVIDENCED (corpus).] */
+#define REAC_DT1_DATA_OVERHEAD          0x10
+
+/* ---- Identity page fields reac.ksy parses and libreac builds -------------------
+ * The rest of the identity_addr enum reac.ksy dispatches on, and the reply
+ * sizes its `if:` guards test, which libreac's reac_identity.c and
+ * reac_box_synth.c and reac-pw's test DT1 builders spelled as literals.
+ */
+/* The model-name continuation address. [EVIDENCED (corpus).] */
+#define REAC_IDENTITY_ADDR_MODEL_NAME_EXT 0x1011
+
+/* The second model-name slot. [EVIDENCED (corpus).] */
+#define REAC_IDENTITY_ADDR_MODEL_NAME_SLOT_B 0x1100
+
+/* The second slot's continuation. [EVIDENCED (corpus).] */
+#define REAC_IDENTITY_ADDR_MODEL_NAME_SLOT_B_EXT 0x1111
+
+/* The firmware version reply — four bytes, one decimal digit each (2200 is
+ * `02 02 00 00`). [EVIDENCED (corpus).]
+ */
+#define REAC_IDENTITY_FIRMWARE_BYTES    4
+
+/* The REAC version reply — four big-endian u16s, reserved / major / minor /
+ * patch. [EVIDENCED (corpus).]
+ */
+#define REAC_IDENTITY_REAC_VERSION_BYTES 8
+
+/* ---- The config announce and the enroll group map, field by field --------------
+ * Block offsets of the fields reac.ksy's `cfea_payload` and
+ * `enroll_group_map` parse by sequence and libreac's reac_master.c /
+ * tools/group_map_scan.c index by literal. The pace code sits at
+ * ANNOUNCE_PACE_OFF (the "cfea[19]" of the prose above, which counts from
+ * the type word) and at ENROLL_PACE_OFF ("ENROLL[8]").
+ */
+/* The fixed `01 03 0d 01 04` after the op word. [EVIDENCED (corpus) — 17,040
+ * announces, 2026-09-13.]
+ */
+#define REAC_ANNOUNCE_HEAD_BYTES        5
+
+/* The master's MAC. [EVIDENCED (corpus).] */
+#define REAC_ANNOUNCE_MAC_OFF           9
+
+/* The fabric's slot total (0x28 on every capture). [EVIDENCED (corpus).] */
+#define REAC_ANNOUNCE_TOTAL_SLOTS_OFF   15
+
+/* The announced box input width. [EVIDENCED (corpus).] */
+#define REAC_ANNOUNCE_BOX_IN_WIDTH_OFF  16
+
+/* console_field — the pace code. [EVIDENCED (corpus + rig) — see
+ * CONSOLE_FIELD_GATES_RATE.]
+ */
+#define REAC_ANNOUNCE_PACE_OFF          17
+
+/* The big-endian box count. [EVIDENCED (corpus).] */
+#define REAC_ANNOUNCE_BOX_COUNT_OFF     18
+
+/* Block offset of the commit report's board-configuration code — the chassis
+ * strap HEADAMP_BASE_FROM_CONFIG_BYTE7 names, which libreac (reac_ports.h,
+ * reac_box_synth.c) and its tests index as a bare 7. After the subtype and
+ * two zero bytes, right before the inventory. [EVIDENCED (image + corpus) —
+ * S-1608 FUN_0c003c8a; see LEN_SUB_COMMIT_REPORT.]
+ */
+#define REAC_BOARD_CONFIG_OFF           7
+
+/* The enroll group map's console byte — the pace code. [EVIDENCED (corpus) —
+ * m200-enrol-441k-2026-09-13.]
+ */
+#define REAC_ENROLL_PACE_OFF            6
+
+/* First of ENROLL_GROUPS input-group cells. [EVIDENCED (image + corpus).] */
+#define REAC_ENROLL_IN_GROUPS_OFF       7
+
+/* First of ENROLL_GROUPS output-group cells. Five in plus five out is the
+ * ten-cell run tools/group_map_scan.c scans. [EVIDENCED (image + corpus).]
+ */
+#define REAC_ENROLL_OUT_GROUPS_OFF      12
+
+/* Channels per enroll group — ENROLL_GROUP_IN counts eight inputs. [EVIDENCED
+ * (image + corpus).]
+ */
+#define REAC_ENROLL_GROUP_CHANNELS      8
+
+/* ---- The scene body's tag words ------------------------------------------------
+ * Only their OFFSETS were declared (scene_body group). The four ASCII bytes
+ * at each were spelled again by reac.ksy's contents, libreac's
+ * reac_ctrlblk.c / reac_master.c and reac-pw's recover-scene.py, as
+ * strings. Declared as big-endian u32 so every target can carry them.
+ */
+/* "1234" at SCENE_TAG_ID_OFF. [EVIDENCED (corpus) — 27 real-desk bodies.] */
+#define REAC_SCENE_TAG_ID               0x31323334
+
+/* "SYSP" at SCENE_TAG_SYSP_OFF. [EVIDENCED (corpus).] */
+#define REAC_SCENE_TAG_SYSP             0x53595350
+
+/* "SCEN" at SCENE_TAG_SCEN_OFF. [EVIDENCED (corpus).] */
+#define REAC_SCENE_TAG_SCEN             0x5343454e
+
+/* The little-endian `revision` at SCENE_REVISION_OFF — the pace code's scene
+ * carrier. [EVIDENCED (corpus + rig).]
+ */
+#define REAC_SCENE_REVISION_BYTES       2
+
+/* ---- What each box model declares ----------------------------------------------
+ * A box's geometry is READ FROM ITS DECLARATION (the inventory group) and
+ * nothing may key behaviour on a model. But emulators, fixtures and tests
+ * in libreac (reac_ctrlblk.c box table, transport/reac_slave.h) and
+ * reac-pw spell what each model declares, and those counts are protocol
+ * observations, so they are declared once here rather than per consumer.
+ */
+/* S-0808 analog inputs. [EVIDENCED (corpus) — config-announce inventory,
+ * fixtures/control.json; 24-record head-amp sweeps.]
+ */
+#define REAC_BOX_S0808_IN               8
+
+/* S-0808 outputs. [EVIDENCED (corpus) — config-announce inventory.] */
+#define REAC_BOX_S0808_OUT              8
+
+/* S-1608 analog inputs. [EVIDENCED (corpus) — inventory; 48-record sweeps.] */
+#define REAC_BOX_S1608_IN               16
+
+/* S-1608 outputs. [EVIDENCED (corpus) — config-announce inventory.] */
+#define REAC_BOX_S1608_OUT              8
+
+/* S-4000S in its 32-in/8-out configuration. [EVIDENCED (corpus) — inventory;
+ * 96-record sweeps.]
+ */
+#define REAC_BOX_S4000S_3208_IN         32
+
+/* S-4000S 32x8 outputs. [EVIDENCED (corpus).] */
+#define REAC_BOX_S4000S_3208_OUT        8
+
+/* S-4000S in its 8-in/32-out configuration. [EVIDENCED (corpus) —
+ * vlan13-0832.pcap.]
+ */
+#define REAC_BOX_S4000S_0832_IN         8
+
+/* S-4000S 8x32 outputs. [EVIDENCED (corpus) — vlan13-0832.pcap.] */
+#define REAC_BOX_S4000S_0832_OUT        32
+
+/* ---- Timing a second implementation has to match -------------------------------
+ * Periods and budgets a box or a desk FIXES and a peer must honour, as
+ * opposed to this project's own tunables (which live in libreac's
+ * reac_tunables.h and are not protocol). Each was a literal in libreac's
+ * reac_fsm.h / reac_master.h / reac_master.c.
+ */
+/* The box firmware's established link-check reload, in frames. [EVIDENCED
+ * (image) — 0x0258 in the S-1608 image.]
+ */
+#define REAC_BOX_LINKCHECK_RELOAD_FRAMES 600   /* 0x0258 */
+
+/* A master announces, and while established sends one chanmap window, once a
+ * second. [EVIDENCED (corpus + rig) — at the hunt rate (~0.37/s) the box's
+ * link light kept blinking (rig, 2026-07-12).]
+ */
+#define REAC_ANNOUNCE_PERIOD_MS         1000
+
+/* A desk's scene push rate — 341 chunks in ~0.68 s. [EVIDENCED (corpus) —
+ * M-200i -> S-1608, SCENE_CHUNKS evidence.]
+ */
+#define REAC_SCENE_BURST_CHUNKS_PER_SEC 500
+
+/* One echoed grant per twelve frame slots across the ~150 ms grant burst.
+ * [EVIDENCED (corpus) — the transcribed real burst.]
+ */
+#define REAC_GRANT_STRIDE_SLOTS         12
+
+/* A desk's dwell between the enroll group map and the grant burst. [EVIDENCED
+ * (corpus) — 1503 ms on matrix-m200-s0808 and 1717 ms on matrix-m200-s1608
+ * (2026-07-11); nominal.]
+ */
+#define REAC_ENROLL_GRANT_DWELL_MS      1600
+
+/* How long a desk rides through box silence before it reverts to hunting.
+ * [EVIDENCED (rig) — one M-200i reboot measurement, 2026-07-11 (heartbeat
+ * stops t=16.0 s, first probe t=22.47 s).]
+ */
+#define REAC_MASTER_LINK_HOLD_MS        6500
 
 #endif /* REAC_FACTS_H */
