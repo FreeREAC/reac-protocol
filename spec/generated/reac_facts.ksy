@@ -46,7 +46,7 @@ instances:
       The non-audio bytes of any frame — 50 header + 2 end marker. The 52 in
       `52 + n*36`. [EVIDENCED (corpus).]
   pace_is_the_masters:
-    value: True
+    value: 1
     doc: |
       The master sets the pace and the slaves follow it unconditionally.
       There is no
@@ -63,7 +63,7 @@ instances:
       segment and no negotiation exchange.
       ]
   rate_is_independent_of_model:
-    value: True
+    value: 1
     doc: |
       A clock rate is NOT a property of a mixer model. Any legal pace may
       run on any desk,
@@ -81,7 +81,7 @@ instances:
       any correlation the corpus appears to show.
       ]
   console_field_gates_rate:
-    value: True
+    value: 1
     doc: |
       The config-announce console_field byte (cfea[19]) PROPOSES the box's
       rate CLASS; the
@@ -1148,25 +1148,6 @@ instances:
       S-1608 0x0c0327a0 = file 0x527a0; the same 112 bytes at S-0808 file
       0x45ec8 as a raw byte match, not a disassembly — there is no S-0808
       decompilation).]
-  headamp_sens_stages:
-    value: 4
-    doc: |
-      Coarse analog ranges the table selects between, driven onto two GPIO
-      pins per channel by FUN_0c00af2a. [EVIDENCED (image).]
-  headamp_sens_stage_break_1:
-    value: 0x08
-    doc: |
-      First step of the second range. The three breaks are the only places a
-      uniform step could fail, and the rig measured all three at about a
-      decibel. [EVIDENCED (image + rig).]
-  headamp_sens_stage_break_2:
-    value: 0x18
-    doc: |
-      First step of the third range. [EVIDENCED (image + rig).]
-  headamp_sens_stage_break_3:
-    value: 0x28
-    doc: |
-      First step of the fourth range. [EVIDENCED (image + rig).]
   headamp_pad_cdb:
     value: 2000
     doc: |
@@ -1231,7 +1212,7 @@ instances:
       (corpus, m200-s4000h-coldboot.pcap + m200-s4000h-replug.pcap, box
       00:40:ab:c4:25:80, cells = 01x8 00x2 03x2).]
   port_slot_unknown_cost:
-    value: True
+    value: 1
     doc: |
       A cell carrying a code outside {00,01,02,03} is no longer a reason to
       refuse the table. A SLOT CODE SPEAKS FOR ITS OWN FOUR CHANNELS AND NO
@@ -1241,7 +1222,7 @@ instances:
       for the day one arrives. [EVIDENCED (libreac reac_ports.c; no unknown
       code seen in the corpus).]
   port_slot_in_split_headamp_base:
-    value: True
+    value: 1
     doc: |
       OPEN, not a law. The S-4000H straps board_config_code = 0x00 like the
       S-0808 and the S-4000S, predicting head-amp base CH 0x00 by `base =
@@ -1264,3 +1245,372 @@ instances:
     doc: |
       Five groups of 8 span exactly the 40-slot audio fabric. [EVIDENCED
       (image + corpus).]
+  # ---- Frame field widths the geometry is built from ----
+  ethertype_off:
+    value: 12
+    doc: |
+      Frame offset of the EtherType, after the two 6-byte MAC addresses.
+      libreac and reac-pw tools open-code `frame[12] == 0x88 && frame[13] ==
+      0x19` rather than naming the position. [EVIDENCED (corpus) — every
+      frame in 72 captures; reac.ksy seq/0..2 (6 + 6, then the contents).]
+  eth_addr_bytes:
+    value: 6
+    doc: |
+      A MAC address — the frame's destination and source, the scene's
+      master_id and peer ids, and the config announce's master MAC.
+      [EVIDENCED (corpus).]
+  hdr_counter_bytes:
+    value: 2
+    doc: |
+      Width of the little-endian frame counter at HDR_COUNTER_OFF.
+      [EVIDENCED (corpus).]
+  type_word_bytes:
+    value: 2
+    doc: |
+      Width of the big-endian type word at TYPED_BLOCK_OFF, the 2 in
+      TYPED_BLOCK_LEN = 2 + 32 and in every two-byte `pos` of typed_block.
+      [EVIDENCED (corpus).]
+  end_marker_bytes:
+    value: 2
+    doc: |
+      The two end-marker bytes, END_MARKER_0 and END_MARKER_1 — the 2 in
+      FRAME_OVERHEAD = 50 + 2. [EVIDENCED (corpus).]
+  braid_pair_channels:
+    value: 2
+    doc: |
+      The braid carries channels in PAIRS — one 6-byte pair group per two
+      channels per sample time — so every legal audio width is even. The
+      byte permutation inside a pair stays libreac's (see the header of
+      this file); the pairing itself is spelled by reac.ksy's
+      `num_channels / 2` and by every even-width check in libreac and
+      reac-pw, so it is shared.
+        [EVIDENCED (corpus) — reac.ksy time_sample, validated against
+        libreac's upstream goldens by reac_xcheck.py.]
+  seg_middle:
+    value: 0x00
+    doc: |
+      Neither segment bit — a frame in the middle of a bulk transfer.
+      [EVIDENCED (image) — FUN_0c003398 writes block[1] = 0 for a middle
+      frame (control_header group doc).]
+  link_announce:
+    value: 0xff
+    doc: |
+      block[0] of a master announce (type word 0xcfea, op 0xffff).
+      [EVIDENCED (corpus).]
+  # ---- Pace — packet rates, sample rates and the pace code ----
+  pkt_rate_48k:
+    value: 4000
+    doc: |
+      Frames per second at 48 kHz. [EVIDENCED (corpus) — pcap timestamps,
+      every 48 kHz capture.]
+  pkt_rate_96k:
+    value: 8000
+    doc: |
+      Frames per second at 96 kHz. [EVIDENCED (corpus + rig) — 96 kHz
+      windows measured at 8000 fps (CONSOLE_FIELD_GATES_RATE evidence).]
+  pkt_rate_44k1:
+    value: 3675
+    doc: |
+      Frames per second at 44.1 kHz. [EVIDENCED (corpus) —
+      m200-enrol-441k-2026-09-13 and m200-enrol-s4000-441k-2026-09-13, 3675
+      fps from the pcap timestamps.]
+  sample_rate_48k:
+    value: 48000
+    doc: |
+      The 48 kHz class. [derived — 4000 frames x 12 samples.]
+  sample_rate_96k:
+    value: 96000
+    doc: |
+      The 96 kHz class. [derived — 8000 frames x 12 samples.]
+  sample_rate_44k1:
+    value: 44100
+    doc: |
+      The 44.1 kHz class. [derived — 3675 frames x 12 samples.]
+  # ---- The pace code ----
+  pace_code_48k:
+    value: 0x00
+    doc: |
+      48 kHz. Was called the V-Mixer family. [RIG-VERIFIED (2026-08-27) and
+      WIRE-CAPTURED (2026-09-13) — see CONSOLE_FIELD_GATES_RATE.]
+  pace_code_96k:
+    value: 0x01
+    doc: |
+      96 kHz. Was called the OHRCA family. [RIG-VERIFIED (2026-08-27) — see
+      CONSOLE_FIELD_GATES_RATE.]
+  pace_code_44k1:
+    value: 0x02
+    doc: |
+      44.1 kHz. [WIRE-CAPTURED (2026-09-13) — an M-200 at 44.1 kHz writes
+      0x02 on all four carriers. RULED (operator, 2026-09-13).]
+  # ---- The filler descriptor ----
+  filler_desc_none:
+    value: 0x00
+    doc: |
+      Before the box has asked — the first frames after link-up. [EVIDENCED
+      (corpus) — the granted S-0808 sent 48 zero frames first (wire,
+      2026-09-09).]
+  filler_desc_requesting:
+    value: 0x52
+    doc: |
+      Announce sent, grant not yet received. [EVIDENCED (corpus + replay) —
+      8691 frames between the S-0808's announce and its grant (wire,
+      2026-09-09; box-to-box-enroll.pcap).]
+  filler_desc_established:
+    value: 0x7a
+    doc: |
+      Granted. Claiming it before the grant gets the enrolment refused.
+      [EVIDENCED (corpus + replay) — from t=7.619 in
+      box-to-box-enroll.pcap.]
+  # ---- The Roland DT1 record inside op-0403 ----
+  dt1_wrapper:
+    value: 0x000200fe
+    doc: |
+      The four bytes at block[4:8] ahead of every DT1 record and record
+      fragment. Its tail `02 00 fe` is the box-return marker's too, which is
+      why SUB_0403_OFF alone discriminates them. [EVIDENCED (corpus).]
+  dt1_wrapper_bytes:
+    value: 4
+    doc: |
+      Width of DT1_WRAPPER. [EVIDENCED (corpus).]
+  dt1_len_echo_off:
+    value: 8
+    doc: |
+      Block offset of the SysEx length echo, right after the wrapper.
+      [EVIDENCED (corpus).]
+  dt1_sysex_off:
+    value: 9
+    doc: |
+      Block offset of SYSEX_START. [EVIDENCED (corpus).]
+  sysex_start:
+    value: 0xf0
+    doc: |
+      MIDI SysEx start. [EVIDENCED (corpus).]
+  roland_id:
+    value: 0x41
+    doc: |
+      Roland's SysEx manufacturer id. [EVIDENCED (corpus).]
+  dt1_device_id:
+    value: 0x0a
+    doc: |
+      The device id byte every captured box-built record carries. [EVIDENCED
+      (corpus) — the cold-connect records of matrix-m200-s1608 and
+      matrix-m200-s0808 (2026-07-11). reac.ksy parses it as a free u1 and
+      does not validate it.]
+  dt1_sysex_head_bytes:
+    value: 3
+    doc: |
+      SYSEX_START, ROLAND_ID and the device id — the bytes before the model
+      id. [EVIDENCED (corpus).]
+  dt1_model_id_bytes:
+    value: 3
+    doc: |
+      The Roland model id, `00 00 12`. [EVIDENCED (corpus).]
+  dt1_model_id_lo:
+    value: 0x12
+    doc: |
+      The model id's low byte, which the classifier checks to tell a genuine
+      DT1 record from the look-alikes. [EVIDENCED (corpus).]
+  dt1_model_lo_off:
+    value: 14
+    doc: |
+      Block offset of DT1_MODEL_ID_LO. [EVIDENCED (corpus).]
+  dt1_cmd_off:
+    value: 15
+    doc: |
+      Block offset of the command byte, DT_CMD_RQ1 or DT_CMD_DT1. [EVIDENCED
+      (corpus).]
+  dt1_tag_off:
+    value: 16
+    doc: |
+      Block offset of the big-endian register-page tag (the dt1_tag group).
+      [EVIDENCED (corpus).]
+  dt_cmd_rq1:
+    value: 0x11
+    doc: |
+      Roland RQ1 — a read request (the identity poll). [EVIDENCED (corpus).]
+  dt_cmd_dt1:
+    value: 0x12
+    doc: |
+      Roland DT1 — data set. [EVIDENCED (corpus).]
+  sysex_end:
+    value: 0xf7
+    doc: |
+      MIDI SysEx end, after the inner checksum. [EVIDENCED (corpus).]
+  dt1_record_overhead:
+    value: 0x0d
+    doc: |
+      rec_len minus the SysEx record's own length. [EVIDENCED (corpus).]
+  dt1_data_overhead:
+    value: 0x10
+    doc: |
+      rec_len minus the record's data bytes. [EVIDENCED (corpus).]
+  # ---- Identity page fields reac.ksy parses and libreac builds ----
+  identity_addr_model_name_ext:
+    value: 0x1011
+    doc: |
+      The model-name continuation address. [EVIDENCED (corpus).]
+  identity_addr_model_name_slot_b:
+    value: 0x1100
+    doc: |
+      The second model-name slot. [EVIDENCED (corpus).]
+  identity_addr_model_name_slot_b_ext:
+    value: 0x1111
+    doc: |
+      The second slot's continuation. [EVIDENCED (corpus).]
+  identity_firmware_bytes:
+    value: 4
+    doc: |
+      The firmware version reply — four bytes, one decimal digit each (2200
+      is `02 02 00 00`). [EVIDENCED (corpus).]
+  identity_reac_version_bytes:
+    value: 8
+    doc: |
+      The REAC version reply — four big-endian u16s, reserved / major /
+      minor / patch. [EVIDENCED (corpus).]
+  # ---- The config announce and the enroll group map, field by field ----
+  announce_head_bytes:
+    value: 5
+    doc: |
+      The fixed `01 03 0d 01 04` after the op word. [EVIDENCED (corpus) —
+      17,040 announces, 2026-09-13.]
+  announce_mac_off:
+    value: 9
+    doc: |
+      The master's MAC. [EVIDENCED (corpus).]
+  announce_total_slots_off:
+    value: 15
+    doc: |
+      The fabric's slot total (0x28 on every capture). [EVIDENCED (corpus).]
+  announce_box_in_width_off:
+    value: 16
+    doc: |
+      The announced box input width. [EVIDENCED (corpus).]
+  announce_pace_off:
+    value: 17
+    doc: |
+      console_field — the pace code. [EVIDENCED (corpus + rig) — see
+      CONSOLE_FIELD_GATES_RATE.]
+  announce_box_count_off:
+    value: 18
+    doc: |
+      The big-endian box count. [EVIDENCED (corpus).]
+  board_config_off:
+    value: 7
+    doc: |
+      Block offset of the commit report's board-configuration code — the
+      chassis strap HEADAMP_BASE_FROM_CONFIG_BYTE7 names, which libreac
+      (reac_ports.h, reac_box_synth.c) and its tests index as a bare 7.
+      After the subtype and two zero bytes, right before the inventory.
+      [EVIDENCED (image + corpus) — S-1608 FUN_0c003c8a; see
+      LEN_SUB_COMMIT_REPORT.]
+  enroll_pace_off:
+    value: 6
+    doc: |
+      The enroll group map's console byte — the pace code. [EVIDENCED
+      (corpus) — m200-enrol-441k-2026-09-13.]
+  enroll_in_groups_off:
+    value: 7
+    doc: |
+      First of ENROLL_GROUPS input-group cells. [EVIDENCED (image +
+      corpus).]
+  enroll_out_groups_off:
+    value: 12
+    doc: |
+      First of ENROLL_GROUPS output-group cells. Five in plus five out is
+      the ten-cell run tools/group_map_scan.c scans. [EVIDENCED (image +
+      corpus).]
+  enroll_group_channels:
+    value: 8
+    doc: |
+      Channels per enroll group — ENROLL_GROUP_IN counts eight inputs.
+      [EVIDENCED (image + corpus).]
+  # ---- The scene body's tag words ----
+  scene_tag_id:
+    value: 0x31323334
+    doc: |
+      "1234" at SCENE_TAG_ID_OFF. [EVIDENCED (corpus) — 27 real-desk
+      bodies.]
+  scene_tag_sysp:
+    value: 0x53595350
+    doc: |
+      "SYSP" at SCENE_TAG_SYSP_OFF. [EVIDENCED (corpus).]
+  scene_tag_scen:
+    value: 0x5343454e
+    doc: |
+      "SCEN" at SCENE_TAG_SCEN_OFF. [EVIDENCED (corpus).]
+  scene_revision_bytes:
+    value: 2
+    doc: |
+      The little-endian `revision` at SCENE_REVISION_OFF — the pace code's
+      scene carrier. [EVIDENCED (corpus + rig).]
+  # ---- What each box model declares ----
+  box_s0808_in:
+    value: 8
+    doc: |
+      S-0808 analog inputs. [EVIDENCED (corpus) — config-announce inventory,
+      fixtures/control.json; 24-record head-amp sweeps.]
+  box_s0808_out:
+    value: 8
+    doc: |
+      S-0808 outputs. [EVIDENCED (corpus) — config-announce inventory.]
+  box_s1608_in:
+    value: 16
+    doc: |
+      S-1608 analog inputs. [EVIDENCED (corpus) — inventory; 48-record
+      sweeps.]
+  box_s1608_out:
+    value: 8
+    doc: |
+      S-1608 outputs. [EVIDENCED (corpus) — config-announce inventory.]
+  box_s4000s_3208_in:
+    value: 32
+    doc: |
+      S-4000S in its 32-in/8-out configuration. [EVIDENCED (corpus) —
+      inventory; 96-record sweeps.]
+  box_s4000s_3208_out:
+    value: 8
+    doc: |
+      S-4000S 32x8 outputs. [EVIDENCED (corpus).]
+  box_s4000s_0832_in:
+    value: 8
+    doc: |
+      S-4000S in its 8-in/32-out configuration. [EVIDENCED (corpus) —
+      vlan13-0832.pcap.]
+  box_s4000s_0832_out:
+    value: 32
+    doc: |
+      S-4000S 8x32 outputs. [EVIDENCED (corpus) — vlan13-0832.pcap.]
+  # ---- Timing a second implementation has to match ----
+  box_linkcheck_reload_frames:
+    value: 600
+    doc: |
+      The box firmware's established link-check reload, in frames.
+      [EVIDENCED (image) — 0x0258 in the S-1608 image.]
+  announce_period_ms:
+    value: 1000
+    doc: |
+      A master announces, and while established sends one chanmap window,
+      once a second. [EVIDENCED (corpus + rig) — at the hunt rate (~0.37/s)
+      the box's link light kept blinking (rig, 2026-07-12).]
+  scene_burst_chunks_per_sec:
+    value: 500
+    doc: |
+      A desk's scene push rate — 341 chunks in ~0.68 s. [EVIDENCED (corpus)
+      — M-200i -> S-1608, SCENE_CHUNKS evidence.]
+  grant_stride_slots:
+    value: 12
+    doc: |
+      One echoed grant per twelve frame slots across the ~150 ms grant
+      burst. [EVIDENCED (corpus) — the transcribed real burst.]
+  enroll_grant_dwell_ms:
+    value: 1600
+    doc: |
+      A desk's dwell between the enroll group map and the grant burst.
+      [EVIDENCED (corpus) — 1503 ms on matrix-m200-s0808 and 1717 ms on
+      matrix-m200-s1608 (2026-07-11); nominal.]
+  master_link_hold_ms:
+    value: 6500
+    doc: |
+      How long a desk rides through box silence before it reverts to
+      hunting. [EVIDENCED (rig) — one M-200i reboot measurement, 2026-07-11
+      (heartbeat stops t=16.0 s, first probe t=22.47 s).]
