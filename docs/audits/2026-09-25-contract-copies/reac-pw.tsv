@@ -1,0 +1,735 @@
+repo	file:line	literal	fact restated (YAML name | NEW:proposed | DERIVED:expr)	declared before this PR	note
+reac-pw	packaging/reac-pw.env.example:25	REAC_RATE=96000	NEW:REAC_RATE_96K	no	example config value
+reac-pw	packaging/reac-pw.spec:44	"EtherType 0x8819"	REAC_ETHERTYPE	yes	%description prose; changelog also restates 1492/340/0x82/0x84 (prose, not itemised)
+reac-pw	src/main.c:635	"0x8819"	REAC_ETHERTYPE	yes	in --help text
+reac-pw	src/main.c:647	"44100, 48000 or 96000"	NEW:REAC_RATE_*	no	in --help text
+reac-pw	src/main.c:656	"even 2..40"	NEW:REAC_BRAID_PAIR_CHANNELS ; REAC_MAX_CHANNELS	no	in --help text; 40 has a macro
+reac-pw	src/main.c:678	"0x8819"	REAC_ETHERTYPE	yes	in --help text
+reac-pw	src/main.c:746	"4000 fps"	DERIVED:REAC_RATE_48K/REAC_SAMPLES_PER_PKT	derived	in --help text
+reac-pw	src/main.c:747	"8000 fps"	DERIVED:REAC_RATE_96K/REAC_SAMPLES_PER_PKT	derived	in --help text
+reac-pw	src/main.c:1416	2 and (n & 1)	NEW:REAC_BRAID_PAIR_CHANNELS	no	box width must be even >=2 (braid pairs channels)
+reac-pw	src/main.c:1440	44100 / 48000 / 96000	NEW:REAC_RATE_44K1 / REAC_RATE_48K / REAC_RATE_96K	no	duplicate of reac_rate_is_closed() in conf rate parse
+reac-pw	src/main.c:1447	"44100, 48000 or 96000"	NEW:REAC_RATE_*	no	in refusal string
+reac-pw	src/main.c:1939	"(40 ch)"	REAC_MAX_CHANNELS	yes	in log string
+reac-pw	src/main.c:3157	"0x8819"	REAC_ETHERTYPE	yes	in sniffer error string
+reac-pw	src/main.c:4453	"52 + n*36"	REAC_FRAME_OVERHEAD ; REAC_BYTES_PER_CHANNEL	yes	geometry restated in refusal string
+reac-pw	src/main.c:5497	44100 / 48000 / 96000	NEW:REAC_RATE_44K1 / REAC_RATE_48K / REAC_RATE_96K	no	third copy of legal-rate check (--rate argv)
+reac-pw	src/main.c:5499	"44100, 48000 or 96000"	NEW:REAC_RATE_*	no	in refusal string
+reac-pw	src/main.c:5554	2 and (box_channels & 1)	NEW:REAC_BRAID_PAIR_CHANNELS	no	same even-width rule, --box-channels argv
+reac-pw	src/main.c:5556	"8 = S-0808, 16 = S-1608, 32 = S-4000S"	REAC_PLACEMENT(in_ch rows 8/16/32)	yes	per-model widths in refusal string
+reac-pw	src/reac_link_budget.c:17	12u	REAC_SAMPLES_PER_PKT	yes	pps = sample_rate / 12; macro exists in libreac
+reac-pw	src/reac_rate_cfg.c:28	44100 / 48000 / 96000	NEW:REAC_RATE_44K1 / REAC_RATE_48K / REAC_RATE_96K	no	closed set of legal paces; YAML has only boolean pace facts
+reac-pw	src/reac_rate_cfg.c:34	44100	NEW:REAC_RATE_44K1	no	switch case rate->bit
+reac-pw	src/reac_rate_cfg.c:35	48000	NEW:REAC_RATE_48K	no	switch case rate->bit
+reac-pw	src/reac_rate_cfg.c:36	96000	NEW:REAC_RATE_96K	no	switch case rate->bit
+reac-pw	src/reac_rate_cfg.c:44	96000	NEW:REAC_RATE_96K	no	best-drivable return value
+reac-pw	src/reac_rate_cfg.c:45	48000	NEW:REAC_RATE_48K	no	best-drivable return value
+reac-pw	src/reac_rate_cfg.c:46	44100	NEW:REAC_RATE_44K1	no	best-drivable return value
+reac-pw	src/reac_rate_cfg.c:52	{ 44100, 48000, 96000 } and [3]	NEW:REAC_RATE_* ; DERIVED:count(REAC_RATE_*)	no	ordered rate table; size 3 = number of legal paces
+reac-pw	src/reac_rate_cfg.c:56	3	DERIVED:count(REAC_RATE_*)	derived	loop bound restates legal-pace count
+reac-pw	src/reac_sink_node.c:584	"44100|48000|96000"	NEW:REAC_RATE_*	no	in PropInfo description string
+reac-pw	tests/box-0832-enrols.sh:81	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg (same in many netns scripts)
+reac-pw	tests/box-0832-enrols.sh:132	"S-4000S-0832 (8 in / 32 out)"	NEW:MODEL_S4000H_0832_IN=8/OUT=32	no	split chassis widths; PORT_SLOT_IN_SPLIT evidence
+reac-pw	tests/box-0832-enrols.sh:152	"S-4000S-3208 (32 in / 8 out)"	NEW:MODEL_S4000S_IN=32/OUT=8	no	S-4000S widths
+reac-pw	tests/box-declares-its-row.sh:69	socket.htons(0x8819)	ETHERTYPE	yes	embedded python sniffer binds EtherType literal
+reac-pw	tests/box-declares-its-row.sh:92	f[18:50]	CTRL_BLOCK_OFF..CTRL_BLOCK_END	yes	control block slice by hand
+reac-pw	tests/box-declares-its-row.sh:94	f[16:18] == b'\xcd\xea'	TYPED_BLOCK_OFF / TYPE_CONTROL	yes	type word offset and cdea literal
+reac-pw	tests/box-declares-its-row.sh:97	blk[0] == 0x04 and blk[16:18] == b'\x05\x00'	LINK_RECORD / DT1_TAG_IDENTITY	yes	DT1 tag offset 16 in block is not a fact
+reac-pw	tests/box-declares-its-row.sh:98	addr = blk[18:20]	NEW:DT1_ADDR_LO_OFF_IN_BLOCK=18	no	addr_lo position (IDENTITY_ADDR_LO_BYTES=2 wide)
+reac-pw	tests/box-declares-its-row.sh:99	blk[1] == 0x03 and addr == b'\x00\x00'	SEG_SINGLE / IDENTITY_ADDR_FIRMWARE_VERSION	yes	
+reac-pw	tests/box-declares-its-row.sh:100	fw = blk[20:24]	NEW:DT1_PAYLOAD_OFF_IN_BLOCK=20 ; NEW:IDENTITY_FIRMWARE_VERSION_BYTES=4	no	YAML prose says 4 bytes, no numeric fact
+reac-pw	tests/box-declares-its-row.sh:101	addr == b'\x06\x00'	IDENTITY_ADDR_REAC_VERSION	yes	0x0600 as raw bytes
+reac-pw	tests/box-declares-its-row.sh:102	ver = blk[20:28]	NEW:IDENTITY_REAC_VERSION_BYTES=8	no	YAML prose says 8 bytes four u16be
+reac-pw	tests/box-declares-its-row.sh:105	blk[0] == 0x04 and blk[1] == 0x02	LINK_RECORD / SEG_LAST_BIT (OP_DT1_LAST_FRAGMENT)	yes	
+reac-pw	tests/box-declares-its-row.sh:112	announce[8:20] ... == 0x02) * 4	PORTS_TABLE_OFF, PORTS_TABLE_SLOTS, PORT_SLOT_IN, PORTS_CH_PER_SLOT	yes	port table decoded by hand
+reac-pw	tests/box-declares-its-row.sh:113	announce[8:20] ... == 0x01) * 4	PORT_SLOT_OUT / PORTS_CH_PER_SLOT	yes	
+reac-pw	tests/box-declares-its-row.sh:114	announce[4]	SUB_0103_OFF	yes	selector byte offset
+reac-pw	tests/box-declares-its-row.sh:115	announce[7]	HEADAMP_BASE_FROM_CONFIG_BYTE7 (offset 7)	yes	strap byte offset
+reac-pw	tests/box-declares-its-row.sh:118	sum(announce) % 256	CTRL_BLOCK_SUM	yes	block checksum rule restated
+reac-pw	tests/box-declares-its-row.sh:125	name_first[21:31]	NEW:IDENTITY_NAME_FIRST_FRAG_OFF=21	no	model-name bytes in 0x0401 fragment; IDENTITY_ADDR_MODEL_NAME prose
+reac-pw	tests/box-declares-its-row.sh:127	name_last[9:15]	NEW:IDENTITY_NAME_LAST_FRAG_OFF=9	no	model-name tail in 0x0402 fragment
+reac-pw	tests/box-declares-its-row.sh:252	arm A s1608 bxa0 8	NEW:MODEL_S1608_OUT_CH=8	no	box width arg
+reac-pw	tests/box-declares-its-row.sh:274	"16"	NEW:MODEL_S1608_IN_CH=16	no	expected declared inputs of S-1608
+reac-pw	tests/box-declares-its-row.sh:275	"8"	NEW:MODEL_S1608_OUT_CH=8	no	expected declared outputs of S-1608
+reac-pw	tests/box-declares-its-row.sh:276	"0x82"	SUB_0103_COMMIT_REPORT	yes	S-1608 selector expectation
+reac-pw	tests/box-declares-its-row.sh:277	"2"	NEW:MODEL_S1608_HEADAMP_STRAP=2	no	S-1608 strap (base 0x20); YAML PLACEMENT row in_ch=16 base=0x20
+reac-pw	tests/box-declares-its-row.sh:278	"0"	CTRL_BLOCK_SUM	yes	blocksum expectation
+reac-pw	tests/box-declares-its-row.sh:285	"40"	MAX_CHANNELS	yes	experiment row 40 inputs
+reac-pw	tests/box-declares-its-row.sh:315	"16/8"	NEW:MODEL_S1608_IN_CH/OUT_CH	no	roster width expectation
+reac-pw	tests/box-declares-its-row.sh:316	"40/0"	MAX_CHANNELS	yes	roster width expectation
+reac-pw	tests/box-is-not-re-decided.sh:81	00:40:ab:c4:dc:a2	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC carries Roland OUI (fixture data)
+reac-pw	tests/box-is-not-re-decided.sh:82	"$FAKE" ngnp0 "$BOXMAC" 8	NEW:MODEL_S0808_CH=8	no	fake box width 8 = S-0808
+reac-pw	tests/box-master-rejoins.sh:119	00:40:ab:c4:dc:9c	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/box-master-rejoins.sh:122	"$FAKE" rbox0 "$BOXMAC" 8	NEW:MODEL_S0808_CH=8	no	fake box width
+reac-pw	tests/box-master-rejoins.sh:165	"S-0808 (8 in / 8 out)"*"8 ch"	NEW:MODEL_S0808_CH=8	no	model width string expectation
+reac-pw	tests/box-master-slave-join.sh:189	00:40:ab:c4:08:bc	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (also 529, 569) (fixture data)
+reac-pw	tests/box-master-slave-join.sh:192	"$FAKE" mbx0 "$BOXMAC" 8	NEW:MODEL_S0808_CH=8	no	fake box width
+reac-pw	tests/box-master-slave-join.sh:224	WANT_LEN=1492	FRAME_BYTES	yes	downstream length expectation
+reac-pw	tests/box-master-slave-join.sh:225	WANT_LEN=340	DERIVED:FRAME_OVERHEAD+8*BYTES_PER_CHANNEL	derived	8-ch box frame length
+reac-pw	tests/box-master-slave-join.sh:292	selector 0x80 at offset 6	SUB_0103_DECLARATION_ALT / DERIVED:TYPED offset 6 = SUB_0103_OFF+2	yes	message text restating fact
+reac-pw	tests/box-master-slave-join.sh:341	0x52	NEW:FILLER_DESC_REQUESTING=0x52	no	message; slave filler REQUESTING byte (fake_box_master.c:163 comment, 0.5.6-10)
+reac-pw	tests/box-master-slave-join.sh:362	[ "$NPORT" = "8" ]	NEW:MODEL_S0808_CH=8	no	playback door width expectation
+reac-pw	tests/box-master-slave-join.sh:411	"$WANT_LEN" = "340"	DERIVED:FRAME_OVERHEAD+8*BYTES_PER_CHANNEL	derived	
+reac-pw	tests/box-master-slave-join.sh:529	"$FAKE" mbx1 ... 16	NEW:MODEL_S1608_IN_CH=16	no	fake 16-in box
+reac-pw	tests/box-master-slave-join.sh:547	[ "$NP16" = "8" ]	NEW:MODEL_S1608_OUT_CH=8	no	S-1608 has eight outputs
+reac-pw	tests/box-master-slave-join.sh:569	"$FAKE" mbx2 ... 8	NEW:MODEL_S0808_CH=8	no	fake box width
+reac-pw	tests/box-wakes-on-a-phy-edge.sh:99	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tests/courtship-backs-off.sh:40	FPS=3675	NEW:PKT_RATE_44K1=3675	no	44.1k packet rate; YAML evidence m200-enrol-441k measures 3675 fps
+reac-pw	tests/courtship-backs-off.sh:42	00:40:ab:9f:9e:be	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/courtship-backs-off.sh:68	44100	NEW:RATE_44K1=44100	no	slave sample rate arg
+reac-pw	tests/courtship-backs-off.sh:109	b <= 7.0 (1.486 s flood + 4 s budget)	DERIVED:(impl flood 5460 frames / PKT_RATE_44K1)	derived	flood length at 3675 fps; budget is implementation
+reac-pw	tests/courtship-backs-off.sh:115	s > 7.148	NEW:M200_SESSION_HOLD_S=7.148	no	measured M-200 session hold the slave backoff must outlast
+reac-pw	tests/courtship_probe.c:72	htons(0x8819)	ETHERTYPE	yes	also 125, 132, 140
+reac-pw	tests/courtship_probe.c:96	enum { N_CH = 40 }	MAX_CHANNELS	yes	desk width re-declared
+reac-pw	tests/courtship_probe.c:99	{ 0x00, 0x40, 0xab, 0xc9, 0xcc, 0x03 }	NEW:ROLAND_OUI=00:40:ab	no	M-200i MAC (fixture data)
+reac-pw	tests/courtship_probe.c:112	.out_channels = 8	NEW:MODEL_S1608_OUT_CH=8	no	console cfg outputs
+reac-pw	tests/courtship_probe.c:176	rn < 14	DERIVED:HDR_COUNTER_OFF (eth header len 14)	derived	minimum frame = ethernet header
+reac-pw	tests/courtship_probe.c:198	memcpy(f + 16, ann.announce_blk, ...)	TYPED_BLOCK_OFF	yes	
+reac-pw	tests/courtship_probe.c:240	reac_ring_init(&ring, 16, 8192)	NEW:MODEL_S1608_IN_CH=16	no	ring width
+reac-pw	tests/courtship_probe.c:248	cfg.box_channels = 16	NEW:MODEL_S1608_IN_CH=16	no	
+reac-pw	tests/declared-vlan-waits-for-its-tag.sh:130	00:40:ab:c4:11:21 8	NEW:ROLAND_OUI / MODEL_S0808_CH=8	no	fixture MAC + width (fixture data)
+reac-pw	tests/empty-master-yields-the-budget.sh:237	(16 ch)	NEW:MODEL_S1608_IN_CH=16	no	expected heard width
+reac-pw	tests/etf-late-is-the-wake.sh:85	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tests/etf-late-is-the-wake.sh:130	--fps 8000	NEW:PKT_RATE_96K=8000	no	96k packet rate
+reac-pw	tests/etf-late-is-the-wake.sh:131	rate_hz=96000	NEW:RATE_96K=96000	no	grep expectation
+reac-pw	tests/etf-late-is-the-wake.sh:197	'17 slots = 2125 us at 8000 fps'	NEW:PKT_RATE_96K=8000	no	expectation string (125 us period)
+reac-pw	tests/etf-late-is-the-wake.sh:199	'8 slots = 1000 us at 8000 fps'	NEW:PKT_RATE_96K=8000	no	expectation string
+reac-pw	tests/etf-qdisc-owned.sh:120	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tests/etf_wire_probe.c:47	#define REAC_ETHERTYPE 0x8819	ETHERTYPE	yes	hand-written copy of the fact macro
+reac-pw	tests/etf_wire_probe.c:104	n < 14	DERIVED:HDR_COUNTER_OFF	derived	ethernet header length
+reac-pw	tests/etf_wire_probe.c:107	(buf[12] << 8) | buf[13]	NEW:ETHERTYPE_OFF=12	no	EtherType offset (Ethernet, implied by L2_HEADER_LEN breakdown)
+reac-pw	tests/fake_box_master.c:92	uint8_t announce_blk[34]	TYPED_BLOCK_LEN	yes	also 93, 108, 116
+reac-pw	tests/fake_box_master.c:163	for (int i = 18; i < 50; i++)	CTRL_BLOCK_OFF..CTRL_BLOCK_END	yes	
+reac-pw	tests/fake_box_master.c:169	f[19] == 0x52	NEW:FILLER_DESC_REQUESTING=0x52 ; f[19]=CTRL_BLOCK_OFF+HDR_SEG_OFF	no	comment 0.5.6-10: slave filler 0x52 until grant, 0x7a after
+reac-pw	tests/fake_box_master.c:171	f[19] != 0x52	NEW:FILLER_DESC_REQUESTING=0x52	no	
+reac-pw	tests/fake_box_master.c:181	memcpy(e->announce_seen, f + 16, ...)	TYPED_BLOCK_OFF	yes	also 329, 332, 644, 657, 673
+reac-pw	tests/fake_box_master.c:192	f[16 + 6] == 0x80	DERIVED:TYPED_BLOCK_OFF+2+SUB_0103_OFF / SUB_0103_DECLARATION_ALT	derived	selector check
+reac-pw	tests/fake_box_master.c:193	f[6]==0x00 && f[7]==0x40 && f[8]==0xab	NEW:ROLAND_OUI=00:40:ab	no	OUI gate in emulator; comment: gear a box has enrolled
+reac-pw	tests/fake_box_master.c:195	for (int i = 11; i < 22; i++) ... f[16 + 10]	DERIVED:TYPED_BLOCK_OFF+2+PORTS_TABLE_OFF (+PORTS_TABLE_SLOTS)	derived	port table at typed[10:22]
+reac-pw	tests/fake_box_master.c:213	memcmp(e->grant_q[i], f + 16, 34)	TYPED_BLOCK_OFF / TYPED_BLOCK_LEN	yes	also 216, 673
+reac-pw	tests/fake_box_master.c:242	n < 14 || f[12] != 0x88 || f[13] != 0x19	ETHERTYPE	yes	EtherType as two bytes
+reac-pw	tests/fake_box_master.c:269	* 3	RESOLUTION	yes	also 314
+reac-pw	tests/fake_box_master.c:481	htons(0x8819)	ETHERTYPE	yes	also 497, 526, 534
+reac-pw	tests/fake_box_master.c:583	.out_channels = 8	NEW:MODEL_S1608_OUT_CH=8	no	
+reac-pw	tests/fake_box_master.c:586	ann.announce_blk[17] = (uint8_t)n_ch	NEW:ANNOUNCE_WIDTH_OFF=17 (typed)	no	cfea width byte; conformance checks 0x28 there
+reac-pw	tests/fake_box_master.c:618	n_ch > 8 ? n_ch : 8	NEW:MODEL_S0808_CH=8	no	also 708
+reac-pw	tests/fake_box_master.c:642	{ 0xcd, 0xea, 0x01, 0x00, 0x00, 0x1a }	TYPE_CONTROL / OP_SCENE_CHUNK / SCENE_CHUNK_BYTES	yes	hand-built scene chunk header
+reac-pw	tests/fake_box_master.c:645	memset(f + 22, 0, 28)	DERIVED:CTRL_BLOCK_OFF+HDR_OPCODE_OFF ; CTRL_BLOCK_END-22	derived	
+reac-pw	tests/fake_box_master.c:659	b[21] = granted > 0 ? 0x01 : 0x00	NEW:ANNOUNCE_ENROLLED_OFF=21 (typed)	no	enrolled-box count in cfea; m200-enrol-441k-2026-09-13/analysis.md
+reac-pw	tests/fake_box_master.c:685	reac_ctrl_stamp_headamp(f, 0x20, 0, 1)	DERIVED:2*HEADAMP_BASE_MULTIPLIER / HEADAMP_PARAM_PHANTOM	derived	S-1608 head-amp base 0x20
+reac-pw	tests/graph-state-follows-segment-state.sh:134	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tests/graph-survives-a-pipewire-restart.sh:94	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tests/headamp-refusal-is-visible.sh:161	"55"	HEADAMP_SENS_MAX	yes	sens.max expectation
+reac-pw	tests/hearing-finds-a-segment.sh:268	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg (also 382, 565, 717)
+reac-pw	tests/hearing-finds-a-segment.sh:269	00:40:ab:de:5c:01	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs throughout file (fixture data)
+reac-pw	tests/hearing-finds-a-segment.sh:351	--box-channels 16	NEW:MODEL_S1608_IN_CH=16	no	also 465, 493, 534, 642
+reac-pw	tests/hearing-finds-a-segment.sh:398	"16x8"	NEW:MODEL_S1608_IN_CH/OUT_CH	no	also 443
+reac-pw	tests/hearing-finds-a-segment.sh:829	"$FAKE" mbox0 "$BOXMAC" 8	NEW:MODEL_S0808_CH=8	no	also 963, 1127, 1129
+reac-pw	tests/hearing-finds-a-segment.sh:858	"S-0808 (8 in / 8 out)"*"8 ch"	NEW:MODEL_S0808_CH=8	no	also 1232
+reac-pw	tests/hearing-finds-a-segment.sh:880	"8x8"	NEW:MODEL_S0808_CH=8	no	
+reac-pw	tests/hearing-finds-a-segment.sh:1056	(40 ch)	MAX_CHANNELS	yes	master downstream width in grep
+reac-pw	tests/hearing-finds-a-segment.sh:1128	"$FAKE" tbox0.12 "$TBOX12" 16	NEW:MODEL_S1608_IN_CH=16	no	
+reac-pw	tests/hearing-finds-a-segment.sh:1236	"S-1608 (16 in / 8 out)"*"16 ch"	NEW:MODEL_S1608_IN_CH/OUT_CH	no	
+reac-pw	tests/iface-vanish-exits.sh:41	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tests/link-up-reestablishes.sh:47	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tests/master-gone-is-re-decided.sh:84	00:40:ab:c4:dc:a1 ... 8	NEW:ROLAND_OUI / MODEL_S0808_CH=8	no	fixture MAC + width (fixture data)
+reac-pw	tests/no-box-no-node.sh:93	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tests/reac_conformance_golden.inc:44	uint8_t cfea_idle[34]	TYPED_BLOCK_LEN	yes	also 45, 46; array bytes 50-58 are captured cfea (fixture data)
+reac-pw	tests/reac_conformance_golden.inc:63	#define CONF_MAC_IDX 11	NEW:ANNOUNCE_MAC_OFF=11 (typed)	no	master MAC in cfea frame[16:50]
+reac-pw	tests/reac_grant_golden.inc:26	GOLD_S1608_SWEEP[56][34]	DERIVED:16*HEADAMP_SWEEP_RECORDS_PER_CH+8 / TYPED_BLOCK_LEN	derived	array bytes captured matrix-m200-s1608-2026-07-11 (fixture data)
+reac-pw	tests/reac_grant_golden.inc:86	GOLD_S1608_CELLS[48][3]	SLOT_SPACE / CHANMAP_REC_BYTES	yes	fixture data
+reac-pw	tests/reac_m200_golden.inc:14	#define GOLD_CHANMAP_WINDOWS 49	CHANMAP_RING_LEN	yes	hand copy of fact
+reac-pw	tests/reac_m200_golden.inc:15	GOLD_CHANMAP_SWEEP[...][34]	TYPED_BLOCK_LEN	yes	array bytes captured M-200i (fixture data); also 72
+reac-pw	tests/reac_m200_golden.inc:71	#define GOLD_PROBE_VARIANTS 10	DERIVED:SCENE_SLOT_BYTES (period-10 probe rotation)	derived	YAML SCENE_SLOT_BYTES prose
+reac-pw	tests/reac_m300_golden.inc:27	M300_CHANMAP_FE[34]	TYPED_BLOCK_LEN	yes	also 40 M300_CFEA[34]; bytes are fixture data
+reac-pw	tests/reac_m300_golden.inc:45	#define M300_CFEA_MAC_IDX 11	NEW:ANNOUNCE_MAC_OFF=11 (typed)	no	duplicate of CONF_MAC_IDX
+reac-pw	tests/reac_m300_golden.inc:46	#define M300_CFEA_CKSUM_IDX 33	DERIVED:CTRL_CKSUM_OFF-TYPED_BLOCK_OFF	derived	
+reac-pw	tests/reac_s4000_golden.inc:48	uint8_t head[50]	L2_HEADER_LEN	yes	header bytes are captured (fixture data)
+reac-pw	tests/reac_s4000_golden.inc:56	.len = 1494	DERIVED:FRAME_BYTES+OHRCA_TRAILER_BYTES	derived	also 63, 70, 77, 93, 100, 129
+reac-pw	tests/reac_s4000_golden.inc:84	.len = 342	DERIVED:FRAME_OVERHEAD+8*BYTES_PER_CHANNEL+OHRCA_TRAILER	derived	also 153
+reac-pw	tests/reac_s4000_golden.inc:107	.len = 1206	DERIVED:FRAME_OVERHEAD+32*BYTES_PER_CHANNEL+OHRCA_TRAILER	derived	also 114, 121, 137, 144
+reac-pw	tests/tap-sends-nothing.sh:40	FPS=4000	NEW:PKT_RATE_48K=4000	no	48k packet rate
+reac-pw	tests/tap-sends-nothing.sh:88	48000	NEW:RATE_48K=48000	no	slave rate arg
+reac-pw	tests/tap-sends-nothing.sh:126	[ "$RATE" -eq 48000 ]	NEW:RATE_48K=48000 (DERIVED:PKT_RATE_48K*SAMPLES_PER_PKT)	no	tap measured rate expectation
+reac-pw	tests/test_reac_arbitration.c:23	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_arbitration.c:140	1204	DERIVED:FRAME_OVERHEAD+32*BYTES_PER_CHANNEL	derived	32-ch upstream length
+reac-pw	tests/test_reac_arbitration.c:141	628	DERIVED:FRAME_OVERHEAD+16*BYTES_PER_CHANNEL	derived	
+reac-pw	tests/test_reac_arbitration.c:142	340	DERIVED:FRAME_OVERHEAD+8*BYTES_PER_CHANNEL	derived	
+reac-pw	tests/test_reac_arbitration.c:144	reac_frame_channels(1204) == 32	DERIVED:(1204-FRAME_OVERHEAD)/BYTES_PER_CHANNEL	derived	
+reac-pw	tests/test_reac_arbitration.c:145	reac_frame_channels(628) == 16	DERIVED	derived	
+reac-pw	tests/test_reac_arbitration.c:146	reac_frame_channels(340) == 8	DERIVED	derived	
+reac-pw	tests/test_reac_arbitration.c:147	reac_frame_channels(REAC_FRAME_BYTES) == 40	MAX_CHANNELS	yes	
+reac-pw	tests/test_reac_arbitration.c:156	reac_rival_kind_from_channels(40)	MAX_CHANNELS	yes	desk width
+reac-pw	tests/test_reac_arbitration.c:157	32 / 16 / 8	NEW:MODEL_S4000S_IN=32, S1608_IN=16, S0808=8	no	lines 157-159 box widths
+reac-pw	tests/test_reac_arbitration.c:193	t.e[0].channels = 8	NEW:MODEL_S0808_CH=8	no	also 197
+reac-pw	tests/test_reac_boxreg.c:12	{ 0x00,0x40,0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_boxreg.c:21	reac_boxreg_init(&r, 40)	MAX_CHANNELS	yes	also 22, 47, 57, 79
+reac-pw	tests/test_reac_boxreg.c:23	reac_boxreg_add(&r, A, 16)	NEW:MODEL_S1608_IN_CH=16	no	also 32, 48, 52, 58, 64
+reac-pw	tests/test_reac_boxreg.c:25	reac_boxreg_add(&r, B, 8)	NEW:MODEL_S0808_CH=8	no	also 27, 49, 61, 67, 82
+reac-pw	tests/test_reac_boxreg.c:26	base == 16	DERIVED:MODEL_S1608_IN_CH	derived	packed base
+reac-pw	tests/test_reac_boxreg.c:28	base == 24	DERIVED:16+8 (also HEADAMP_SENS_STAGE_BREAK_2 coincidence)	derived	also 61, 62, 68
+reac-pw	tests/test_reac_boxreg.c:43	reac_boxreg_add(&r, D, 42) == -1	DERIVED:>MAX_CHANNELS	derived	
+reac-pw	tests/test_reac_boxreg.c:83	placed == 5	DERIVED:MAX_CHANNELS/8 = ENROLL_GROUPS	derived	five 8-ch boxes fill the fabric
+reac-pw	tests/test_reac_box_badge.c:84	{ 0x00, 0x40, 0xab, 0xc4, 0x80, 0x3b }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_box_badge.c:126	p.fps = 8000	NEW:PKT_RATE_96K=8000	no	also 129
+reac-pw	tests/test_reac_box_badge.c:128	reac_frame_ring_init(&p.ring, 8, 2048)	NEW:MODEL_S0808_CH=8	no	
+reac-pw	tests/test_reac_box_badge.c:139	build_upstream_filler(..., 16, NULL, 12)	NEW:MODEL_S1608_IN_CH=16 / SAMPLES_PER_PKT	no	12 = SAMPLES_PER_PKT literal; also 147, 195
+reac-pw	tests/test_reac_box_badge.c:163	build_config_announce(..., 16)	NEW:MODEL_S1608_IN_CH=16	no	also 181, 203
+reac-pw	tests/test_reac_box_badge.c:182	bf[22] = 0x00	DERIVED:CTRL_BLOCK_OFF+SUB_0103_OFF	derived	clears heartbeat subtype byte
+reac-pw	tests/test_reac_box_identity.c:71	{ 0x00, 0x40, 0xab, 0xc4, 0x80, 0x3b }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_box_identity.c:82	fr[12] = 0x88; fr[13] = 0x19	ETHERTYPE	yes	
+reac-pw	tests/test_reac_box_identity.c:83	fr[16] = 0xcd; fr[17] = 0xea	TYPED_BLOCK_OFF / TYPE_CONTROL	yes	
+reac-pw	tests/test_reac_box_identity.c:85	13 + n	NEW:DT1_SYSEX_OVERHEAD=13	no	SysEx bytes around payload; comment f0 41 0a 00 00 12 12 tag addr ... f7
+reac-pw	tests/test_reac_box_identity.c:86	b[0] = 0x04; b[1] = 0x03; b[3] = sx + 5	LINK_RECORD / SEG_SINGLE / DERIVED:CTRL_RECLEN_BASE+1	yes	
+reac-pw	tests/test_reac_box_identity.c:87	b[5] = 0x02; b[7] = 0xfe	NEW:DT1_CONTAINER_HDR bytes (0x02 at [5], 0xfe at [7])	no	container prefix before SysEx
+reac-pw	tests/test_reac_box_identity.c:88	b[9]=0xf0; b[10]=0x41; b[11]=0x0a; b[14]=0x12; b[15]=0x12	NEW:SYSEX_START=0xf0, ROLAND_ID=0x41, DEVICE_ID=0x0a, DT1_CMD=0x12	no	Roland DT1 framing; comment line 73
+reac-pw	tests/test_reac_box_identity.c:89	b[16] = 0x05; b[17] = 0x00	DT1_TAG_IDENTITY ; NEW:DT1_TAG_OFF_IN_BLOCK=16	yes	
+reac-pw	tests/test_reac_box_identity.c:90	b[18] ... b[19]	NEW:DT1_ADDR_LO_OFF_IN_BLOCK=18	no	
+reac-pw	tests/test_reac_box_identity.c:92	b[20 + i]	NEW:DT1_PAYLOAD_OFF_IN_BLOCK=20	no	
+reac-pw	tests/test_reac_box_identity.c:93	0x7f ... 0xf7	NEW:SYSEX_EOX=0xf7	no	
+reac-pw	tests/test_reac_box_identity.c:108	FW_S1608[4]	NEW:IDENTITY_FIRMWARE_VERSION_BYTES=4	no	also 110, 136, 151
+reac-pw	tests/test_reac_box_identity.c:109	VER_S1608[8]	NEW:IDENTITY_REAC_VERSION_BYTES=8	no	also 111, 138, 153
+reac-pw	tests/test_reac_box_identity.c:116	p.fps = 8000	NEW:PKT_RATE_96K=8000	no	also 119
+reac-pw	tests/test_reac_box_master_audio.c:52	#define BOX_CH 8	NEW:MODEL_S0808_CH=8	no	
+reac-pw	tests/test_reac_box_master_audio.c:89	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_box_master_audio.c:118	CHK(flen == 340)	DERIVED:FRAME_OVERHEAD+8*BYTES_PER_CHANNEL	derived	
+reac-pw	tests/test_reac_box_master_audio.c:123	.forced_rate = 96000	NEW:RATE_96K=96000	no	
+reac-pw	tests/test_reac_box_master_audio.c:166	40	MAX_CHANNELS	yes	printf arg
+reac-pw	tests/test_reac_box_master_identity.c:65	reac_box_master_model(8)	NEW:MODEL_S0808_CH=8	no	also 68, 87, 105, 130, 136
+reac-pw	tests/test_reac_box_master_identity.c:70	reac_box_master_model(16)	NEW:MODEL_S1608_IN_CH=16	no	
+reac-pw	tests/test_reac_box_master_identity.c:72	reac_box_master_model(32)	NEW:MODEL_S4000S_IN=32	no	
+reac-pw	tests/test_reac_box_master_identity.c:80	reac_box_master_model(40) == NULL	MAX_CHANNELS	yes	
+reac-pw	tests/test_reac_box_master_identity.c:86	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_box_pin.c:39	in_ch == 16 && out_ch == 8	NEW:MODEL_S1608_IN_CH/OUT_CH	no	
+reac-pw	tests/test_reac_box_pin.c:43	in_ch == 8 && out_ch == 8	NEW:MODEL_S0808_CH=8	no	
+reac-pw	tests/test_reac_clock.c:27	#define NOMINAL_NS 125000L	NEW:PKT_PERIOD_96K_NS=125000 (DERIVED:1e9/PKT_RATE_96K)	no	96 kHz frame period
+reac-pw	tests/test_reac_conformance.c:51	#define S1608_BASE 0x20	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	S-1608 head-amp base; PLACEMENT row
+reac-pw	tests/test_reac_conformance.c:54	#define FPS 4000	NEW:PKT_RATE_48K=4000	no	
+reac-pw	tests/test_reac_conformance.c:75	.out_channels = 8	NEW:MODEL_S1608_OUT_CH=8	no	
+reac-pw	tests/test_reac_conformance.c:78	first_scene_chunk[34]	TYPED_BLOCK_LEN	yes	also 136, 171, 179, 181, 203, 207
+reac-pw	tests/test_reac_conformance.c:84	memcmp(f + 16, cc->cfea_idle, 34)	TYPED_BLOCK_OFF / TYPED_BLOCK_LEN	yes	also 95, 100, 135
+reac-pw	tests/test_reac_conformance.c:85	f[16 + 17] == 0x28	MAX_CHANNELS ; NEW:ANNOUNCE_WIDTH_OFF=17	yes	cfea width byte
+reac-pw	tests/test_reac_conformance.c:86	f[16 + 19]	NEW:ANNOUNCE_CONSOLE_FIELD_OFF=19 (typed)	no	cfea[19], named in CONSOLE_FIELD_GATES_RATE prose only
+reac-pw	tests/test_reac_conformance.c:91	reac_master_set_box(&m, 16, 8, S1608_BASE)	NEW:MODEL_S1608_IN_CH/OUT_CH	no	also 93
+reac-pw	tests/test_reac_conformance.c:98	reac_master_set_box(&m, 8, 8, S0808_BASE)	NEW:MODEL_S0808_CH=8	no	
+reac-pw	tests/test_reac_conformance.c:105	f[16+2]==0x01 && f[16+3]==0x03 && f[16+4]==0x00 && f[16+5]==0x0d	LINK_CONTROL / SEG_SINGLE / LEN_SUB_ENROLL_GROUP_MAP	yes	
+reac-pw	tests/test_reac_conformance.c:107	f[16 + 8]	NEW:ENROLL_MAP_CONSOLE_FIELD_OFF	no	console field in 0x10 frame
+reac-pw	tests/test_reac_conformance.c:142	sl < 8	CHANMAP_RECS_PER_FRAME	yes	
+reac-pw	tests/test_reac_conformance.c:143	7 + sl * 3 + 1 ... == 0xfe	SEG_FIRST_PAYLOAD_OFF? / CHANMAP_REC_BYTES / CHANMAP_ID_IDENTITY	yes	7 = typed offset 5+2; record stride 3
+reac-pw	tests/test_reac_conformance.c:149	i == 33	DERIVED:CTRL_CKSUM_OFF-TYPED_BLOCK_OFF	derived	checksum byte in typed block
+reac-pw	tests/test_reac_conformance.c:162	f[18] == 0x01 && f[19] == 0x01	OP_SCENE_HEADER	yes	scene header
+reac-pw	tests/test_reac_conformance.c:163	f[23] == 0x22 && f[24] == 0xc8	SCENE_BYTES ; DERIVED:CTRL_BLOCK_OFF+SCENE_HEAD_TOTAL_OFF	yes	
+reac-pw	tests/test_reac_conformance.c:173	blk[0] == 0xcd && blk[1] == 0xea	TYPE_CONTROL	yes	
+reac-pw	tests/test_reac_conformance.c:174	blk[2] == 0x01 && blk[3] == 0x00	OP_SCENE_CHUNK	yes	
+reac-pw	tests/test_reac_conformance.c:175	blk[4] == 0x00 && blk[5] == 0x1a	SCENE_CHUNK_BYTES	yes	
+reac-pw	tests/test_reac_conformance.c:176	blk + 7	DERIVED:2+SCENE_CHUNK_PAY_OFF	derived	typed offset of chunk payload
+reac-pw	tests/test_reac_conformance.c:200	reac_grant_allocate(&a, 0x20, 16)	DERIVED:2*HEADAMP_BASE_MULTIPLIER / MODEL_S1608_IN_CH	derived	also 201
+reac-pw	tests/test_reac_conformance.c:212	sw[0][16]==0x12 && sw[0][17]==0x12 && sw[0][18]==0x01 && sw[0][19]==0x00	NEW:DT1_CMD=0x12 / DT1_TAG_JOIN_GRANT (0x0100)	no	also 213 (tag 0x0000 HEAD_MARK)
+reac-pw	tests/test_reac_courtship.c:44	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_courtship.c:48	#define FPS 8000	NEW:PKT_RATE_96K=8000	no	
+reac-pw	tests/test_reac_courtship.c:121	build_flood_filler(..., 16, NULL,	NEW:MODEL_S1608_IN_CH=16	no	also 137, 141, 147, 154, 158, 163, 204, 240
+reac-pw	tests/test_reac_courtship.c:185	sf + 18	CTRL_BLOCK_OFF	yes	
+reac-pw	tests/test_reac_courtship.c:205	.sample_rate = 96000	NEW:RATE_96K=96000	no	also 241, 290, 351, 405
+reac-pw	tests/test_reac_ctrl.c:16	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_ctrl.c:42	{ 0x20, REAC_HEADAMP_SENS, 0x00 }	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	S-1608 base channel
+reac-pw	tests/test_reac_ctrl.c:43	{ 0x2f, ...}	DERIVED:HEADAMP_CH_SPAN-1	derived	last addressable head-amp channel
+reac-pw	tests/test_reac_ctrl.c:56	f[36], f[37], f[38]	NEW:HEADAMP_REC_CH_OFF=36 (frame)	no	CH/PARAM/VALUE after DT1 addr; = DT1_PAYLOAD_OFF_IN_BLOCK+CTRL_BLOCK_OFF-2
+reac-pw	tests/test_reac_ctrl.c:64	wrong[39]	NEW:HEADAMP_REC_CKSUM_OFF=39 (frame)	no	record checksum byte
+reac-pw	tests/test_reac_ctrl.c:66	reac_ctrl_record_cksum_stamp(wrong + 34, 6)	NEW:DT1_TAG_OFF=34 (frame) / NEW:HEADAMP_REC_LEN=6	no	TAG..CKSUM span summed to CTRL_RECORD_SUM
+reac-pw	tests/test_reac_ctrl.c:76	(..., 16, NULL, 12)	NEW:MODEL_S1608_IN_CH=16 / SAMPLES_PER_PKT	no	12 literal = SAMPLES_PER_PKT; repeated ~25x in file
+reac-pw	tests/test_reac_ctrl.c:77	CHK(m == 628)	DERIVED:FRAME_OVERHEAD+16*BYTES_PER_CHANNEL	derived	also 94, 127, 155, 157, 159
+reac-pw	tests/test_reac_ctrl.c:81	f[626] == 0xc2 && f[627] == 0xea	END_MARKER_0/1 ; DERIVED:628-2	yes	also 97, 130
+reac-pw	tests/test_reac_ctrl.c:95	f[16] == 0xcd && f[17] == 0xea	TYPE_CONTROL	yes	
+reac-pw	tests/test_reac_ctrl.c:96	f[18]==0x01 && f[19]==0x03 && f[20]==0x00 && f[21]==0x01 && f[22]==0x81	LINK_CONTROL / SEG_SINGLE / LEN_SUB_LINK_ACK / SUB_0103_LINK_ACK	yes	heartbeat header
+reac-pw	tests/test_reac_ctrl.c:99	f[49] == 0x7a	CTRL_CKSUM_OFF ; NEW:FILLER_DESC_GRANTED=0x7a?	yes	checksum offset; value is computed sum
+reac-pw	tests/test_reac_ctrl.c:110	build_box_hb(..., 8) == 340	DERIVED:FRAME_OVERHEAD+8*BYTES_PER_CHANNEL	derived	
+reac-pw	tests/test_reac_ctrl.c:111	f[338] == 0xc2 && f[339] == 0xea	END_MARKER_0/1	yes	
+reac-pw	tests/test_reac_ctrl.c:112	build_box_hb(..., 40) == 1492	FRAME_BYTES / MAX_CHANNELS	yes	
+reac-pw	tests/test_reac_ctrl.c:115	build_box_hb(..., 42) == 0	DERIVED:>MAX_CHANNELS	derived	
+reac-pw	tests/test_reac_ctrl.c:120	float chbuf[16][12]	SAMPLES_PER_PKT	yes	also 123, 131, 132, 135, 136
+reac-pw	tests/test_reac_ctrl.c:129	f[18 + 2 * k] == 0x00 && ... == 0x7a	NEW:FILLER_DESC_GRANTED=0x7a	no	upstream filler control area pattern (fake_box_master.c:163 comment)
+reac-pw	tests/test_reac_ctrl.c:131	pcm[16 * 12 * 3]	SAMPLES_PER_PKT / RESOLUTION	yes	
+reac-pw	tests/test_reac_ctrl.c:137	p3[0] | p3[1]<<8 | p3[2]<<16 ; 0x800000	RESOLUTION (24-bit)	yes	s24 sign extension
+reac-pw	tests/test_reac_ctrl.c:150	f[18] == 0x04 && f[19] == 0x03	LINK_RECORD / SEG_SINGLE	yes	
+reac-pw	tests/test_reac_ctrl.c:155	f[20]==0x00 && f[21]==0x13 && f[49]==0x02	NEW:COLDCONNECT_LEN_0013=0x13	no	cold-connect record lengths 0x13/0x16/0x1a/0x14; libreac builder names
+reac-pw	tests/test_reac_ctrl.c:157	f[21] == 0x16	NEW:COLDCONNECT_LEN_0016=0x16	no	
+reac-pw	tests/test_reac_ctrl.c:159	f[21] == 0x1a	NEW:COLDCONNECT_LEN_001A=0x1a	no	
+reac-pw	tests/test_reac_ctrl.c:177	f[18]==0x04 && f[19]==0x03 && f[20]==0x00 && f[21]==0x14 && f[22]==0x00 && f[23]==0x02	LINK_RECORD / SEG_SINGLE / NEW:COLDCONNECT_LEN=0x14 / SUB_0403_BOX_RETURN	yes	
+reac-pw	tests/test_reac_ctrl.c:191	LENS[] = { 0x13, 0x15, 0x1f, 0x00 }	NEW:COLDCONNECT_LEN_*	no	wrong-length probes
+reac-pw	tests/test_reac_ctrl.c:204	f[49] ^= 0x5a	CTRL_CKSUM_OFF	yes	
+reac-pw	tests/test_reac_ctrl.c:207	f[34] = 0x07; f[35] = 0x77	NEW:DT1_TAG_OFF=34 (frame)	no	DT1 tag offset in frame
+reac-pw	tests/test_reac_ctrl.c:234	f[22] = 0x00	DERIVED:CTRL_BLOCK_OFF+SUB_0103_OFF	derived	clear heartbeat subtype
+reac-pw	tests/test_reac_ctrl.c:257	{ "", 16 }, { "", 8 }, { "", 32 }	NEW:MODEL_S1608_IN=16, S0808=8, S4000S_IN=32	no	
+reac-pw	tests/test_reac_ctrl.c:271	f[REAC_CTRL_BLOCK_OFF + 8]	PORTS_TABLE_OFF	yes	
+reac-pw	tests/test_reac_ctrl.c:318	FORMS { 0x01,0x00,0x7f,0x00,0x01,0x03,0x08,0x43,0x05 }	NEW:SPLIT_ANNOUNCE forms	no	fixture data (split announce bodies)
+reac-pw	tests/test_reac_ctrl.c:326	f[12] = 0x88; f[13] = 0x19	ETHERTYPE	yes	
+reac-pw	tests/test_reac_ctrl.c:327	f[16] = 0xce; f[17] = 0xea	NEW:TYPE_SPLIT_ANNOUNCE=0xceea	no	split-device type word; REAC_CTRL_SPLIT_ANNOUNCE
+reac-pw	tests/test_reac_ctrl.c:329	memcpy(f + 27, SRC, 6)	NEW:SPLIT_ANNOUNCE_MAC_OFF=27	no	
+reac-pw	tests/test_reac_ctrl.c:353	uint8_t blk[34]	TYPED_BLOCK_LEN	yes	also 396, 416
+reac-pw	tests/test_reac_ctrl.c:355	blk[0] == 0xcd && blk[1] == 0xea	TYPE_CONTROL	yes	
+reac-pw	tests/test_reac_ctrl.c:358	for (int i = 2; i < 34; i++) ... (sum & 0xff) == 0	CTRL_BLOCK_LEN / CTRL_BLOCK_SUM	yes	
+reac-pw	tests/test_reac_ctrl.c:362	(blk[4] << 8) | blk[5]	DERIVED:2+HDR_LEN_OFF	derived	typed offset of length
+reac-pw	tests/test_reac_ctrl.c:364	blk[2] == 0x01 && blk[3] == 0x01	OP_SCENE_HEADER	yes	
+reac-pw	tests/test_reac_ctrl.c:366	(blk[7] << 8) | blk[8]	DERIVED:2+SCENE_HEAD_TOTAL_OFF	derived	
+reac-pw	tests/test_reac_ctrl.c:367	blk + 9	DERIVED:2+SCENE_HEAD_PAY_OFF	derived	
+reac-pw	tests/test_reac_ctrl.c:370	blk[2] == 0x01 && blk[3] == 0x00	OP_SCENE_CHUNK	yes	
+reac-pw	tests/test_reac_ctrl.c:372	blk + 7	DERIVED:2+SCENE_CHUNK_PAY_OFF	derived	also 378
+reac-pw	tests/test_reac_ctrl.c:376	blk[2] == 0x01 && blk[3] == 0x02	OP_SCENE_FINAL	yes	
+reac-pw	tests/test_reac_ctrl.c:417	build_scene_step(..., 33) / (..., 34)	DERIVED:1+SCENE_TAG_SYSP_OFF chunk index 32/33	derived	YAML: SYSP rides chunk 32, SCEN chunk 33
+reac-pw	tests/test_reac_ctrl.c:419	memmem(c32 + 7, 26, ...)	DERIVED:2+SCENE_CHUNK_PAY_OFF / SCENE_CHUNK_BYTES	derived	also 420
+reac-pw	tests/test_reac_disco.c:29	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_disco.c:56	build_box_hb(..., 16)	NEW:MODEL_S1608_IN_CH=16	no	repeated ~15x
+reac-pw	tests/test_reac_disco.c:57	CHK(n == 628)	DERIVED:FRAME_OVERHEAD+16*BYTES_PER_CHANNEL	derived	
+reac-pw	tests/test_reac_disco.c:70	f[49] ^= 0xff	CTRL_CKSUM_OFF	yes	
+reac-pw	tests/test_reac_disco.c:87	(..., 16, NULL, 12)	SAMPLES_PER_PKT	yes	also 100, 107, 123, 130, 172
+reac-pw	tests/test_reac_disco.c:149	build_config_announce(..., 8)	NEW:MODEL_S0808_CH=8	no	also 163
+reac-pw	tests/test_reac_disco.c:152	p.opcode == 0x84	SUB_0103_COMMIT_REPORT_84	yes	S-0808 selector
+reac-pw	tests/test_reac_disco.c:159	in_ch == 8 && out_ch == 8	NEW:MODEL_S0808_CH=8	no	
+reac-pw	tests/test_reac_disco.c:241	.channels = 8	NEW:MODEL_S0808_CH=8	no	also 244
+reac-pw	tests/test_reac_disco.c:246	wide.channels = 32	NEW:MODEL_S4000S_IN=32	no	also 248, 253
+reac-pw	tests/test_reac_disco.c:267	i <= 8000	NEW:PKT_RATE_96K=8000	no	one second of frames at 96k
+reac-pw	tests/test_reac_disco.c:268	125000ULL	NEW:PKT_PERIOD_96K_NS=125000	no	comment: 8000 fps
+reac-pw	tests/test_reac_disco.c:369	{ 0x00, 0x40, 0xab, 0x77, 0x77, 0x77 }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_disco.c:371	SPLIT_FIRST { 0x01,0x00,0x7f,0x00,0x01,0x03,0x08,0x43,0x05 }	NEW:SPLIT_ANNOUNCE body	no	fixture data (S-4000H split announce)
+reac-pw	tests/test_reac_disco.c:375	f[12] = 0x88; f[13] = 0x19	ETHERTYPE	yes	
+reac-pw	tests/test_reac_disco.c:376	f[16] = 0xce; f[17] = 0xea	NEW:TYPE_SPLIT_ANNOUNCE=0xceea	no	split device type word
+reac-pw	tests/test_reac_disco.c:377	memcpy(f + 18, ...)	CTRL_BLOCK_OFF	yes	
+reac-pw	tests/test_reac_disco.c:378	memcpy(f + 27, SPLIT, 6)	NEW:SPLIT_ANNOUNCE_MAC_OFF=27	no	
+reac-pw	tests/test_reac_encode_golden.c:87	NS[5] = { 0, 1, 6, 12, 13 }	SAMPLES_PER_PKT	yes	12 and 13 probe the per-packet sample count edge
+reac-pw	tests/test_reac_encode_golden.c:107	NCH[8] = { 0, 1, 2, 7, 8, 16, 32, 40 }	MAX_CHANNELS / NEW:MODEL_S0808_CH, MODEL_S1608_IN_CH, MODEL_S4000S_IN	yes	channel-count probe table
+reac-pw	tests/test_reac_encode_golden.c:120	{ 0x00, 0x40, 0xab, ...}	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data), also 148
+reac-pw	tests/test_reac_encode_golden.c:131	NCH[6] = { 2, 8, 16, 32, 38, 40 }	MAX_CHANNELS / NEW:MODEL_S0808_CH, MODEL_S1608_IN_CH, MODEL_S4000S_IN	yes	
+reac-pw	tests/test_reac_encode_golden.c:207	(..., 0, 16, NULL, REAC_SAMPLES_PER_PKT) == 628	DERIVED:FRAME_OVERHEAD+16*BYTES_PER_CHANNEL	derived	
+reac-pw	tests/test_reac_fsm.c:12	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_gain.c:78	float b0[12], b1[12]	SAMPLES_PER_PKT	yes	also 79, 80, 81, 82
+reac-pw	tests/test_reac_grant.c:34	#define ROW(f) ((f) - 16)	TYPED_BLOCK_OFF	yes	local re-declaration
+reac-pw	tests/test_reac_grant.c:35	r[ROW(32)] == 0x12 && r[ROW(33)] == 0x12 && r[ROW(34)] == 0x01 && r[ROW(35)] == 0x01	NEW:DT1_CMD=0x12 / DT1_TAG_HEAD_AMP ; NEW:DT1_TAG_OFF=34 (frame)	no	group-A row = head-amp DT1
+reac-pw	tests/test_reac_grant.c:37	r[ROW(32)] == 0x12 && r[ROW(33)] == 0x11	NEW:GRANT_GROUPB_MARK=0x12,0x11	no	group-B rows; GOLD_S1608_SWEEP capture matrix-m200-s1608-2026-07-11
+reac-pw	tests/test_reac_grant.c:38	r[ROW(36)] / ROW(37) / ROW(38)	NEW:HEADAMP_REC_CH_OFF=36, PARAM_OFF=37, VALUE_OFF=38 (frame)	no	lines 38-40
+reac-pw	tests/test_reac_grant.c:54	reac_grant_allocate(&a, 0x20, 16)	DERIVED:2*HEADAMP_BASE_MULTIPLIER / MODEL_S1608_IN=16	derived	also 55, 79, 328, 367
+reac-pw	tests/test_reac_grant.c:57	reac_grant_allocate(&a, 0x00, 8)	NEW:MODEL_S0808_CH=8	no	also 58, 70
+reac-pw	tests/test_reac_grant.c:60	reac_grant_allocate(&a, 0x00, 32)	NEW:MODEL_S4000S_IN=32	no	also 61, 72, 81
+reac-pw	tests/test_reac_grant.c:68	0x10	HEADAMP_BASE_MULTIPLIER (strap 1)	yes	also 69
+reac-pw	tests/test_reac_grant.c:80	reac_grant_alloc_fits(0x20, 32) == 0	DERIVED:HEADAMP_CH_SPAN bound	derived	also 99
+reac-pw	tests/test_reac_grant.c:82	reac_grant_alloc_fits(0x2f, 1)	DERIVED:HEADAMP_CH_SPAN-1	derived	
+reac-pw	tests/test_reac_grant.c:83	reac_grant_alloc_fits(0x30, 1) == 0	HEADAMP_CH_SPAN	yes	also 100
+reac-pw	tests/test_reac_grant.c:84	reac_grant_alloc_fits(0x29, 8) == 0	DERIVED:HEADAMP_CH_SPAN	derived	0x29+8 > 0x30
+reac-pw	tests/test_reac_grant.c:113	sweep[REAC_GRANT_SWEEP_MAX][34]	TYPED_BLOCK_LEN	yes	also 260, 261, 266, 330, 370
+reac-pw	tests/test_reac_grant.c:114	{ .base = 0x20, .width = 16 }	DERIVED:2*HEADAMP_BASE_MULTIPLIER / MODEL_S1608_IN=16	derived	also 369
+reac-pw	tests/test_reac_grant.c:116	CHK(n == 56)	DERIVED:16*HEADAMP_SWEEP_RECORDS_PER_CH+8	derived	S-1608 grant sweep length (also 162, 225, 263, 269, 372)
+reac-pw	tests/test_reac_grant.c:135	ga == 16 * 3	DERIVED:MODEL_S1608_IN*HEADAMP_SWEEP_RECORDS_PER_CH	derived	
+reac-pw	tests/test_reac_grant.c:136	gb == 6	NEW:GRANT_GROUPB_ROWS=6	no	group-B row count, S-1608 golden sweep (also 271)
+reac-pw	tests/test_reac_grant.c:144	{ .base = 0x00, .width = 8 }	NEW:MODEL_S0808_CH=8	no	
+reac-pw	tests/test_reac_grant.c:145	== 32	DERIVED:8*HEADAMP_SWEEP_RECORDS_PER_CH+8	derived	also 262, 268
+reac-pw	tests/test_reac_grant.c:146	{ .base = 0x00, .width = 32 }	NEW:MODEL_S4000S_IN=32	no	also 150
+reac-pw	tests/test_reac_grant.c:147	== 104	DERIVED:32*HEADAMP_SWEEP_RECORDS_PER_CH+8	derived	also 264, 270
+reac-pw	tests/test_reac_grant.c:164	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data), also 407
+reac-pw	tests/test_reac_grant.c:175	memcmp(sweep[i], ref + 16, 34)	TYPED_BLOCK_OFF / TYPED_BLOCK_LEN	yes	
+reac-pw	tests/test_reac_grant.c:184	for (int b = 2; b < 34; b++) ... (sum & 0xff) == 0	CTRL_BLOCK_LEN / CTRL_BLOCK_SUM	yes	also 186
+reac-pw	tests/test_reac_grant.c:212	reac_headamp_sens_db(0x00, 0) == -10	DERIVED:HEADAMP_SENS_REF_CDB/100	derived	
+reac-pw	tests/test_reac_grant.c:220	reac_headamp_tx_set(&tx, 0x20, ...)	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	0x20/0x21/0x2f used lines 220-251
+reac-pw	tests/test_reac_grant.c:222	0x2f	DERIVED:HEADAMP_CH_SPAN-1	derived	also 234, 235, 380, 383
+reac-pw	tests/test_reac_grant.c:252	reac_grant_headamp_value(&tx, 0x20, 0x03)	DERIVED:HEADAMP_SWEEP_RECORDS_PER_CH (first invalid param)	derived	
+reac-pw	tests/test_reac_grant.c:277	B_EXPECT[6][3] = {{0x00,0x00,0x04},...}	NEW:GRANT_GROUPB rows	no	fixture data from golden sweep
+reac-pw	tests/test_reac_grant.c:285	b16[i][ROW(49)] == 0x03	CTRL_CKSUM_OFF	yes	checksum byte offset; value 0x03 fixture
+reac-pw	tests/test_reac_grant.c:295	row_ch(sw16[i]) == 0x20	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	also 303 (0x21)
+reac-pw	tests/test_reac_grant.c:298	i <= 10 / i = 11	NEW:GRANT_SWEEP_HEAD_ROWS=11	no	row layout of golden sweep (1+3+1+6)
+reac-pw	tests/test_reac_grant.c:304	k % 3	HEADAMP_SWEEP_RECORDS_PER_CH	yes	also 303 k / 3
+reac-pw	tests/test_reac_grant.c:360	REAC_AUDIO_FABRIC_SLOTS == 40	MAX_CHANNELS	yes	macro pinned against literal
+reac-pw	tests/test_reac_grant.c:361	REAC_HEADAMP_SLOTS == 48	HEADAMP_CH_SPAN	yes	macro pinned against literal
+reac-pw	tests/test_reac_grant.c:362	REAC_HEADAMP_CEILING == 0x2f	DERIVED:HEADAMP_CH_SPAN-1	derived	macro pinned against literal
+reac-pw	tests/test_reac_grant.c:400	reac_boxreg_declare(&r, 16, "", 32) == -1	DERIVED:MODEL_S1608_IN+32 > MAX_CHANNELS	derived	also 402 (24)
+reac-pw	tests/test_reac_grant.c:410	reac_boxreg_add(&q, A, 32)	NEW:MODEL_S4000S_IN=32	no	also 411
+reac-pw	tests/test_reac_grant.c:412	reac_boxreg_add(&q, B, 16) == -1	NEW:MODEL_S1608_IN_CH=16	no	also 413 (8)
+reac-pw	tests/test_reac_grant.c:414	base == 32 && base + nch == 40	MAX_CHANNELS	yes	
+reac-pw	tests/test_reac_grant_dwell.c:40	#define FPS 8000	NEW:PKT_RATE_96K=8000	no	
+reac-pw	tests/test_reac_grant_dwell.c:43	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_grant_dwell.c:69	reac_master_set_box(&m, 32, 8, 0x00)	NEW:MODEL_S4000S_IN=32/OUT=8	no	also 89
+reac-pw	tests/test_reac_headamp.c:15	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_headamp.c:27	WIRE_SENS_BLOCK[32]	CTRL_BLOCK_LEN	yes	array bytes are captured wire (fixture data)
+reac-pw	tests/test_reac_headamp.c:43	f[16] == 0xcd && f[17] == 0xea	TYPE_CONTROL	yes	
+reac-pw	tests/test_reac_headamp.c:44	f[18]==0x04 && f[19]==0x03 && f[20]==0x00 && f[21]==0x13	LINK_RECORD / SEG_SINGLE / NEW:HEADAMP_REC_BLK_LEN=0x13	no	head-amp record length (also test_reac_headamp.c:75 0x0013)
+reac-pw	tests/test_reac_headamp.c:45	f[22]==0x00 && f[23]==0x02 && f[24]==0x00 && f[25]==0xfe	NEW:DT1_CONTAINER_HDR (0x02, 0xfe)	no	container prefix; 0x02 at block[5] vs SUB_0403_BOX_RETURN?
+reac-pw	tests/test_reac_headamp.c:46	f[26] == 0x0e	NEW:HEADAMP_SYSEX_LEN=0x0e	no	SysEx length byte
+reac-pw	tests/test_reac_headamp.c:47	f[27]==0xf0 && f[28]==0x41 && f[29]==0x0a	NEW:SYSEX_START=0xf0, ROLAND_ID=0x41, DEVICE_ID=0x0a	no	Roland SysEx framing
+reac-pw	tests/test_reac_headamp.c:48	f[32] == 0x12 && f[33] == 0x12	NEW:DT1_CMD=0x12	no	
+reac-pw	tests/test_reac_headamp.c:49	f[34] == 0x01 && f[35] == 0x01	DT1_TAG_HEAD_AMP ; NEW:DT1_TAG_OFF=34 (frame)	yes	
+reac-pw	tests/test_reac_headamp.c:50	f[36] == 0x00 && f[37] == 0x00 && f[38] == 0x01	NEW:HEADAMP_REC_CH/PARAM/VALUE_OFF=36/37/38	no	
+reac-pw	tests/test_reac_headamp.c:51	f[39] == 0x7d	NEW:HEADAMP_REC_CKSUM_OFF=39	no	value computed
+reac-pw	tests/test_reac_headamp.c:52	f[40] == 0xf7	NEW:SYSEX_EOX=0xf7	no	
+reac-pw	tests/test_reac_headamp.c:53	f[n - 2] == 0xc2 && f[n - 1] == 0xea	END_MARKER_0/1	yes	
+reac-pw	tests/test_reac_headamp.c:58	for (int i = 34; i <= 39; i++)	NEW:DT1_TAG_OFF=34 .. HEADAMP_REC_CKSUM_OFF=39	no	record sum span; also 100
+reac-pw	tests/test_reac_headamp.c:59	for (int i = 18; i < 50; i++)	CTRL_BLOCK_OFF..CTRL_BLOCK_END	yes	
+reac-pw	tests/test_reac_headamp.c:60	(rec & 0xff) == 0x80	CTRL_RECORD_SUM	yes	also 101
+reac-pw	tests/test_reac_headamp.c:61	((f[36]+f[37]+f[38]+f[39]) & 0xff) == 0x7e	NEW:DT1_ROLAND_CKSUM (addr+data+sum ≡ 0 mod 128)	no	Roland checksum form; comment line 25
+reac-pw	tests/test_reac_headamp.c:62	(blk & 0xff) == 0	CTRL_BLOCK_SUM	yes	
+reac-pw	tests/test_reac_headamp.c:65	f[49] == 0x02	CTRL_CKSUM_OFF	yes	
+reac-pw	tests/test_reac_headamp.c:75	p.blk_len == 0x0013	NEW:HEADAMP_REC_BLK_LEN=0x13	no	
+reac-pw	tests/test_reac_headamp.c:82	memcmp(f + 18, WIRE_SENS_BLOCK, 32)	CTRL_BLOCK_OFF / CTRL_BLOCK_LEN	yes	also 85, 86, 122
+reac-pw	tests/test_reac_headamp.c:96	0x2f	DERIVED:HEADAMP_CH_SPAN-1	derived	also 104
+reac-pw	tests/test_reac_headamp.c:114	frame[14] = 0x11; frame[15] = 0x22	HDR_COUNTER_OFF	yes	also 126
+reac-pw	tests/test_reac_headamp.c:115	for (int i = 50; i < REAC_FRAME_BYTES - 2; i++)	AUDIO_OFFSET / DERIVED:END marker len 2	yes	
+reac-pw	tests/test_reac_headamp.c:117	frame[REAC_FRAME_BYTES - 2] = 0xc2	END_MARKER_0	yes	also 118 (0xea), 127
+reac-pw	tests/test_reac_headamp.c:128	frame[50]	AUDIO_OFFSET	yes	
+reac-pw	tests/test_reac_headamp.c:135	memcmp(frame + 16, built + 16, 34)	TYPED_BLOCK_OFF / TYPED_BLOCK_LEN	yes	
+reac-pw	tests/test_reac_headamp.c:141	stamp_headamp(frame, 0x00, 0x03, 0x00) == -1	DERIVED:HEADAMP_SWEEP_RECORDS_PER_CH (first invalid param)	derived	also 173
+reac-pw	tests/test_reac_headamp.c:151	f[39] ^= 0xff	NEW:HEADAMP_REC_CKSUM_OFF=39	no	
+reac-pw	tests/test_reac_headamp.c:163	f[34] == 0x01 && f[35] == 0x00	DT1_TAG_JOIN_GRANT ; NEW:DT1_TAG_OFF=34	yes	
+reac-pw	tests/test_reac_headamp.c:166	f[34] == 0x03 && f[35] == 0x02	DT1_TAG_BOX_READY	yes	
+reac-pw	tests/test_reac_headamp.c:169	f[34] == 0x05 && f[35] == 0x00	DT1_TAG_IDENTITY	yes	
+reac-pw	tests/test_reac_headamp.c:176	REAC_HEADAMP_SENS, 0x38) == 0	HEADAMP_SENS_STEPS	yes	first out-of-range step
+reac-pw	tests/test_reac_headamp.c:207	sens_cdb(0x00, 0) == -1000	HEADAMP_SENS_REF_CDB	yes	also 213
+reac-pw	tests/test_reac_headamp.c:208	sens_cdb(0x37, 0) == -6500	DERIVED:SENS_REF_CDB-SENS_MAX*SENS_STEP_CDB	derived	0x37 = HEADAMP_SENS_MAX; also 214
+reac-pw	tests/test_reac_headamp.c:209	sens_cdb(0x00, 1) == 1000	DERIVED:SENS_REF_CDB+PAD_CDB	derived	
+reac-pw	tests/test_reac_headamp.c:210	sens_cdb(0x37, 1) == -4500	DERIVED:REF-55*STEP+PAD	derived	
+reac-pw	tests/test_reac_headamp.c:211	sens_db(0x00, 0) == -10	DERIVED:SENS_REF_CDB/100	derived	also 212 (-65)
+reac-pw	tests/test_reac_headamp.c:231	== 100	HEADAMP_SENS_STEP_CDB	yes	
+reac-pw	tests/test_reac_headamp.c:255	sens_value(-99, 0) == 0x37	HEADAMP_SENS_MAX	yes	
+reac-pw	tests/test_reac_headamp_live.c:37	& 0x37	HEADAMP_SENS_MAX	yes	used as mask to stay in range
+reac-pw	tests/test_reac_headamp_prop.c:68	kv_int(&b, "", 0x38)	HEADAMP_SENS_STEPS	yes	out-of-range sens
+reac-pw	tests/test_reac_headamp_state.c:61	FX_L4_HEADAMP[34]	TYPED_BLOCK_LEN	yes	bytes are captured wire (fixture data)
+reac-pw	tests/test_reac_headamp_state.c:66	#define CTRL_OFF 16	TYPED_BLOCK_OFF	yes	local re-declaration of fact
+reac-pw	tests/test_reac_headamp_state.c:155	frame[REAC_FRAME_BYTES - 2] == 0xc2 && ... == 0xea	END_MARKER_0/1	yes	
+reac-pw	tests/test_reac_headamp_state.c:180	reac_headamp_cfg_decide(0, 16, 32)	NEW:MODEL_S1608_IN=16 / DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	strap 32 = 0x20; also 181, 191, 196, 248-282, 396
+reac-pw	tests/test_reac_headamp_state.c:298	kv_int(&b, "", 0x38)	HEADAMP_SENS_STEPS	yes	
+reac-pw	tests/test_reac_headamp_state.c:299	0x20	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	also 303
+reac-pw	tests/test_reac_headamp_state.c:423	reac_headamp_tx_arm_scene(&p.headamp, 32, 16)	DERIVED:2*HEADAMP_BASE_MULTIPLIER / MODEL_S1608_IN=16	derived	
+reac-pw	tests/test_reac_headamp_tx.c:44	reac_headamp_tx_set(&t, 0, 0x03, 0) == -1	DERIVED:HEADAMP_SWEEP_RECORDS_PER_CH	derived	first invalid param
+reac-pw	tests/test_reac_headamp_tx.c:46	REAC_HEADAMP_SENS, 0x38) == -1	HEADAMP_SENS_STEPS	yes	
+reac-pw	tests/test_reac_headamp_tx.c:83	0x2f	DERIVED:HEADAMP_CH_SPAN-1	derived	also 91
+reac-pw	tests/test_reac_headamp_tx.c:99	reac_headamp_tx_arm_scene(&rp, 0x00, 8)	NEW:MODEL_S0808_CH=8	no	also 129, 145, 198, 226, 288
+reac-pw	tests/test_reac_headamp_tx.c:102	8 * 3 * REAC_HEADAMP_SWEEP_STRIDE	HEADAMP_SWEEP_RECORDS_PER_CH	yes	3 literal beside the NPARAMS macro; also 132, 151, 162, 200, 228, 255, 267, 290
+reac-pw	tests/test_reac_headamp_tx.c:115	last_ch == 7	DERIVED:MODEL_S0808_CH-1	derived	
+reac-pw	tests/test_reac_headamp_tx.c:139	records == 24	DERIVED:8*HEADAMP_SWEEP_RECORDS_PER_CH	derived	also 154, 203, 228, 231, 290, 293
+reac-pw	tests/test_reac_headamp_tx.c:195	(uint32_t)8000 * REAC_HEADAMP_RESWEEP_SECONDS	NEW:PKT_RATE_96K=8000	no	
+reac-pw	tests/test_reac_hunt.c:31	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_hunt.c:40	build_box_hb(f, DESK, BOX, 0x11, 16)	NEW:MODEL_S1608_IN_CH=16	no	
+reac-pw	tests/test_reac_hunt.c:50	(..., n_ch, NULL, 12)	SAMPLES_PER_PKT	yes	also 92
+reac-pw	tests/test_reac_hunt.c:61	uint8_t f[50]	L2_HEADER_LEN	yes	header-only frame
+reac-pw	tests/test_reac_hunt.c:65	f[12] = 0x88; f[13] = 0x19	ETHERTYPE	yes	
+reac-pw	tests/test_reac_hunt.c:66	f[16] = 0xcd; f[17] = 0xea	TYPE_CONTROL	yes	
+reac-pw	tests/test_reac_hunt.c:67	f + 18	CTRL_BLOCK_OFF	yes	
+reac-pw	tests/test_reac_hunt.c:69	block[1] = 0x03	SEG_SINGLE	yes	
+reac-pw	tests/test_reac_hunt.c:80	build_headamp(..., 0x20, 0, 1)	DERIVED:2*HEADAMP_BASE_MULTIPLIER / HEADAMP_PARAM_PHANTOM	derived	also 93, 105
+reac-pw	tests/test_reac_hunt.c:92	build_flood_filler(..., 32, NULL, 12)	NEW:MODEL_S4000S_IN=32	no	
+reac-pw	tests/test_reac_hunt.c:164	box_flood(&h, BOX, 16, t0)	NEW:MODEL_S1608_IN_CH=16	no	also 286, 297
+reac-pw	tests/test_reac_hunt.c:192	h.arb.rival_channels == 32	NEW:MODEL_S4000S_IN=32	no	also 319
+reac-pw	tests/test_reac_hunt_captures.c:60	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	capture MACs (fixture data)
+reac-pw	tests/test_reac_hunt_captures.c:185	rival_channels == 16	NEW:MODEL_S1608_IN_CH=16	no	also 204
+reac-pw	tests/test_reac_hunt_captures.c:223	rival_channels == 40	MAX_CHANNELS	yes	M-200 desk width
+reac-pw	tests/test_reac_hunt_captures.c:262	synth[12] = 0x88; synth[13] = 0x19	ETHERTYPE	yes	
+reac-pw	tests/test_reac_hunt_captures.c:263	synth[16] = 0xce; synth[17] = 0xea	NEW:TYPE_SPLIT_ANNOUNCE=0xceea	no	comment: the split device's own type word
+reac-pw	tests/test_reac_lat.c:22	const int rate = 48000	NEW:RATE_48K=48000	no	
+reac-pw	tests/test_reac_lat.c:27	(76 * 12)	SAMPLES_PER_PKT	yes	12 literal beside REAC_SAMPLES_PER_PKT on line 26
+reac-pw	tests/test_reac_link_budget.c:19	reac_link_master_pps(96000) == 8000	NEW:RATE_96K / PKT_RATE_96K (DERIVED:/SAMPLES_PER_PKT)	no	
+reac-pw	tests/test_reac_link_budget.c:20	reac_link_master_pps(48000) == 4000	NEW:RATE_48K / PKT_RATE_48K	no	
+reac-pw	tests/test_reac_link_budget.c:21	reac_link_master_pps(44100) == 3675	NEW:RATE_44K1 / PKT_RATE_44K1	no	
+reac-pw	tests/test_reac_link_budget.c:26	reac_link_master_pps(96000)	NEW:RATE_96K=96000	no	also 42 (48000)
+reac-pw	tests/test_reac_link_budget.c:27	one == 97024	DERIVED:8000*(FRAME_BYTES+24)*8/1000	derived	24 = ethernet preamble+FCS+IFG (not REAC)
+reac-pw	tests/test_reac_link_budget.c:29	reac_link_cost_kbit(8000, 0)	NEW:PKT_RATE_96K=8000	no	
+reac-pw	tests/test_reac_link_budget.c:43	half == 48512	DERIVED:4000*(FRAME_BYTES+24)*8/1000	derived	
+reac-pw	tests/test_reac_mac.c:20	s1608 { 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_mac.c:55	out[0] == 0x00 && out[1] == 0x40 && out[2] == 0xab	NEW:ROLAND_OUI=00:40:ab	no	expects derived source MAC to carry Roland OUI
+reac-pw	tests/test_reac_master.c:46	#define S1608_BASE 0x20	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	S-1608 head-amp base
+reac-pw	tests/test_reac_master.c:58	GOLD_SUB01[34]	TYPED_BLOCK_LEN	yes	bytes captured (fixture data); also GOLD_SUB02 line 60
+reac-pw	tests/test_reac_master.c:65	ZONEA_JOIN[32]	CTRL_BLOCK_LEN	yes	bytes captured (fixture data)
+reac-pw	tests/test_reac_master.c:70	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_master.c:78	#define FPS 8000	NEW:PKT_RATE_96K=8000	no	
+reac-pw	tests/test_reac_master.c:143	reac_master_set_box(m, 16, 8, S1608_BASE)	NEW:MODEL_S1608_IN_CH/OUT_CH=16/8	no	also 214, 291, 300, 326, 336, 538, 626, 855
+reac-pw	tests/test_reac_master.c:177	m.chanmap_nframes == 49	CHANMAP_RING_LEN	yes	
+reac-pw	tests/test_reac_master.c:184	memcmp(f + 16, M300_CHANMAP_FE, 34)	TYPED_BLOCK_OFF / TYPED_BLOCK_LEN	yes	also 312, 565
+reac-pw	tests/test_reac_master.c:186	f[16] == 0xcd && f[17] == 0xea	TYPE_CONTROL	yes	also 311, 368, 833
+reac-pw	tests/test_reac_master.c:187	f[18] == 0x01 && f[19] == 0x03	LINK_CONTROL / SEG_SINGLE	yes	
+reac-pw	tests/test_reac_master.c:188	f[20] == 0x00 && f[21] == 0x19	LEN_SUB_CHANMAP	yes	
+reac-pw	tests/test_reac_master.c:195	f[16] == 0xcf && f[17] == 0xea	TYPE_ANNOUNCE	yes	
+reac-pw	tests/test_reac_master.c:199	34 - M300_CFEA_MAC_IDX - 6 - 1	TYPED_BLOCK_LEN	yes	
+reac-pw	tests/test_reac_master.c:201	f[16 + 17] == 0x28 && f[16 + 18] == 0x08	MAX_CHANNELS ; NEW:ANNOUNCE_WIDTH_OFF=17, ANNOUNCE_BOX_WIDTH_OFF=18	yes	cfea width + enrolled box width
+reac-pw	tests/test_reac_master.c:216	f[16 + 18] == 0x10	NEW:ANNOUNCE_BOX_WIDTH_OFF=18 / MODEL_S1608_IN=16	no	also 293
+reac-pw	tests/test_reac_master.c:219	reac_master_set_box(&mw, 8, 8, S0808_BASE)	NEW:MODEL_S0808_CH=8	no	also 259, 330, 819
+reac-pw	tests/test_reac_master.c:221	f[16 + 18] == 0x08	NEW:ANNOUNCE_BOX_WIDTH_OFF=18 / MODEL_S0808=8	no	also 261, 285
+reac-pw	tests/test_reac_master.c:262	f[16 + 20] == 0x00 && f[16 + 21] == 0x00	NEW:ANNOUNCE_ENROLLED_OFF=20..21 (typed)	no	also 278-279, 286, 294
+reac-pw	tests/test_reac_master.c:311	f[18] == 0x04 && f[19] == 0x03	LINK_RECORD / SEG_SINGLE	yes	
+reac-pw	tests/test_reac_master.c:327	alloc.base == 0x20 && alloc.width == 16	DERIVED:2*HEADAMP_BASE_MULTIPLIER / MODEL_S1608_IN	derived	also 357, 856
+reac-pw	tests/test_reac_master.c:328	grant_burst_len == 56	DERIVED:16*HEADAMP_SWEEP_RECORDS_PER_CH+8	derived	also 356, 539, 857
+reac-pw	tests/test_reac_master.c:332	grant_burst_len == 32	DERIVED:8*HEADAMP_SWEEP_RECORDS_PER_CH+8	derived	also 822, 840
+reac-pw	tests/test_reac_master.c:340	r[16]==0x12 && r[17]==0x12 && r[18]==0x01 && r[19]==0x01	NEW:DT1_CMD=0x12 / DT1_TAG_HEAD_AMP	no	typed-block offsets of DT1 cmd/tag; also 860
+reac-pw	tests/test_reac_master.c:343	r[20]	NEW:HEADAMP_REC_CH_OFF (typed 20 = frame 36)	no	also 344, 861
+reac-pw	tests/test_reac_master.c:346	groupa == 16 * 3	DERIVED:MODEL_S1608_IN*HEADAMP_SWEEP_RECORDS_PER_CH	derived	
+reac-pw	tests/test_reac_master.c:352	enroll_before[34]	TYPED_BLOCK_LEN	yes	also 353, 358
+reac-pw	tests/test_reac_master.c:369	f[18] == 0x01 && f[19] == 0x01	OP_SCENE_HEADER	yes	scene header
+reac-pw	tests/test_reac_master.c:370	f[20] == 0x00 && f[21] == 0x18	DERIVED:SCENE_HEAD_BYTES (op_len 0x18)	derived	
+reac-pw	tests/test_reac_master.c:371	f[23] == 0x22 && f[24] == 0xc8	SCENE_BYTES	yes	
+reac-pw	tests/test_reac_master.c:372	memcmp(f + 25, ...)	DERIVED:CTRL_BLOCK_OFF+SCENE_HEAD_PAY_OFF	derived	
+reac-pw	tests/test_reac_master.c:377	f[18] == 0x01 && f[19] == 0x02	OP_SCENE_FINAL	yes	
+reac-pw	tests/test_reac_master.c:378	f[20] == 0x00 && f[21] == 0x0e	SCENE_TAIL_BYTES	yes	
+reac-pw	tests/test_reac_master.c:379	memcmp(f + 23, ...)	DERIVED:CTRL_BLOCK_OFF+SCENE_CHUNK_PAY_OFF	derived	
+reac-pw	tests/test_reac_master.c:386	blk[5] == 0xfe	CHANMAP_ID_IDENTITY / SEG_CONT_PAYLOAD_OFF	yes	
+reac-pw	tests/test_reac_master.c:388	blk + 5 + (c + 1) * 3	SEG_CONT_PAYLOAD_OFF / CHANMAP_REC_BYTES	yes	
+reac-pw	tests/test_reac_master.c:389	t[1] == 0x28	NEW:CHANMAP_FLAGS_M300_DEFAULT=0x28	no	flags value in M-300 golden window
+reac-pw	tests/test_reac_master.c:396	int seen[0x30]	SLOT_SPACE	yes	also 402 (< 0x30)
+reac-pw	tests/test_reac_master.c:399	f + 16 + 2	TYPED_BLOCK_OFF+2 = CTRL_BLOCK_OFF	yes	
+reac-pw	tests/test_reac_master.c:400	s < 8	CHANMAP_RECS_PER_FRAME	yes	
+reac-pw	tests/test_reac_master.c:401	blk[5 + s * 3]	SEG_CONT_PAYLOAD_OFF / CHANMAP_REC_BYTES	yes	
+reac-pw	tests/test_reac_master.c:402	ch != 0xfe	CHANMAP_ID_IDENTITY	yes	
+reac-pw	tests/test_reac_master.c:406	ch <= 0x2f	DERIVED:SLOT_SPACE-1	derived	
+reac-pw	tests/test_reac_master.c:411	{ 48000, 40, 12 }	NEW:RATE_48K / MAX_CHANNELS / SAMPLES_PER_PKT	yes	mode literal
+reac-pw	tests/test_reac_master.c:416	f[16] == 0x00 && f[17] == 0x00	TYPE_FILLER	yes	
+reac-pw	tests/test_reac_master.c:429	for (int i = 18; i < 50; i += 2)	CTRL_BLOCK_OFF..CTRL_BLOCK_END	yes	
+reac-pw	tests/test_reac_master.c:446	int cm_seen[49]	CHANMAP_RING_LEN	yes	also 470, 475, 586
+reac-pw	tests/test_reac_master.c:480	51L * 341 ... 53L * 341	SCENE_CHUNKS	yes	
+reac-pw	tests/test_reac_master.c:484	n_ann >= 138 && n_ann <= 141	NEW:ANNOUNCE_PERIOD_S=~1	no	cfea free-runs ~1/s (comment)
+reac-pw	tests/test_reac_master.c:503	m.filler_desc == f[49]	CTRL_CKSUM_OFF	yes	
+reac-pw	tests/test_reac_master.c:505	chunk == 31	DERIVED:SCENE_MAC_OFF chunk index	derived	MAC rides chunk 31
+reac-pw	tests/test_reac_master.c:506	memcmp(f + 25, SRC, 6)	DERIVED:SCENE_MAC_OFF position in chunk	derived	
+reac-pw	tests/test_reac_master.c:508	chunk == 32	DERIVED:SCENE_TAG_SYSP_OFF chunk index	derived	YAML: rides op-0100 chunk 32
+reac-pw	tests/test_reac_master.c:509	f[39]..f[42] 'SYSP'	DERIVED:SCENE_TAG_SYSP_OFF in-chunk offset	derived	
+reac-pw	tests/test_reac_master.c:511	chunk == 33	DERIVED:SCENE_TAG_SCEN_OFF chunk index	derived	
+reac-pw	tests/test_reac_master.c:512	f[33]..f[36] 'SCEN'	DERIVED:SCENE_TAG_SCEN_OFF in-chunk offset	derived	
+reac-pw	tests/test_reac_master.c:637	(FPS * 65) / 10	NEW:M200_SESSION_HOLD_S (~6.5 here)	no	M-200i hold ~6.5 s; conflicts with 7.148 s in courtship-backs-off.sh:115
+reac-pw	tests/test_reac_master.c:720	48000 / 96000	NEW:RATE_48K / RATE_96K	no	lines 720-726 rate resolution
+reac-pw	tests/test_reac_master.c:734	44100	NEW:RATE_44K1=44100	no	also 735
+reac-pw	tests/test_reac_master.c:736	88200 -> 48000 clamped	NEW:RATE set {44100,48000,96000}	no	88200/32000 are illegal paces (737)
+reac-pw	tests/test_reac_master.c:745	fps_m200_48k == 4000	NEW:PKT_RATE_48K=4000	no	also 763
+reac-pw	tests/test_reac_master.c:746	fps_m5000_96k == 8000	NEW:PKT_RATE_96K=8000	no	also 763
+reac-pw	tests/test_reac_master.c:835	f[32]==0x12 && f[33]==0x12 && f[34]==0x01 && f[35]==0x01	NEW:DT1_CMD=0x12 / DT1_TAG_HEAD_AMP	no	
+reac-pw	tests/test_reac_master.c:837	f[36] <= 0x07	DERIVED:MODEL_S0808_CH-1	derived	
+reac-pw	tests/test_reac_master.c:841	ga_records == 8 * 3	DERIVED:MODEL_S0808*HEADAMP_SWEEP_RECORDS_PER_CH	derived	
+reac-pw	tests/test_reac_master.c:861	r[20] >= 0x20 && r[20] <= 0x2f	DERIVED:2*HEADAMP_BASE_MULTIPLIER .. HEADAMP_CH_SPAN-1	derived	
+reac-pw	tests/test_reac_master_no_enroll.c:36	ZONEA_JOIN[32]	CTRL_BLOCK_LEN	yes	bytes captured (fixture data)
+reac-pw	tests/test_reac_master_no_enroll.c:40	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_master_no_enroll.c:43	#define FPS 8000	NEW:PKT_RATE_96K=8000	no	
+reac-pw	tests/test_reac_master_no_enroll.c:49	#define S1608_BASE 0x20	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	
+reac-pw	tests/test_reac_master_no_enroll.c:98	reac_master_set_box(&m, 16, 8, S1608_BASE)	NEW:MODEL_S1608_IN_CH/OUT_CH	no	
+reac-pw	tests/test_reac_master_no_enroll.c:104	grant_burst_len == 56	DERIVED:16*HEADAMP_SWEEP_RECORDS_PER_CH+8	derived	
+reac-pw	tests/test_reac_node_ensure.c:37	8 / 16 widths	NEW:MODEL_S0808_CH / MODEL_S1608_IN	no	lines 37-90 node widths
+reac-pw	tests/test_reac_ohrca_chanmap.c:33	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_ohrca_chanmap.c:34	#define FPS 8000	NEW:PKT_RATE_96K=8000	no	
+reac-pw	tests/test_reac_ohrca_chanmap.c:37	#define SLOT(blk, s) ((blk) + 7 + (s) * 3)	DERIVED:2+SEG_CONT_PAYLOAD_OFF / CHANMAP_REC_BYTES	derived	typed offset of chanmap records
+reac-pw	tests/test_reac_ohrca_chanmap.c:43	s < 8	CHANMAP_RECS_PER_FRAME	yes	also 85
+reac-pw	tests/test_reac_ohrca_chanmap.c:45	t[0] == 0xfe	CHANMAP_ID_IDENTITY	yes	also 87
+reac-pw	tests/test_reac_ohrca_chanmap.c:81	i < 34	TYPED_BLOCK_LEN	yes	
+reac-pw	tests/test_reac_ohrca_chanmap.c:87	i == (7 + s * 3 + 1)	DERIVED:2+SEG_CONT_PAYLOAD_OFF / CHANMAP_REC_BYTES	derived	
+reac-pw	tests/test_reac_ohrca_chanmap.c:95	i == 33	DERIVED:CTRL_CKSUM_OFF-TYPED_BLOCK_OFF	derived	
+reac-pw	tests/test_reac_pacer.c:35	reac_pacer_period_ns(8000) == 125000	NEW:PKT_RATE_96K / DERIVED period	no	
+reac-pw	tests/test_reac_pacer.c:36	reac_pacer_period_ns(4000) == 250000	NEW:PKT_RATE_48K / DERIVED period	no	
+reac-pw	tests/test_reac_pacer.c:37	reac_pacer_period_ns(3675) == 272109	NEW:PKT_RATE_44K1 / DERIVED period	no	
+reac-pw	tests/test_reac_pacer.c:49	in[14]	HDR_COUNTER_OFF	yes	also 54, 60
+reac-pw	tests/test_reac_pacer.c:111	pg.fps = 4000	NEW:PKT_RATE_48K=4000	no	also 112
+reac-pw	tests/test_reac_pacer.c:150	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data); also 306, 374, 413
+reac-pw	tests/test_reac_pacer.c:155	p3.fps = 8000	NEW:PKT_RATE_96K=8000	no	also 158, 311, 314, 379, 382, 506, 520
+reac-pw	tests/test_reac_pacer.c:165	build_upstream_filler(..., 16, NULL, 12)	NEW:MODEL_S1608_IN_CH=16 / SAMPLES_PER_PKT	no	also 171, 176, 288
+reac-pw	tests/test_reac_pacer.c:177	uint8_t join_blk[32]	CTRL_BLOCK_LEN	yes	also 178 (bf + 18, 32), 233
+reac-pw	tests/test_reac_pacer.c:210	build_config_announce(..., 16)	NEW:MODEL_S1608_IN_CH=16	no	also 213, 254, 263, 271
+reac-pw	tests/test_reac_pacer.c:218	alloc.base == 0x20 && alloc.width == 16	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	also 274
+reac-pw	tests/test_reac_pacer.c:219	grant_burst_len == 56	DERIVED:16*HEADAMP_SWEEP_RECORDS_PER_CH+8	derived	
+reac-pw	tests/test_reac_pacer.c:222	r[16]==0x12 && r[17]==0x12 && r[18]==0x01 && r[19]==0x01	NEW:DT1_CMD=0x12 / DT1_TAG_HEAD_AMP	no	
+reac-pw	tests/test_reac_pacer.c:224	r[20] >= 0x20 && r[20] <= 0x2f	DERIVED:2*HEADAMP_BASE_MULTIPLIER .. HEADAMP_CH_SPAN-1	derived	
+reac-pw	tests/test_reac_pacer.c:264	bf[22] = 0x00	DERIVED:CTRL_BLOCK_OFF+SUB_0103_OFF	derived	
+reac-pw	tests/test_reac_pacer.c:328	(FR)[12]=0x88; (FR)[13]=0x19; (FR)[16]=0xcd; (FR)[17]=0xea	ETHERTYPE / TYPE_CONTROL	yes	BUILD_ID_REPLY macro duplicates test_reac_box_identity.c builder
+reac-pw	tests/test_reac_pacer.c:329	(FR) + 18 ; 13 + _n	CTRL_BLOCK_OFF ; NEW:DT1_SYSEX_OVERHEAD=13	no	
+reac-pw	tests/test_reac_pacer.c:330	_b[0]=0x04; _b[1]=0x03; _b[3]=_sx+5	LINK_RECORD / SEG_SINGLE	yes	
+reac-pw	tests/test_reac_pacer.c:331	_b[5]=0x02; _b[7]=0xfe	NEW:DT1_CONTAINER_HDR	no	
+reac-pw	tests/test_reac_pacer.c:332	0xf0, 0x41, 0x0a, 0x12, 0x12	NEW:SYSEX_START / ROLAND_ID / DEVICE_ID / DT1_CMD	no	
+reac-pw	tests/test_reac_pacer.c:333	_b[16]=0x05; _b[17]=0x00	DT1_TAG_IDENTITY ; NEW:DT1_TAG_OFF_IN_BLOCK=16	yes	
+reac-pw	tests/test_reac_pacer.c:334	_b[18], _b[19]	NEW:DT1_ADDR_LO_OFF_IN_BLOCK=18	no	
+reac-pw	tests/test_reac_pacer.c:335	_b[20 + _i]	NEW:DT1_PAYLOAD_OFF_IN_BLOCK=20	no	
+reac-pw	tests/test_reac_pacer.c:336	0x7f ; 0xf7	NEW:SYSEX_EOX=0xf7	no	
+reac-pw	tests/test_reac_pacer.c:389	build_config_announce(..., 32)	NEW:MODEL_S4000S_IN=32	no	also 398
+reac-pw	tests/test_reac_pacer.c:391	bf[18 + 26] ^= 0x5a	CTRL_BLOCK_OFF	yes	corrupts block[26]
+reac-pw	tests/test_reac_pacer.c:399	announce_blk[18] == 32	NEW:ANNOUNCE_BOX_WIDTH_OFF=18 (typed)	no	
+reac-pw	tests/test_reac_pacer.c:410	reac_pace_code(3675) == 2	NEW:PACE_CODE_44K1=2	no	YAML SCENE_REVISION_OFF prose: 0=48k 1=96k 2=44.1k
+reac-pw	tests/test_reac_pacer.c:411	reac_pace_code(4000) == 0	NEW:PACE_CODE_48K=0	no	
+reac-pw	tests/test_reac_pacer.c:412	reac_pace_code(8000) == 1	NEW:PACE_CODE_96K=1	no	
+reac-pw	tests/test_reac_pacer.c:414	.out_channels = 16	NEW:MODEL_S1608_IN_CH=16	no	
+reac-pw	tests/test_reac_pacer.c:416	reac_master_init(&m, OUR, &cfg, 3675)	NEW:PKT_RATE_44K1=3675	no	
+reac-pw	tests/test_reac_pacer.c:417	m.announce_blk[19] == 2	NEW:ANNOUNCE_CONSOLE_FIELD_OFF=19 / PACE_CODE_44K1=2	no	cfea[19]
+reac-pw	tests/test_reac_pacer_clock.c:36	#define NOMINAL_NS 125000L	NEW:PKT_PERIOD_96K_NS=125000	no	comment: 96 kHz = 8000 fps
+reac-pw	tests/test_reac_pacer_clock.c:43	p->fps = 8000	NEW:PKT_RATE_96K=8000	no	
+reac-pw	tests/test_reac_pacer_clock.c:141	slot_period_ns == 124998L	DERIVED:PKT_PERIOD_96K_NS/ppm	derived	also 229 (125003)
+reac-pw	tests/test_reac_pace_watch.c:47	reac_pace_watch_init(&ok, 48000)	NEW:RATE_48K=48000	no	also 49, 58
+reac-pw	tests/test_reac_pace_watch.c:48	run_seconds(&ok, &now, 4000, 30)	NEW:PKT_RATE_48K=4000	no	also 56, 63
+reac-pw	tests/test_reac_pace_watch.c:55	reac_pace_watch_init(&bad, 96000)	NEW:RATE_96K=96000	no	also 59
+reac-pw	tests/test_reac_pace_watch.c:70	run_seconds(&bad, &now, 8000, 20)	NEW:PKT_RATE_96K=8000	no	also 71 (96000)
+reac-pw	tests/test_reac_pace_watch.c:78	reac_pace_watch_init(&seam, 48000)	NEW:RATE_48K=48000	no	also 92, 94, 99, 107, 109, 114, 126
+reac-pw	tests/test_reac_pace_watch.c:80	now += SEC / 4000	NEW:PKT_RATE_48K=4000	no	also 85, 93, 108
+reac-pw	tests/test_reac_pace_watch.c:119	reac_pace_watch_init(&f44, 44100)	NEW:RATE_44K1=44100	no	also 121
+reac-pw	tests/test_reac_pace_watch.c:120	run_seconds(&f44, &now, 3675, 20)	NEW:PKT_RATE_44K1=3675	no	
+reac-pw	tests/test_reac_qdisc.c:111	reac_qdisc_etf_catchup_slots(2500, 8000)	NEW:PKT_RATE_96K=8000	no	also 113, 125, 131, 133, 134, 136
+reac-pw	tests/test_reac_qdisc.c:114	(2500, 4000)	NEW:PKT_RATE_48K=4000	no	also 116
+reac-pw	tests/test_reac_qdisc.c:117	(2500, 3675)	NEW:PKT_RATE_44K1=3675	no	also 119
+reac-pw	tests/test_reac_rate_cfg.c:51	44100 / 48000 / 96000	NEW:RATE_44K1 / RATE_48K / RATE_96K	no	closed rate set, lines 51-58
+reac-pw	tests/test_reac_rate_cfg.c:66	== 96000	NEW:RATE_96K=96000	no	also 106, 180, 355, 366, 416, 463, 464, 467, 546
+reac-pw	tests/test_reac_rate_cfg.c:70	== 48000	NEW:RATE_48K=48000	no	also 112, 118, 161, 166, 418, 519
+reac-pw	tests/test_reac_rate_cfg.c:71	== 44100	NEW:RATE_44K1=44100	no	
+reac-pw	tests/test_reac_rate_cfg.c:79	reac_rate_drivable_csv(...) == 17	DERIVED:strlen("44100,48000,96000")	derived	also 84 (5), 88 (11)
+reac-pw	tests/test_reac_rate_cfg.c:222	ZONEA_JOIN[32]	CTRL_BLOCK_LEN	yes	bytes captured (fixture data)
+reac-pw	tests/test_reac_rate_cfg.c:226	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_rate_cfg.c:228	#define S1608_BASE 0x20	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	
+reac-pw	tests/test_reac_rate_cfg.c:269	reac_master_set_box(m, 16, 8, S1608_BASE)	NEW:MODEL_S1608_IN_CH/OUT_CH	no	
+reac-pw	tests/test_reac_rate_cfg.c:347	.out_channels = 16, .console_field = 1	NEW:PACE_CODE_96K=1	no	also 372, 440, 501
+reac-pw	tests/test_reac_rate_cfg.c:349	bare_pacer_init(&p, 4000, &cfg)	NEW:PKT_RATE_48K=4000	no	also 388, 442, 443, 503, 517, 518, 540
+reac-pw	tests/test_reac_rate_cfg.c:356	fps == 8000	NEW:PKT_RATE_96K=8000	no	also 357, 358, 465, 466, 550
+reac-pw	tests/test_reac_rate_cfg.c:439	.console_field = 0	NEW:PACE_CODE_48K=0	no	
+reac-pw	tests/test_reac_ring.c:32	float src[CH * 12]	SAMPLES_PER_PKT	yes	12 literal ~20x in file (34-179)
+reac-pw	tests/test_reac_role_cfg.c:109	spa_pod_builder_int(&b, 48000)	NEW:RATE_48K=48000	no	
+reac-pw	tests/test_reac_role_swap.c:328	reac_segment_heard_step(&h, 4000, 5)	NEW:PKT_RATE_48K=4000	no	also 333-345
+reac-pw	tests/test_reac_role_swap.c:358	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data); also 497
+reac-pw	tests/test_reac_role_swap.c:363	reac_segment_answer_slave(&a, 0, 0, 96000, ...)	NEW:RATE_96K=96000	no	also 427, 491, 497
+reac-pw	tests/test_reac_role_swap.c:378	48000	NEW:RATE_48K=48000	no	also 394, 403, 415
+reac-pw	tests/test_reac_role_swap.c:403	reac_segment_answer_slave(&a, 1, mac48, 48000, 8)	NEW:MODEL_S0808_CH=8	no	also 415
+reac-pw	tests/test_reac_roster.c:60	16, 8	NEW:MODEL_S1608_IN_CH/OUT_CH	no	also 90, 100
+reac-pw	tests/test_reac_roster.c:102	8, 8	NEW:MODEL_S0808_CH=8	no	also 118
+reac-pw	tests/test_reac_rx_dup.c:119	out[14] ... out[15] = ctr >> 8	HDR_COUNTER_OFF (LE)	yes	also 138, 359, 360
+reac-pw	tests/test_reac_rx_dup.c:135	{ 0x00, 0x40, 0xab, 0xc4, 0x91, 0x90 }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_rx_dup.c:137	out[12] = 0x88; out[13] = 0x19	ETHERTYPE	yes	
+reac-pw	tests/test_reac_rx_dup.c:141	reac_braid_pos(s, 0, 40, pos)	MAX_CHANNELS	yes	
+reac-pw	tests/test_reac_rx_dup.c:171	pcm[NFRAMES][16 * REAC_SAMPLES_PER_PKT * 3]	RESOLUTION	yes	3 literal beside macro
+reac-pw	tests/test_reac_rx_dup.c:193	.forced_rate = 48000	NEW:RATE_48K=48000	no	also 266, 328
+reac-pw	tests/test_reac_rx_dup.c:228	(c * 12 + s) * 3	SAMPLES_PER_PKT / RESOLUTION	yes	also 232, 293, 297
+reac-pw	tests/test_reac_rx_dup.c:231	v & 0x00800000 ; 8388608.0f	DERIVED:1<<(8*RESOLUTION-1)	derived	24-bit sign/scale; also 296, 297
+reac-pw	tests/test_reac_rx_dup.c:367	.forced_rate = 96000	NEW:RATE_96K=96000	no	
+reac-pw	tests/test_reac_rx_gate.c:65	{ 0x00, 0x40, 0xab, 0xc4, 0x91, 0x90 }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_rx_gate.c:67	out[12] = 0x88; out[13] = 0x19	ETHERTYPE	yes	
+reac-pw	tests/test_reac_rx_gate.c:68	out[14] ... out[15]	HDR_COUNTER_OFF (LE)	yes	
+reac-pw	tests/test_reac_rx_gate.c:78	reac_braid_pos(s, 0, 40, pos)	MAX_CHANNELS	yes	
+reac-pw	tests/test_reac_rx_gate.c:99	out[REAC_FRAME_BYTES + 0] = 0xB1; [+1] = 0x06	NEW:OHRCA_TRAILER_BYTES=2	no	M-5000/M-480 2-byte trailer after end marker (FCS residue); fixture bytes
+reac-pw	tests/test_reac_rx_gate.c:141	pcm[16 * REAC_SAMPLES_PER_PKT * 3]	RESOLUTION	yes	3 literal beside macro; 16 = S-1608 upstream width
+reac-pw	tests/test_reac_rx_gate.c:147	.forced_rate = 48000	NEW:RATE_48K=48000	no	also 183, 216
+reac-pw	tests/test_reac_rx_gate.c:164	float ch[REAC_MAX_CHANNELS][12]	SAMPLES_PER_PKT	yes	also 167, 231, 234, 237, 247, 284, 287
+reac-pw	tests/test_reac_rx_gate.c:236	c < 16	NEW:MODEL_S1608_IN_CH=16	no	also 246
+reac-pw	tests/test_reac_rx_gate.c:238	(c * 12 + s) * 3	SAMPLES_PER_PKT / RESOLUTION	yes	
+reac-pw	tests/test_reac_rx_gate.c:241	v & 0x00800000	DERIVED:1<<(8*RESOLUTION-1)	derived	24-bit sign
+reac-pw	tests/test_reac_rx_gate.c:273	.forced_rate = 96000	NEW:RATE_96K=96000	no	
+reac-pw	tests/test_reac_rx_live_iface.c:83	.forced_rate = 96000	NEW:RATE_96K=96000	no	
+reac-pw	tests/test_reac_s1608.c:41	{ 0x00, 0x40, 0xab, 0xc9, 0xd8, 0x5b }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_s1608.c:95	reac_master_init(&m, OUR_MAC, &idle, 8000)	NEW:PKT_RATE_96K=8000	no	also 153, 186
+reac-pw	tests/test_reac_s1608.c:114	f[18] == 0x01 && f[19] == 0x00	OP_SCENE_CHUNK	yes	
+reac-pw	tests/test_reac_s1608.c:115	f[20] == 0x00 && f[21] == 0x1a	SCENE_CHUNK_BYTES	yes	
+reac-pw	tests/test_reac_s1608.c:118	memcmp(f + 23, ...)	DERIVED:CTRL_BLOCK_OFF+SCENE_CHUNK_PAY_OFF	derived	
+reac-pw	tests/test_reac_s1608.c:130	cur_desc = f[49]	CTRL_CKSUM_OFF	yes	
+reac-pw	tests/test_reac_s1608.c:134	for (int k = 18; k < 50; k += 2)	CTRL_BLOCK_OFF..CTRL_BLOCK_END	yes	
+reac-pw	tests/test_reac_s1608.c:159	memcmp(f + 16, M300_CHANMAP_FE, 34)	TYPED_BLOCK_OFF / TYPED_BLOCK_LEN	yes	also 167, 173, 175, 179, 188, 192
+reac-pw	tests/test_reac_sink_format.c:56	reac_sink_format_build(&b, 8, 48000)	NEW:RATE_48K / MODEL_S0808_CH	no	PipeWire format at REAC rates; 48000/96000/44100 recur lines 63-211
+reac-pw	tests/test_reac_sink_format.c:79	reac_sink_format_build(&b, 16, 96000)	NEW:RATE_96K / MODEL_S1608_IN	no	
+reac-pw	tests/test_reac_sink_format.c:133	44100	NEW:RATE_44K1=44100	no	also 185, 198
+reac-pw	tests/test_reac_slave.c:38	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MACs (fixture data)
+reac-pw	tests/test_reac_slave.c:56	.box_channels = 16	NEW:MODEL_S1608_IN_CH=16	no	also 63
+reac-pw	tests/test_reac_slave.c:57	.sample_rate = 96000	NEW:RATE_96K=96000	no	
+reac-pw	tests/test_reac_source_format.c:60	widths[] = { 8, 16, 32, REAC_MAX_CHANNELS }	NEW:MODEL_S0808_CH / MODEL_S1608_IN_CH / MODEL_S4000S_IN	no	
+reac-pw	tests/test_reac_source_format.c:64	44100	NEW:RATE_44K1=44100	no	48000/96000/44100 recur lines 71-136
+reac-pw	tests/test_reac_topo.c:41	size_t off = 12	NEW:ETHERTYPE_OFF=12	no	Ethernet type offset (builds tag stack)
+reac-pw	tests/test_reac_topo.c:57	{ 0x8819 }	ETHERTYPE	yes	also 74, 78, 85, 94
+reac-pw	tests/test_reac_topo.c:74	{ 0x8100, 12, 0x8819 }	NEW:VLAN_TPID=0x8100 (IEEE 802.1Q)	no	not REAC-specific; also 85, 94, 111
+reac-pw	tests/test_reac_topo.c:78	{ 0x88a8, 3001, 0x8819 }	NEW:VLAN_STAG_TPID=0x88a8 (IEEE 802.1ad)	no	not REAC-specific
+reac-pw	tests/test_reac_tx.c:49	p[0] | p[1]<<8 | p[2]<<16 ; 0x00800000	RESOLUTION (s24le)	yes	
+reac-pw	tests/test_reac_tx.c:64	uint8_t trio[3]	RESOLUTION	yes	also 82, 92, 188, 227, 229
+reac-pw	tests/test_reac_tx.c:66	trio[0]=g[3]; trio[1]=g[0]; trio[2]=g[1]	NEW:BRAID_EVEN_LANES={3,0,1}	no	downstream channel-pair byte braid; obs-h8819 convert_to_pcm24lep
+reac-pw	tests/test_reac_tx.c:68	trio[0]=g[4]; trio[1]=g[5]; trio[2]=g[2]	NEW:BRAID_ODD_LANES={4,5,2}	no	same braid, odd channel
+reac-pw	tests/test_reac_tx.c:86	pos[0]=g+3; pos[1]=g+0; pos[2]=g+1	NEW:BRAID_EVEN_LANES={3,0,1}	no	test-local oracle restates braid; also 88
+reac-pw	tests/test_reac_tx.c:126	frame[12] == 0x88 && frame[13] == 0x19	ETHERTYPE	yes	
+reac-pw	tests/test_reac_tx.c:127	frame[14] == 0x34 && frame[15] == 0x12	HDR_COUNTER_OFF (LE)	yes	
+reac-pw	tests/test_reac_tx.c:168	g[0]=be[1]; g[1]=be[0]; g[2]=be[3]; g[3]=be[2]; g[4]=be[5]; g[5]=be[4]	NEW:BRAID layout (BE pair view)	no	also 169
+reac-pw	tests/test_reac_tx.c:270	captured M-5000 frame bytes	FRAME_BYTES	yes	fixture data (lines 269-363)
+reac-pw	tests/test_reac_tx.c:366	trailer[2]	NEW:OHRCA_TRAILER_BYTES=2	no	CRC-32 FCS residue after end marker (comment 256-265)
+reac-pw	tests/test_reac_tx.c:370	trailer[0] == 0xd0 && trailer[1] == 0x28	NEW:OHRCA_TRAILER_BYTES=2	no	captured trailer value (fixture data)
+reac-pw	tests/test_reac_upstream.c:37	(ch * REAC_SAMPLES_PER_PKT + s) * 3	RESOLUTION	yes	3 literal beside macro; sign-ext 0x00800000 line 39
+reac-pw	tests/test_reac_upstream.c:47	reac_upstream_channels(628) == 16	DERIVED:(628-FRAME_OVERHEAD)/BYTES_PER_CHANNEL	derived	
+reac-pw	tests/test_reac_upstream.c:48	reac_upstream_channels(340) == 8	DERIVED	derived	
+reac-pw	tests/test_reac_upstream.c:49	reac_upstream_channels(1492) == -1	FRAME_BYTES	yes	
+reac-pw	tests/test_reac_upstream.c:50	627 / 629	DERIVED:628±1	derived	also 51
+reac-pw	tests/test_reac_upstream.c:52	reac_upstream_channels(52) == -1	FRAME_OVERHEAD	yes	nch 0
+reac-pw	tests/test_reac_upstream.c:53	reac_upstream_channels(160) == -1	DERIVED:FRAME_OVERHEAD+3*BYTES_PER_CHANNEL ; NEW:BRAID_CHANNEL_PAIR=2	no	odd nch refused: braid needs channel pairs
+reac-pw	tests/test_reac_upstream.c:55	reac_upstream_channels(14) == -1	DERIVED:HDR_COUNTER_OFF (eth header)	derived	
+reac-pw	tests/test_reac_upstream.c:61	reac_frame_counter(UP16) == 0xd9b1	HDR_COUNTER_OFF (LE)	yes	value from fixture; also 85, 101
+reac-pw	tests/test_reac_upstream.c:63	ch < 16 ; s < 12	NEW:MODEL_S1608_IN_CH=16 / SAMPLES_PER_PKT	no	also 64, 88, 104, 114
+reac-pw	tests/test_reac_upstream.c:78	reac_upstream_channels(1206) == -1	DERIVED:FRAME_OVERHEAD+32*36+OHRCA_TRAILER	derived	
+reac-pw	tests/test_reac_upstream.c:79	reac_frame_clean_len(1206) == 1204	DERIVED:1206-OHRCA_TRAILER_BYTES	derived	
+reac-pw	tests/test_reac_upstream.c:80	== 32	NEW:MODEL_S4000S_IN=32	no	also 81, 87, 103
+reac-pw	tests/test_reac_upstream.c:81	reac_upstream_channels(1204) == 32	DERIVED:FRAME_OVERHEAD+32*BYTES_PER_CHANNEL	derived	also 82 (1205), 95
+reac-pw	tests/test_reac_upstream.c:96	(size_t)32 * 12 * 3	SAMPLES_PER_PKT / RESOLUTION	yes	
+reac-pw	tests/test_reac_upstream.c:113	ch < 8	NEW:MODEL_S0808_CH=8	no	
+reac-pw	tests/test_reac_upstream.c:120	uint8_t f[628]	DERIVED:FRAME_OVERHEAD+16*BYTES_PER_CHANNEL	derived	also 129
+reac-pw	tests/test_reac_upstream.c:122	f[12] = 0x08	NEW:ETHERTYPE_OFF=12	no	corrupts EtherType
+reac-pw	tests/test_reac_upstream.c:125	f[626] = 0x00	DERIVED:628-2 (END_MARKER_0 position)	derived	
+reac-pw	tests/test_reac_upstream.c:128	reac_upstream_decode(f, 627, out)	DERIVED:628-1	derived	
+reac-pw	tests/test_reac_vboxgain.c:24	{ 0x00, 0x40, 0xab, ... }	NEW:ROLAND_OUI=00:40:ab	no	fixture MAC (fixture data)
+reac-pw	tests/test_reac_vboxgain.c:41	.box_channels = 16	NEW:MODEL_S1608_IN_CH=16	no	also 86-94, 163-170
+reac-pw	tests/test_reac_vboxgain.c:42	.sample_rate = 48000	NEW:RATE_48K=48000	no	also 120
+reac-pw	tests/test_reac_vboxgain.c:73	sens_cdb(0x08, 0) == -1800	DERIVED:SENS_REF_CDB-8*SENS_STEP_CDB	derived	also 74 (-1700), 75 (18 dB)
+reac-pw	tests/test_reac_vboxgain.c:82	s.ch_base == 0x20	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	
+reac-pw	tests/test_reac_vboxgain.c:106	ha_rec(0x20, ...) == 0	DERIVED:2*HEADAMP_BASE_MULTIPLIER	derived	also 137, 143, 150, 151, 157 (0x22/0x25/0x27)
+reac-pw	tests/test_reac_vboxgain.c:107	ha_rec(0x2f, ...) == 15	DERIVED:HEADAMP_CH_SPAN-1	derived	
+reac-pw	tests/test_reac_vboxgain.c:109	0x1f	DERIVED:2*HEADAMP_BASE_MULTIPLIER-1	derived	
+reac-pw	tests/test_reac_vboxgain.c:110	ha_rec(0x30, ...) == -1	HEADAMP_CH_SPAN	yes	
+reac-pw	tests/test_reac_vboxgain.c:119	.box_channels = 8	NEW:MODEL_S0808_CH=8	no	also 125-126 (0x07/0x08)
+reac-pw	tests/trunk-classification-is-about-now.sh:84	00:40:ab:c4:11:21 8	NEW:ROLAND_OUI / MODEL_S0808_CH=8	no	fixture MAC + width (fixture data)
+reac-pw	tests/trunk-verdict-expires-on-the-start-path.sh:86	00:40:ab:c4:11:21 8	NEW:ROLAND_OUI / MODEL_S0808_CH=8	no	fixture MAC + width (also 125)
+reac-pw	tests/trunk-verdict-is-inbound-only.sh:129	00:40:ab:c4:$v:21 8 8000	NEW:PKT_RATE_96K=8000 / MODEL_S0808_CH=8	no	noise fake box at 8000 fps
+reac-pw	tests/trunk-verdict-is-inbound-only.sh:131	00:40:ab:c4:21:21 8	NEW:ROLAND_OUI / MODEL_S0808_CH=8	no	fixture MAC + width
+reac-pw	tests/upstream_fixtures.inc:1	UP16[628]	DERIVED:FRAME_OVERHEAD+16*BYTES_PER_CHANNEL	derived	whole file is captured upstream frames + PCM (fixture data)
+reac-pw	tests/upstream_fixtures.inc:44	UP16_PCM[16][12]	SAMPLES_PER_PKT	yes	also 87, 184, 297
+reac-pw	tests/upstream_fixtures.inc:62	UP8[340]	DERIVED:FRAME_OVERHEAD+8*BYTES_PER_CHANNEL	derived	
+reac-pw	tests/upstream_fixtures.inc:105	UP32A[1206]	DERIVED:FRAME_OVERHEAD+32*BYTES_PER_CHANNEL+OHRCA_TRAILER	derived	also 218 UP32B
+reac-pw	tests/wake-holds-when-nothing-is-sent.sh:84	--rate 96000	NEW:RATE_96K=96000	no	rate CLI arg
+reac-pw	tools/bench_hotpath.c:72	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	Roland OUI in synthetic master MAC
+reac-pw	tools/bench_hotpath.c:74	0x88, 0x19	REAC_ETHERTYPE	yes	ethertype hand-split into bytes 12/13
+reac-pw	tools/bench_hotpath.c:75	out[14]	REAC_HDR_COUNTER_OFF	yes	LE counter low byte
+reac-pw	tools/bench_hotpath.c:76	out[15]	DERIVED:REAC_HDR_COUNTER_OFF+1	derived	LE counter high byte
+reac-pw	tools/bench_hotpath.c:78	40	REAC_MAX_CHANNELS	yes	channel loop bound; macro used elsewhere in same file
+reac-pw	tools/bench_hotpath.c:80	40	REAC_MAX_CHANNELS	yes	braid width argument
+reac-pw	tools/bench_hotpath.c:107	48000	NEW:REAC_RATE_48K	no	also :109 :150 :152 reac_mode_for(48000)
+reac-pw	tools/bench_hotpath.c:139	UP8	fixture data	-	captured S-0808 340 B return (from reac_rx.c/tests); not itemised
+reac-pw	tools/bench_hotpath.c:142	frames[i][14]	REAC_HDR_COUNTER_OFF	yes	counter byte in UP8 copy
+reac-pw	tools/bench_hotpath.c:260	40	REAC_MAX_CHANNELS	yes	default width
+reac-pw	tools/clock-drift.py:110	16	REAC_TYPED_BLOCK_OFF	yes	min captured length to read counter
+reac-pw	tools/clock-drift.py:111	d[14:16] "<H"	REAC_HDR_COUNTER_OFF	yes	LE u16 counter
+reac-pw	tools/clock-drift.py:115	"ether proto 0x8819"	REAC_ETHERTYPE	yes	tcpdump filter in message
+reac-pw	tools/clock-drift.py:127	0xFFFF	DERIVED:u16 counter width (REAC_TYPED_BLOCK_OFF-REAC_HDR_COUNTER_OFF=2)	derived	counter wrap modulus
+reac-pw	tools/clock-drift.py:159	4000	DERIVED:REAC_RATE_48K/REAC_SAMPLES_PER_PKT	derived	--fps default (also :160)
+reac-pw	tools/gen-scene-body.py:13	8904	REAC_SCENE_BYTES	yes	body length gate (also :14 message)
+reac-pw	tools/pcap-variants.py:19	0040ab...	NEW:REAC_ROLAND_OUI	no	S1608/OURMAC/BOX MACs (:19-21, :355) — fixture MACs, OUI restated
+reac-pw	tools/pcap-variants.py:51	d[14] | d[15]<<8	REAC_HDR_COUNTER_OFF	yes	LE counter read (also :53-54 write)
+reac-pw	tools/pcap-variants.py:55	d[18:50]	REAC_CTRL_BLOCK_OFF ; REAC_CTRL_BLOCK_END	yes	control block all-zero test
+reac-pw	tools/pcap-variants.py:56	d[16]==0xCD d[17]==0xEA	REAC_TYPED_BLOCK_OFF ; REAC_TYPE_CONTROL	yes	control-frame test (also :417 :486)
+reac-pw	tools/pcap-variants.py:85	52 / len-2	REAC_AUDIO_OFFSET (=50) ; DERIVED:REAC_FRAME_OVERHEAD-REAC_L2_HEADER_LEN	yes	BUG: audio starts at 50, not 52; first 2 audio bytes left
+reac-pw	tools/pcap-variants.py:93	0xFFFF	DERIVED:u16 counter width	derived	counter wrap (also :111)
+reac-pw	tools/pcap-variants.py:106	125	DERIVED:1e6/(REAC_RATE_96K/REAC_SAMPLES_PER_PKT)	derived	8000 pps slot period in us
+reac-pw	tools/pcap-variants.py:130	range(16)	DERIVED:REAC_CTRL_BLOCK_LEN/2	derived	16 two-byte descriptor cells
+reac-pw	tools/pcap-variants.py:131	18	REAC_CTRL_BLOCK_OFF	yes	descriptor cell base (also :132)
+reac-pw	tools/pcap-variants.py:132	0x7A	NEW:REAC_FILLER_DESC_ESTABLISHED	no	00 7a "ESTABLISHED" filler descriptor; negative-control V5
+reac-pw	tools/pcap-variants.py:213	b"\xcd\xea\x01\x03\x00\x10"	REAC_TYPE_CONTROL ; REAC_LINK_CONTROL+REAC_SEG_SINGLE (op 0x0103) ; REAC_LEN_SUB_COMMIT_REPORT	yes	KIND_ANNOUNCE prefix
+reac-pw	tools/pcap-variants.py:214	b"\xcd\xea\x04\x03\x00\x14"	REAC_TYPE_CONTROL ; REAC_OP_DT1_CONTAINER ; NEW:REAC_LEN_DT1_JOIN_REC	no	KIND_0014; rec_len 0x14 undeclared
+reac-pw	tools/pcap-variants.py:215	b"\xcd\xea\x04\x03\x00\x13"	REAC_TYPE_CONTROL ; REAC_OP_DT1_CONTAINER ; NEW:REAC_LEN_DT1_BOX_READY_REC	no	KIND_0013; rec_len 0x13 undeclared
+reac-pw	tools/pcap-variants.py:225	d[16:22]	REAC_TYPED_BLOCK_OFF ; DERIVED:REAC_TYPED_BLOCK_OFF+2+REAC_HDR_OPCODE_OFF	derived	kind prefix window (also :330 :380 :385 :393)
+reac-pw	tools/pcap-variants.py:333	[16:50]	REAC_TYPED_BLOCK_OFF ; REAC_CTRL_BLOCK_END	yes	typed-window copy (also :335 :391 :393 :440-442 :450-452 :460-462 :504 :518)
+reac-pw	tools/pcap-variants.py:356	S1608_TABLE / HEADMARK_BLK(:409)	fixture data	-	captured port table and head_mark block; not itemised
+reac-pw	tools/pcap-variants.py:361	d[18:49]	REAC_CTRL_BLOCK_OFF ; REAC_CTRL_CKSUM_OFF	yes	checksum span
+reac-pw	tools/pcap-variants.py:362	d[49] = (0x100 - s) & 0xFF	REAC_CTRL_CKSUM_OFF ; REAC_CTRL_BLOCK_SUM	yes	block checksum rule reimplemented
+reac-pw	tools/pcap-variants.py:381	d[26:32]	DERIVED:REAC_CTRL_BLOCK_OFF+REAC_PORTS_TABLE_OFF ; +REAC_PORTS_TABLE_SLOTS/2	derived	announce port table (12 nibble cells in 6 B)
+reac-pw	tools/pcap-variants.py:422	d[16]=0x00 d[17]=0x00	REAC_TYPED_BLOCK_OFF ; REAC_TYPE_FILLER	yes	_blank: type word -> FILLER
+reac-pw	tools/pcap-variants.py:424	range(18, 50)	REAC_CTRL_BLOCK_OFF ; REAC_CTRL_BLOCK_END	yes	_blank: zero control block
+reac-pw	tools/pcap-variants.py:440	[:34]	REAC_TYPED_BLOCK_LEN	yes	HEADMARK_BLK slice
+reac-pw	tools/pcap-variants.py:447	8000	DERIVED:REAC_RATE_96K/REAC_SAMPLES_PER_PKT	derived	fps for timing variants
+reac-pw	tools/pcap-variants.py:519	50 / len-2 / len-52	REAC_AUDIO_OFFSET ; REAC_FRAME_OVERHEAD	yes	audio region copy
+reac-pw	tools/probe-ports.sh:29	--rate=48000	NEW:REAC_RATE_48K	no	pw-cat playback rate into REAC sink
+reac-pw	tools/recover-scene.py:35	52 / 36	REAC_FRAME_OVERHEAD ; REAC_BYTES_PER_CHANNEL	yes	52+n*36 geometry dedup
+reac-pw	tools/recover-scene.py:37	b'\xcd\xea'	REAC_TYPE_CONTROL	yes	searched anywhere in frame, not at offset 16
+reac-pw	tools/recover-scene.py:40	34	REAC_TYPED_BLOCK_LEN	yes	typed-window length
+reac-pw	tools/recover-scene.py:41	blk[2:4]	DERIVED:(REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF)+REAC_SCENE_OP_OFF	derived	op word in typed window
+reac-pw	tools/recover-scene.py:42	b'\x01\x01' b'\x01\x00' b'\x01\x02'	REAC_OP_SCENE_HEADER ; REAC_OP_SCENE_CHUNK ; REAC_OP_SCENE_FINAL	yes	op bytes (also :44 :47 :50)
+reac-pw	tools/recover-scene.py:45	blk[7:9]	DERIVED:2+REAC_SCENE_HEAD_TOTAL_OFF	derived	header declared total
+reac-pw	tools/recover-scene.py:46	9 / 24	DERIVED:2+REAC_SCENE_HEAD_PAY_OFF ; REAC_SCENE_HEAD_BYTES	yes	header body slice
+reac-pw	tools/recover-scene.py:48	7 / 26	DERIVED:2+REAC_SCENE_CHUNK_PAY_OFF ; REAC_SCENE_CHUNK_BYTES	yes	chunk body slice
+reac-pw	tools/recover-scene.py:51	7 / 14	DERIVED:2+REAC_SCENE_CHUNK_PAY_OFF ; REAC_SCENE_TAIL_BYTES	yes	final body slice
+reac-pw	tools/recover-scene.py:58	8904	REAC_SCENE_BYTES	yes	completeness gate (also :59 message)
+reac-pw	tools/scene-on-wire.py:18	b'\x01\x01' b'\x01\x00' b'\x01\x02'	REAC_OP_SCENE_HEADER ; REAC_OP_SCENE_CHUNK ; REAC_OP_SCENE_FINAL	yes	HEAD/CHUNK/FINAL constants
+reac-pw	tools/scene-on-wire.py:19	24, 26, 14	REAC_SCENE_HEAD_BYTES ; REAC_SCENE_CHUNK_BYTES ; REAC_SCENE_TAIL_BYTES	yes	HEAD_B/CHUNK_B/FINAL_B
+reac-pw	tools/scene-on-wire.py:43	b'\xcd\xea'	REAC_TYPE_CONTROL	yes	searched anywhere in frame
+reac-pw	tools/scene-on-wire.py:46	34	REAC_TYPED_BLOCK_LEN	yes	also :47
+reac-pw	tools/scene-on-wire.py:49	blk[2:4]	DERIVED:(REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF)+REAC_SCENE_OP_OFF	derived	op word
+reac-pw	tools/scene-on-wire.py:66	blk[7:9]	DERIVED:2+REAC_SCENE_HEAD_TOTAL_OFF	derived	declared total
+reac-pw	tools/scene-on-wire.py:67	9	DERIVED:2+REAC_SCENE_HEAD_PAY_OFF	derived	header body start
+reac-pw	tools/scene-on-wire.py:73	7	DERIVED:2+REAC_SCENE_CHUNK_PAY_OFF	derived	chunk body start (also :82 final)
+reac-pw	tools/scene-on-wire.py:96	341	REAC_SCENE_CHUNKS	yes	completeness check (also :101)
+reac-pw	tools/wire-audio.py:39	1400	DERIVED:~REAC_FRAME_BYTES	derived	heuristic "is a downstream frame" threshold
+reac-pw	tools/wire-audio.py:43	50	REAC_AUDIO_OFFSET	yes	audio slice start

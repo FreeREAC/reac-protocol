@@ -1,0 +1,914 @@
+repo	file:line	literal	fact restated (YAML name | NEW:proposed | DERIVED:expr)	declared before this PR	note
+libreac	include/reac/reac.h:19	0x8819	ETHERTYPE	yes	hand-written copy of REAC_ETHERTYPE
+libreac	include/reac/reac.h:20	1492	FRAME_BYTES	yes	hand-written copy
+libreac	include/reac/reac.h:21	1440	AUDIO_BYTES	yes	hand-written copy
+libreac	include/reac/reac.h:22	50	AUDIO_OFFSET	yes	hand-written copy
+libreac	include/reac/reac.h:23	50	L2_HEADER_LEN	yes	hand-written copy
+libreac	include/reac/reac.h:24	40	MAX_CHANNELS	yes	hand-written copy
+libreac	include/reac/reac.h:25	12	SAMPLES_PER_PKT	yes	hand-written copy
+libreac	include/reac/reac.h:26	3	RESOLUTION	yes	hand-written copy
+libreac	include/reac/reac.h:27	14	HDR_COUNTER_OFF	yes	hand-written copy
+libreac	include/reac/reac.h:28	0xC2	END_MARKER_0	yes	hand-written copy
+libreac	include/reac/reac.h:29	0xEA	END_MARKER_1	yes	hand-written copy
+libreac	include/reac/reac.h:65	52	FRAME_OVERHEAD	yes	copy under different name REAC_UPSTREAM_OVERHEAD
+libreac	include/reac/reac.h:66	36	BYTES_PER_CHANNEL	yes	copy under different name REAC_UPSTREAM_BYTES_PER_CH
+libreac	include/reac/reac_boxreg.h:23	5	ENROLL_GROUPS (DERIVED:MAX_CHANNELS/8)	derived	5 x 8ch S-0808 = fabric
+libreac	include/reac/reac_braid.h:58	3, & ~1	RESOLUTION + NEW:BRAID_PAIR_MAP	no	3 bypasses REAC_RESOLUTION; YAML line 24 deliberately excludes braid map
+libreac	include/reac/reac_braid.h:60	3,0,1 / 4,5,2	NEW:BRAID_PAIR_MAP	no	per-pair byte permutation; wire layout (YAML says libreac-owned)
+libreac	include/reac/reac_cfg.h:93	44100	NEW:SAMPLE_RATE_44K1	no	closed rate list
+libreac	include/reac/reac_cfg.h:94	48000	NEW:SAMPLE_RATE_48K	no	closed rate list
+libreac	include/reac/reac_cfg.h:95	96000	NEW:SAMPLE_RATE_96K	no	closed rate list
+libreac	include/reac/reac_cfg.h:99	3	NEW:SAMPLE_RATE_COUNT	no	three legal paces (YAML PACE prose)
+libreac	include/reac/reac_ctrlblk.h:41	18	CTRL_BLOCK_OFF	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:42	50	CTRL_BLOCK_END	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:43	49	CTRL_CKSUM_OFF	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:44	32	CTRL_BLOCK_LEN	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:85	1	LINK_CONTROL	yes	copy as REAC_LINK_CTRL
+libreac	include/reac/reac_ctrlblk.h:86	2	LINK_AUX_S4000S	yes	copy as REAC_LINK_SECOND
+libreac	include/reac/reac_ctrlblk.h:87	4	LINK_RECORD	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:89	0x00	NEW:SEG_MIDDLE	no	neither FIRST nor LAST bit; implied by SEG_FIRST_BIT/SEG_LAST_BIT
+libreac	include/reac/reac_ctrlblk.h:90	0x01	SEG_FIRST_BIT	yes	copy as REAC_SEG_FIRST
+libreac	include/reac/reac_ctrlblk.h:91	0x02	SEG_LAST_BIT	yes	copy as REAC_SEG_LAST
+libreac	include/reac/reac_ctrlblk.h:92	0x03	SEG_SINGLE	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:95	0x00	SUB_0103_SCENE	yes	copy as REAC_OP_BULK (block[4] opcode 0)
+libreac	include/reac/reac_ctrlblk.h:96	0x01	SUB_0103_SLOT_MAP	yes	copy as REAC_OP_SLOT_MAP
+libreac	include/reac/reac_ctrlblk.h:98	0x10	SUB_0103_ENROLL_GROUP_MAP	yes	copy as REAC_OP_GROUP_MAP
+libreac	include/reac/reac_ctrlblk.h:99	0x80	SUB_0103_DECLARATION_ALT	yes	copy as REAC_OP_DECL_ALT
+libreac	include/reac/reac_ctrlblk.h:100	0x81	SUB_0103_LINK_ACK	yes	copy as REAC_OP_BOX_HB
+libreac	include/reac/reac_ctrlblk.h:101	0x82	SUB_0103_COMMIT_REPORT	yes	copy as REAC_OP_DECL; also S-1608 device selector
+libreac	include/reac/reac_ctrlblk.h:102	0x84	SUB_0103_COMMIT_REPORT_84	yes	copy as REAC_OP_DECL_OTHER; S-0808/S-4000S selector
+libreac	include/reac/reac_ctrlblk.h:108	0x12	NEW:DT1_MODEL_ID_LO	no	Roland model id low byte at block[14]; ctrlblk.h:104-107
+libreac	include/reac/reac_ctrlblk.h:109	0x11	NEW:DT1_CMD_RQ1	no	Roland RQ1 command at block[15]; YAML identity_page prose mentions 0x11
+libreac	include/reac/reac_ctrlblk.h:110	0x12	NEW:DT1_CMD_DT1	no	Roland DT1 set command; YAML prose only
+libreac	include/reac/reac_ctrlblk.h:111	0x0000	DT1_TAG_HEAD_MARK	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:112	0x0100	DT1_TAG_JOIN_GRANT	yes	copy as REAC_DT1_TAG_JOIN
+libreac	include/reac/reac_ctrlblk.h:113	0x0101	DT1_TAG_HEAD_AMP	yes	copy as REAC_DT1_TAG_HEADAMP (also HEADAMP_TAG)
+libreac	include/reac/reac_ctrlblk.h:114	0x0302	DT1_TAG_BOX_READY	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:115	0x0500	DT1_TAG_IDENTITY	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:140	8904	SCENE_BYTES	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:141	24	SCENE_HEAD_BYTES	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:142	26	SCENE_CHUNK_BYTES	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:143	14	SCENE_TAIL_BYTES	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:144	341	SCENE_CHUNKS	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:145	(1 + REAC_SCENE_CHUNKS + 1)	SCENE_STEPS	yes	restated derivation of declared 343
+libreac	include/reac/reac_ctrlblk.h:151	0x000	SCENE_TAG_ID_OFF	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:152	0x368	SCENE_TAG_SYSP_OFF	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:153	0x37c	SCENE_TAG_SCEN_OFF	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:157	0x340	SCENE_MAC_OFF	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:172	0x014	SCENE_REVISION_OFF	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:177	blk[34]	TYPED_BLOCK_LEN	yes	array size literal 34 = type word + block
+libreac	include/reac/reac_ctrlblk.h:260	0x37	HEADAMP_SENS_MAX	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:265	(-1000)	HEADAMP_SENS_REF_CDB	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:266	(100)	HEADAMP_SENS_STEP_CDB	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:267	(2000)	HEADAMP_PAD_CDB	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:365	config_block[32]	CTRL_BLOCK_LEN	yes	struct field size literal 32 (also 376,377,382-385,480)
+libreac	include/reac/reac_ctrlblk.h:713	0x00	HEADAMP_PARAM_PHANTOM	yes	enum copy
+libreac	include/reac/reac_ctrlblk.h:714	0x01	HEADAMP_PARAM_PAD	yes	enum copy
+libreac	include/reac/reac_ctrlblk.h:715	0x02	HEADAMP_PARAM_SENS	yes	enum copy
+libreac	include/reac/reac_ctrlblk.h:737	48	HEADAMP_CH_SPAN	yes	copy as REAC_HEADAMP_MAX_CH
+libreac	include/reac/reac_ctrlblk.h:835	0	HEADAMP_GRAN_SENS_SHIFT	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:836	0	HEADAMP_GRAN_FLAGS_SHIFT	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:837	0	HEADAMP_GRAN_PHANTOM_SHIFT	yes	hand-written copy
+libreac	include/reac/reac_ctrlblk.h:838	3	HEADAMP_BANK_SHIFT	yes	copy as REAC_HEADAMP_GRAN_READBACK_SHIFT
+libreac	include/reac/reac_ctrlblk.h:857	3	HEADAMP_SWEEP_RECORDS_PER_CH	yes	copy as REAC_HEADAMP_NPARAMS
+libreac	include/reac/reac_ctrlblk.h:859	6	NEW:GRANT_GROUPB_RECORDS	no	six fixed RQ1 identity-poll records in grant sweep (marker 12 11, TAG 05 00)
+libreac	include/reac/reac_ctrlblk.h:860	(8 + (w) * 3)	DERIVED:2+NEW:GRANT_GROUPB_RECORDS+HEADAMP_SWEEP_RECORDS_PER_CH*w	derived	ack+mark+6 groupB + 3/ch; 3 bypasses NPARAMS
+libreac	include/reac/reac_ctrlblk.h:862	sweep[][34]	TYPED_BLOCK_LEN	yes	array dim literal
+libreac	include/reac/reac_disco.h:71	5ULL	DERIVED:NEW:BOX_HEARTBEAT_PERIOD_S(1)	derived	box heartbeat 1/s; 5 s stale is policy
+libreac	include/reac/reac_fsm.h:35	600	NEW:BOX_LINKCHECK_RELOAD=0x0258	no	S-1608 firmware link-check frames; duplicate of reac_master.h:148
+libreac	include/reac/reac_fsm.h:41	800	NEW?:TXMUTE_DWELL	no	placeholder pending rig capture; ~100ms@8000
+libreac	include/reac/reac_fsm.h:49	5460	NEW:BOX_FLOOD_BURST_FRAMES=5459	no	byte-verified 2026-07-11 §13p.3, 1.36 s @48k
+libreac	include/reac/reac_fsm.h:55	800	NEW:BOX_JOIN_RETRY_MS=100	no	box's documented ~100 ms cold-connect grid (frames at 8000 fps)
+libreac	include/reac/reac_fsm.h:69	7200	DERIVED:9*JOIN_RETRY_PERIOD	derived	8-phase escalation +1
+libreac	include/reac/reac_fsm.h:85	4	NEW?:COLDCONNECT_BUDGET_S	no	derived from M-200 7.148 s session hold (m200-master-441k)
+libreac	include/reac/reac_fsm.h:86	10	NEW:MASTER_SESSION_HOLD_S~7.1 (backoff > hold)	no	m200-master-441k 2026-09-11
+libreac	include/reac/reac_grant.h:55	32	NEW:MAX_BOX_INPUTS=32 (S-4000S width)	no	widest enrollable box; tied to S-4000S model
+libreac	include/reac/reac_grant.h:60	(8 + (w) * 3)	DERIVED:2+NEW:GRANT_GROUPB_RECORDS+HEADAMP_SWEEP_RECORDS_PER_CH*w	derived	DUPLICATE macro of reac_ctrlblk.h:860
+libreac	include/reac/reac_grant.h:104	sweep[][34]	TYPED_BLOCK_LEN	yes	array dim
+libreac	include/reac/reac_headamp_tx.h:66	12	NEW:GRANT_STRIDE_SLOTS	no	duplicate of REAC_M_GRANT_STRIDE (reac_master.h:161)
+libreac	include/reac/reac_hunt.h:79	3ULL	DERIVED:3*NEW:ANNOUNCE_PERIOD_S(1)	derived	three cfea cadences (master announces 1/s)
+libreac	include/reac/reac_identity.h:72	0x0500u	DT1_TAG_IDENTITY	yes	second hand-written copy (also REAC_DT1_TAG_IDENTITY in reac_ctrlblk.h:115)
+libreac	include/reac/reac_identity.h:75	0x0000u	IDENTITY_ADDR_FIRMWARE_VERSION	yes	copy as REAC_IDENTITY_ADDR_FIRMWARE
+libreac	include/reac/reac_identity.h:76	0x0600u	IDENTITY_ADDR_REAC_VERSION	yes	hand-written copy
+libreac	include/reac/reac_identity.h:77	0x1000u	IDENTITY_ADDR_MODEL_NAME	yes	hand-written copy
+libreac	include/reac/reac_identity.h:80	17u	DERIVED:IDENTITY_NAME_FIELD_BYTES+1	derived	16-byte name + NUL
+libreac	include/reac/reac_identity.h:82	8u	NEW:IDENTITY_REAC_VERSION_BYTES=8	no	four u16be at 0x0600; YAML prose on IDENTITY_ADDR_REAC_VERSION
+libreac	include/reac/reac_knock.h:85	500ULL	DERIVED:NEW:PKT_RATE_44K1	derived	justified by 3675 fps worst-case slot; policy
+libreac	include/reac/reac_link.h:62	0x00	NEW:FILLER_DESC_NONE	no	upstream filler descriptor before announce; wire 2026-09-09
+libreac	include/reac/reac_link.h:63	0x52	NEW:FILLER_DESC_REQUESTING	no	S-0808 sent 0x52 between announce and grant (2026-09-09); reac.ksy unnamed
+libreac	include/reac/reac_link.h:64	0x7a	NEW:FILLER_DESC_ESTABLISHED	no	granted box filler descriptor; same value as DESC_WORD_LO in ctrl*.c
+libreac	include/reac/reac_master.h:148	600	NEW:BOX_LINKCHECK_RELOAD=0x0258	no	S-1608 firmware constant 0x0258 frames (doc only)
+libreac	include/reac/reac_master.h:149	65	NEW:MASTER_LINK_HOLD_S=6.5	no	M-200i measured hold 2026-07-11
+libreac	include/reac/reac_master.h:151	600	NEW:BOX_LINKCHECK_RELOAD	no	reused for presence decay
+libreac	include/reac/reac_master.h:158	500	NEW:SCENE_BURST_CHUNKS_PER_SEC	no	M-300/S-1608 at 4000 fps; M-200 at 3675
+libreac	include/reac/reac_master.h:161	12	NEW:GRANT_STRIDE_SLOTS	no	transcribed real burst @8000 fps
+libreac	include/reac/reac_master.h:167	16	NEW:ENROLL_GRANT_DWELL_S=1.6	no	matrix-m200-s0808/s1608 2026-07-11; YAML SUB_0103_ENROLL_GROUP_MAP prose "~1.6 s"
+libreac	include/reac/reac_master.h:224	8, 0	NEW:ANNOUNCE_IDLE_WIDTH=8 / NEW:PACE_CODE_48K	no	idle cfea width 0x08 (M-200 compare 2026-07-11)
+libreac	include/reac/reac_master.h:303	[34]	TYPED_BLOCK_LEN	yes	array dims (also 356,423,459,463)
+libreac	include/reac/reac_master.h:379	[32]	CTRL_BLOCK_LEN	yes	array dims (also 427, 552)
+libreac	include/reac/reac_ports.h:89	8	PORTS_TABLE_OFF	yes	hand-written copy
+libreac	include/reac/reac_ports.h:90	12	PORTS_TABLE_SLOTS	yes	hand-written copy
+libreac	include/reac/reac_ports.h:91	4	PORTS_CH_PER_SLOT	yes	hand-written copy
+libreac	include/reac/reac_ports.h:93	0x01	PORT_SLOT_OUT	yes	hand-written copy
+libreac	include/reac/reac_ports.h:94	0x02	PORT_SLOT_IN	yes	hand-written copy
+libreac	include/reac/reac_ports.h:95	0x03	PORT_SLOT_EMPTY	yes	hand-written copy
+libreac	include/reac/reac_ports.h:96	0x00	PORT_SLOT_IN_SPLIT	yes	hand-written copy
+libreac	include/reac/reac_ports.h:158	7	NEW:HEADAMP_BASE_OFF=7	no	config-announce strap byte offset; YAML encodes it only in the name HEADAMP_BASE_FROM_CONFIG_BYTE7
+libreac	include/reac/reac_ports.h:162	0x10	HEADAMP_BASE_MULTIPLIER	yes	hand-written copy
+libreac	include/reac/reac_ports.h:166	1	HEADAMP_BASE_FROM_CONFIG_BYTE7	yes	hand-written copy
+libreac	include/reac/reac_ports.h:167	1	HEADAMP_BASE_IS_CHASSIS_NOT_GRANT	yes	hand-written copy
+libreac	include/reac/reac_ports.h:178	8	HEADAMP_APPLY_UNIT_SLOTS	yes	hand-written copy (= HEADAMP_APPLY_GROUP_CHANNELS/HEADAMP_BANK_CHANNELS)
+libreac	include/reac/reac_sample.h:29	<<8, <<16, 0x00800000	NEW:SAMPLE_FORMAT_S24LE	no	24-bit signed little-endian sample; width=RESOLUTION
+libreac	include/reac/reac_slots.h:53	40	MAX_CHANNELS	yes	second hand-written copy as REAC_AUDIO_FABRIC_SLOTS
+libreac	include/reac/reac_slots.h:54	- 1	DERIVED:MAX_CHANNELS-1	derived	audio ceiling 39
+libreac	include/reac/reac_slots.h:60	48	SLOT_SPACE / HEADAMP_CH_SPAN	yes	third copy of 48 (also REAC_HEADAMP_MAX_CH)
+libreac	include/reac/reac_slots.h:65	+ 1	CHANMAP_RING_LEN	yes	restates derived SLOT_SPACE+1 =49
+libreac	include/reac/transport/reac_pacer.h:226	blk[32]	CTRL_BLOCK_LEN	yes	array dim literal
+libreac	include/reac/transport/reac_pacer.h:247	3675 / 4000 / 8000	NEW:PKT_RATE_44K1/48K/96K	no	comment only
+libreac	include/reac/transport/reac_pace_watch.h:45	5000000ull	DERIVED:NEW:PKT_RATE_48K (250 us spacing x20)	derived	policy; comment cites 3675/4000
+libreac	include/reac/transport/reac_rx.h:148	1560	DERIVED:FRAME_BYTES+64 (rounded)	derived	buffer sized from frame bytes by literal
+libreac	include/reac/transport/reac_segment_ident.h:88	25	DERIVED:5 s/200 ms poll	derived	policy, mirrors disco stale
+libreac	include/reac/transport/reac_slave.h:56	16	NEW:MODEL_S1608 in_ch	no	default box width = S-1608 (628 B frames)
+libreac	include/reac/transport/reac_tap.h:60	9	DERIVED:1+REAC_DISCO_MAX	derived	implementation cap
+libreac	packaging/vendor/reac-pw-headers/reac_rate_cfg.h:68	REAC_RATE_BIT_44100 / _48000 / _96000	NEW:REAC_RATE_{44K1,48K,96K}	no	closed rate set in macro names (bits, lines 68-70)
+libreac	python/libreac/__init__.py:132	16	DERIVED:HDR_COUNTER_OFF+2	derived	min length for counter (message restates bytes 14..15)
+libreac	python/libreac/__init__.py:270	ctypes.c_uint8 * 32	CTRL_BLOCK_LEN	yes	config_block field size in ctypes struct
+libreac	python/test_libreac.py:18	0040ab000001	NEW:REAC_ROLAND_OUI	no	test master MAC (also BOX :19 0040abc4803b)
+libreac	python/test_libreac.py:35	3675 / 44100	DERIVED:NEW:REAC_RATE_44K1/SAMPLES_PER_PKT	no	rate_snap expectation
+libreac	python/test_libreac.py:36	4000 / 48000	DERIVED:NEW:REAC_RATE_48K/SAMPLES_PER_PKT	no	rate_snap expectation
+libreac	python/test_libreac.py:37	8000 / 96000	DERIVED:NEW:REAC_RATE_96K/SAMPLES_PER_PKT	no	rate_snap expectation
+libreac	python/test_libreac.py:42	3837/3838/5999/6001	DERIVED:midpoints of packet rates	no	snap thresholds 3837.5 and 6000 (lines 42-45)
+libreac	python/test_libreac.py:50	1494 / 1492	FRAME_BYTES (+2 FCS residue)	yes	40 ch downstream; also :54
+libreac	python/test_libreac.py:51	1206 / 1204	DERIVED:FRAME_OVERHEAD+32*BYTES_PER_CHANNEL	derived	32 ch S-4000 return; also :55
+libreac	python/test_libreac.py:52	342 / 340	DERIVED:FRAME_OVERHEAD+8*BYTES_PER_CHANNEL	derived	8 ch S-0808 return; also :56
+libreac	python/test_libreac.py:80	0x20, 0x2F	PLACEMENT(in_ch=16 base);DERIVED:HEADAMP_CH_SPAN-1	yes	channel probes
+libreac	python/test_libreac.py:92	-10	DERIVED:HEADAMP_SENS_REF_CDB/100	derived	sens_db(0)
+libreac	python/test_libreac.py:93	55 / -65	HEADAMP_SENS_MAX;DERIVED:(SENS_REF_CDB-55*SENS_STEP_CDB)/100	derived	sens_db(55)
+libreac	python/test_libreac.py:94	range(0, 55)	HEADAMP_SENS_MAX	yes	step loop
+libreac	python/test_libreac.py:96	-1	DERIVED:-HEADAMP_SENS_STEP_CDB/100	derived	1 dB per step
+libreac	python/test_libreac.py:154	[8, 16, 32]	PLACEMENT(in_ch)	yes	box widths S-0808/S-1608/S-4000S
+libreac	python/test_libreac.py:176	52 + width * 36	FRAME_OVERHEAD;BYTES_PER_CHANNEL	yes	frame length formula restated
+libreac	python/test_libreac.py:199	0x00, 0x20, 0x2F	PLACEMENT base;DERIVED:HEADAMP_CH_SPAN-1	yes	headamp channel probes
+libreac	python/test_libreac.py:215	(16, 32)	PLACEMENT(in_ch)	yes	widths without identity record
+libreac	src/pcap_source.c:84	18, 0x81, 0x00	NEW:VLAN_TPID=0x8100	no	IEEE 802.1Q TPID; REAC segments may be VLAN-tagged (1.5.0 note)
+libreac	src/pcap_source.c:86	0x0fff	NEW:VLAN_VID_MASK	no	802.1Q VID mask; Ethernet not REAC-specific
+libreac	src/pcap_source.c:87	12, 16, 4	NEW:VLAN_TAG_LEN=4	no	tag strip; generic 802.1Q
+libreac	src/reac.c:13	44100, 40, 12	NEW:SAMPLE_RATE_44K1 / MAX_CHANNELS / SAMPLES_PER_PKT	no	REAC_MODE_44K1 literal row; 40,12 bypass macros; ref wire-format.md
+libreac	src/reac.c:14	48000, 40, 12	NEW:SAMPLE_RATE_48K / MAX_CHANNELS / SAMPLES_PER_PKT	no	REAC_MODE_48K literal row
+libreac	src/reac.c:15	96000, 40, 12	NEW:SAMPLE_RATE_96K / MAX_CHANNELS / SAMPLES_PER_PKT	no	REAC_MODE_96K literal row; 96k = double pps per wire-format.md
+libreac	src/reac.c:19	96000	NEW:SAMPLE_RATE_96K	no	reac_mode_for rate compare
+libreac	src/reac.c:20	44100	NEW:SAMPLE_RATE_44K1	no	reac_mode_for rate compare
+libreac	src/reac.c:27	3837.5, 44100	DERIVED:mid(NEW:PKT_RATE_44K1,NEW:PKT_RATE_48K)	derived	snap threshold midpoint 3675/4000; rate literal
+libreac	src/reac.c:28	6000.0, 48000	DERIVED:mid(NEW:PKT_RATE_48K,NEW:PKT_RATE_96K)	derived	snap threshold midpoint 4000/8000
+libreac	src/reac.c:29	96000	NEW:SAMPLE_RATE_96K	no	snap result
+libreac	src/reac.c:39	8000, 1	NEW:PKT_RATE_96K / NEW:PACE_CODE_96K	no	pace code band; code 1=96k (cfea[19]); YAML CONSOLE_FIELD_GATES_RATE prose only
+libreac	src/reac.c:40	3700, 2	DERIVED:~NEW:PKT_RATE_44K1 / NEW:PACE_CODE_44K1	no	3700 band edge near 3675; code 2=44.1k
+libreac	src/reac.c:41	0	NEW:PACE_CODE_48K	no	code 0=48k
+libreac	src/reac.c:46	14	DERIVED:HDR_COUNTER_OFF (Ethernet header len)	derived	min REAC frame len check
+libreac	src/reac.c:48	0x88, 0x19	ETHERTYPE	yes	ethertype split into bytes, bypasses REAC_ETHERTYPE
+libreac	src/reac.c:67	REAC_UPSTREAM_OVERHEAD + 2	NOT-PROTOCOL:FCS_RESIDUE_LEN (capture artefact)	no	+2 FCS residue; reac.h:31-58 says NOT a protocol field
+libreac	src/reac_boxreg.c:55	2, & 1	NEW:BOX_WIDTH_EVEN_MIN2	no	even width 2..40 rule; duplicate of reac_ctrlblk.c:893
+libreac	src/reac_box_synth.c:27	32	CTRL_BLOCK_LEN	yes	private BLK
+libreac	src/reac_box_synth.c:36	256u	CTRL_BLOCK_SUM	yes	block checksum rule re-implemented (dup of reac_ctrl_block_cksum_stamp)
+libreac	src/reac_box_synth.c:45	128u, 0x7f	CTRL_RECORD_SUM	yes	Roland 7-bit checksum re-implemented, differs from reac_ctrlblk.c:60 (0xff mask)
+libreac	src/reac_box_synth.c:55	+ 5u	DERIVED:HDR_OPCODE_OFF+1 (len counts from block[4])	derived	CTRL_RECLEN_BASE; 5 = block[4..8] before sysex
+libreac	src/reac_box_synth.c:56	0x04	LINK_RECORD	yes	open-coded link
+libreac	src/reac_box_synth.c:60	0x00,0x02,0x00,0xfe	NEW:DT1_CONTAINER_PREAMBLE (block[4:8]=00 02 00 fe)	no	container header before SysEx; captured
+libreac	src/reac_box_synth.c:61	out[8]	NEW:DT1_SYSEX_LEN_OFF=8	no	sysex length position
+libreac	src/reac_box_synth.c:62	0xf0	NEW:SYSEX_START	no	SysEx start at block[9]
+libreac	src/reac_box_synth.c:63	0x41	NEW:ROLAND_MFR_ID	no	Roland manufacturer id
+libreac	src/reac_box_synth.c:64	0x0a	NEW:DT1_DEVICE_ID	no	device id byte
+libreac	src/reac_box_synth.c:65	0x00, 0x00	NEW:DT1_MODEL_ID_HI	no	model id high bytes block[12:14]
+libreac	src/reac_box_synth.c:66	0x12, 0x12	NEW:DT1_MODEL_ID_LO / NEW:DT1_CMD_DT1	no	bypasses REAC_DT1_MODEL_LO/REAC_DT1_CMD_DT1 macros
+libreac	src/reac_box_synth.c:67	out[16..19]	NEW:DT1_TAG_OFF=16 / NEW:DT1_ADDR_LO_OFF=18	no	positions open-coded
+libreac	src/reac_box_synth.c:78	JOIN_0014/JOIN_0013 arrays	fixture data	no	duplicates BOX_MODELS cc0014/cc0013 captured blocks
+libreac	src/reac_box_synth.c:103	0x01, 0x03, 0x00, 0x10	LINK_CONTROL, SEG_SINGLE, NEW:LEN_SUB_DECLARATION=0x10	no	config-announce header; length 16 undeclared (commit-report len LEN_SUB_COMMIT_REPORT=16)
+libreac	src/reac_box_synth.c:105	out[5], out[6]	NEW:CONFIG_ANNOUNCE_RESERVED_5_6 (zero)	no	block[5:7] zero
+libreac	src/reac_box_synth.c:106	out[7]	NEW:HEADAMP_BASE_OFF=7	no	strap byte position; YAML has HEADAMP_BASE_FROM_CONFIG_BYTE7 flag=1 not the offset
+libreac	src/reac_box_synth.c:135	0x03, 7u + 4u + ... + 2u	SEG_SINGLE / NEW:DT1_SYSEX_OVERHEAD	no	sysex len = 7 preamble+cmd, 4 addr, data, 2 cksum+f7
+libreac	src/reac_box_synth.c:136	20	NEW:DT1_PAYLOAD_OFF=20	no	payload position
+libreac	src/reac_box_synth.c:137	16, 4u	NEW:DT1_TAG_OFF / IDENTITY_ADDR_BYTES	no	record checksum span start + addr bytes (4 = IDENTITY_ADDR_BYTES)
+libreac	src/reac_box_synth.c:138	0xf7	NEW:SYSEX_END	no	SysEx terminator
+libreac	src/reac_box_synth.c:147	d[4], 9999, 1000,100,10	NEW:IDENTITY_FIRMWARE_BYTES=4	no	firmware version 4 decimal digits (YAML prose on IDENTITY_ADDR_FIRMWARE_VERSION)
+libreac	src/reac_box_synth.c:154	4	NEW:IDENTITY_FIRMWARE_BYTES	no	firmware body length
+libreac	src/reac_box_synth.c:174	0x01	NEW:IDENTITY_NAME_KIND	no	name_kind byte; YAML prose on IDENTITY_ADDR_MODEL_NAME "0x01 on every observation"
+libreac	src/reac_box_synth.c:175	16	IDENTITY_NAME_FIELD_BYTES	yes	private NAME_LEN copy
+libreac	src/reac_box_synth.c:176	10	NEW:IDENTITY_NAME_IN_FIRST=10	no	name bytes carried in 0x0401 FIRST fragment
+libreac	src/reac_box_synth.c:191	0x01, 7u + 4u + 1u	SEG_FIRST_BIT / NEW:DT1_SYSEX_OVERHEAD	no	FIRST fragment framing
+libreac	src/reac_box_synth.c:193	out[20]	NEW:DT1_PAYLOAD_OFF	no	literal 20/21
+libreac	src/reac_box_synth.c:201	4 + 1	IDENTITY_ADDR_BYTES + NEW:IDENTITY_NAME_KIND len	no	record = addr(4)+kind(1)+name
+libreac	src/reac_box_synth.c:212	0x04, 0x02	LINK_RECORD, SEG_LAST_BIT	yes	open-coded
+libreac	src/reac_box_synth.c:213	2u + 5u	DERIVED:cksum+f7 + CTRL_RECLEN_BASE span	derived	LAST fragment length
+libreac	src/reac_box_synth.c:214	0x00,0x02,0x00,0xfe	NEW:DT1_CONTAINER_PREAMBLE	no	duplicate of line 60
+libreac	src/reac_box_synth.c:215	2u	DERIVED:cksum+SYSEX_END	derived	sysex len of LAST fragment
+libreac	src/reac_box_synth.c:216	9	NEW:DT1_SYSEX_OFF	no	LAST fragment body at block[9]
+libreac	src/reac_box_synth.c:217	out[15]	NEW:DT1_LAST_CKSUM_OFF	no	derived from 9+6
+libreac	src/reac_box_synth.c:218	0xf7	NEW:SYSEX_END	no	
+libreac	src/reac_box_synth.c:224	out[32]	CTRL_BLOCK_LEN	yes	param array dim
+libreac	src/reac_box_synth.c:273	2	NEW:BOX_WIDTH_MIN=2	no	0-input box still emits 2-ch upstream; comment lines 268-272
+libreac	src/reac_capture.c:21	0x8819	ETHERTYPE	yes	ETH_P_REAC fallback copy (#ifndef)
+libreac	src/reac_capture.c:70	14, 0x88, 0x19	ETHERTYPE / DERIVED:HDR_COUNTER_OFF	yes	ethertype bytes open-coded
+libreac	src/reac_ctrlblk.c:15	14	DERIVED:HDR_COUNTER_OFF (Ethernet header length)	derived	private ETH_HDR
+libreac	src/reac_ctrlblk.c:16	14	HDR_COUNTER_OFF	yes	private CNT_OFF duplicate
+libreac	src/reac_ctrlblk.c:17	16	TYPED_BLOCK_OFF	yes	private TYPE_OFF duplicate
+libreac	src/reac_ctrlblk.c:18	50	AUDIO_OFFSET	yes	private AUDIO_OFF duplicate
+libreac	src/reac_ctrlblk.c:19	0x00	NEW:FILLER_DESC_WORD_HI	no	upstream filler per-slot descriptor 00 7a "observed on the wire"
+libreac	src/reac_ctrlblk.c:20	0x7a	NEW:FILLER_DESC_WORD_LO	no	upstream filler descriptor byte; "observed on the wire"
+libreac	src/reac_ctrlblk.c:27	0x88, 0x19	ETHERTYPE	yes	put_hdr writes ethertype bytes literally
+libreac	src/reac_ctrlblk.c:38	256	CTRL_BLOCK_SUM	yes	block checksum rule (sum==0) open-coded
+libreac	src/reac_ctrlblk.c:51	0	CTRL_BLOCK_SUM	yes	verify compares to literal 0
+libreac	src/reac_ctrlblk.c:60	0x80	CTRL_RECORD_SUM	yes	record checksum rule open-coded
+libreac	src/reac_ctrlblk.c:68	0x80	CTRL_RECORD_SUM	yes	record checksum verify
+libreac	src/reac_ctrlblk.c:85	2	DERIVED:TYPED_BLOCK_LEN-CTRL_BLOCK_LEN+HDR_LINK_OFF	derived	typed-block-relative link offset
+libreac	src/reac_ctrlblk.c:86	3	DERIVED:2+HDR_SEG_OFF	derived	typed-block-relative seg offset
+libreac	src/reac_ctrlblk.c:87	4	DERIVED:2+HDR_LEN_OFF (SCENE_LEN_OFF)	derived	typed-block-relative length offset
+libreac	src/reac_ctrlblk.c:88	6	DERIVED:2+HDR_OPCODE_OFF (SCENE_SUB_OFF)	derived	typed-block-relative opcode offset
+libreac	src/reac_ctrlblk.c:89	7	DERIVED:2+SCENE_CHUNK_PAY_OFF	derived	typed-block-relative payload offset
+libreac	src/reac_ctrlblk.c:90	7	DERIVED:2+SCENE_HEAD_TOTAL_OFF	derived	typed-block-relative total offset
+libreac	src/reac_ctrlblk.c:101	34	TYPED_BLOCK_LEN	yes	memset size literal
+libreac	src/reac_ctrlblk.c:102	0xcd, 0xea	TYPE_CONTROL	yes	type word open-coded
+libreac	src/reac_ctrlblk.c:112	+ 2	DERIVED:SCENE_HEAD_PAY_OFF-SCENE_HEAD_TOTAL_OFF	derived	header payload follows 2-byte total
+libreac	src/reac_ctrlblk.c:130	TAIL_TRAILER[12] {..03..01..}	NEW:SCENE_FINAL_TRAILER	no	12 fixed bytes after final chunk body; captured
+libreac	src/reac_ctrlblk.c:145	blk + 2	DERIVED:CTRL_BLOCK_OFF-TYPED_BLOCK_OFF	derived	block start inside typed block
+libreac	src/reac_ctrlblk.c:163	"1234", 4	NEW:SCENE_TAG_ID/SYSP/SCEN strings (4-byte tags)	no	scene body ASCII tags; YAML only names offsets
+libreac	src/reac_ctrlblk.c:209	50, 100	DERIVED:HEADAMP_SENS_STEP_CDB	derived	cdB->dB rounding uses literal 100 (=1 dB step)
+libreac	src/reac_ctrlblk.c:214	100	DERIVED:HEADAMP_SENS_STEP_CDB	derived	dB->cdB
+libreac	src/reac_ctrlblk.c:254	0x88, 0x19	ETHERTYPE	yes	parse ethertype bytes
+libreac	src/reac_ctrlblk.c:264	block[0]	HDR_LINK_OFF	yes	open-coded header offsets 0..4
+libreac	src/reac_ctrlblk.c:265	block[1]	HDR_SEG_OFF	yes	open-coded
+libreac	src/reac_ctrlblk.c:266	block[2], block[3]	HDR_LEN_OFF	yes	open-coded
+libreac	src/reac_ctrlblk.c:267	block[4]	HDR_OPCODE_OFF	yes	open-coded
+libreac	src/reac_ctrlblk.c:270	0x00, 0x00	TYPE_FILLER	yes	type word open-coded
+libreac	src/reac_ctrlblk.c:274	0xcf, 0xea	TYPE_ANNOUNCE	yes	type word open-coded
+libreac	src/reac_ctrlblk.c:278	0xce, 0xea	NEW:TYPE_SPLIT_ANNOUNCE	no	splitter ceea announce; comment at ctrlblk.c:279-284
+libreac	src/reac_ctrlblk.c:288	0xcd, 0xea	TYPE_CONTROL	yes	type word open-coded
+libreac	src/reac_ctrlblk.c:315	block[16], block[17]	NEW:DT1_TAG_OFF=16	no	DT1 tag position in block (frame[34:36]); ctrlblk.h:104-107
+libreac	src/reac_ctrlblk.c:316	block[14], block[15]	NEW:DT1_MODEL_LO_OFF=14 / NEW:DT1_CMD_OFF=15	no	Roland model/cmd positions
+libreac	src/reac_ctrlblk.c:319	block[18..20]	NEW:DT1_ADDR_LO_OFF=18 (headamp CH/PARAM/VALUE)	no	headamp arg positions
+libreac	src/reac_ctrlblk.c:350	block[8]	NEW:DT1_SYSEX_LEN_OFF=8	no	SysEx length byte position
+libreac	src/reac_ctrlblk.c:354	14, 9, 13	NEW:DT1_SYSEX_OFF=9 / NEW:DT1_SYSEX_OVERHEAD=13	no	sysex framing; comment ctrlblk.c:351-353
+libreac	src/reac_ctrlblk.c:356	0xf0, 0xf7	NEW:SYSEX_START=0xf0 / NEW:SYSEX_END=0xf7	no	MIDI SysEx delimiters; F0 collides with CHANMAP_CELL_MASK value
+libreac	src/reac_ctrlblk.c:358	block[18], block[19], block[20]	IDENTITY_ADDR_LO_BYTES / NEW:DT1_PAYLOAD_OFF=20	no	addr_lo at 18, payload at 20
+libreac	src/reac_ctrlblk.c:367	+ 2	DERIVED:FRAME_OVERHEAD-AUDIO_OFFSET	derived	end marker length; box frame len re-derived instead of 52+n*36
+libreac	src/reac_ctrlblk.c:397	in_ch=16 out_ch=8 selector=0x82 headamp_strap=0x02	NEW:MODEL_S1608 (in 16/out 8, sel 0x82, strap 2)	no	S-1608 row; strap matches placement table base 0x20
+libreac	src/reac_ctrlblk.c:400	fw 2200, reac 2.3.2	NEW:MODEL_S1608_IDENTITY	no	captured identity values
+libreac	src/reac_ctrlblk.c:401	config_block/cc00xx arrays	fixture data	no	captured control blocks (lines 401-588, 1117-1128, 1300-1324); not itemised
+libreac	src/reac_ctrlblk.c:428	in_ch=8 out_ch=8 selector=0x84 strap=0x00	NEW:MODEL_S0808	no	S-0808 row
+libreac	src/reac_ctrlblk.c:474	in_ch=32 out_ch=8 selector=0x84 strap=0x00	NEW:MODEL_S4000S_3208	no	S-4000S-3208 row
+libreac	src/reac_ctrlblk.c:553	in_ch=8 out_ch=32 selector=0x84	NEW:MODEL_S4000S_0832	no	S-4000S-0832 row
+libreac	src/reac_ctrlblk.c:594	in 8/16, 24/16, 0/32, 32/0, 40/0, 0/40, 20/20; 0x84	NEW:MODEL_SELECTOR_DEFAULT=0x84 (derived FreeREAC rows)	no	REAC_BOX_DERIVED rows; widths not wire facts but selector 0x84 is
+libreac	src/reac_ctrlblk.c:669	BOX_MODELS[0]	NEW:MODEL_S1608	no	default model hardcoded by index
+libreac	src/reac_ctrlblk.c:681	+ 32	CTRL_BLOCK_LEN	yes	literal 32
+libreac	src/reac_ctrlblk.c:682	0x88, 0x19	ETHERTYPE	yes	ethertype bytes
+libreac	src/reac_ctrlblk.c:683	0xcd, 0xea	TYPE_CONTROL	yes	type word bytes
+libreac	src/reac_ctrlblk.c:695	blk[32] / 32	CTRL_BLOCK_LEN	yes	literal 32 (also 698)
+libreac	src/reac_ctrlblk.c:773	0x01,0x03,0x00,0x01,0x81	LINK_CONTROL,SEG_SINGLE,len 1,SUB_0103_LINK_ACK	yes	box HB template spelled as bytes; len=LEN_SUB_LINK_ACK
+libreac	src/reac_ctrlblk.c:783	04 03 00 13 00 02 00 fe 0x13-5 f0 41 0a 00 00 12 12 01 01 .. f7	LINK_RECORD,SEG_SINGLE,DT1_TAG_HEAD_AMP + NEW:DT1_CONTAINER_PREAMBLE + NEW:ROLAND_MFR_ID + NEW:DT1_DEVICE_ID	no	headamp template; 0x13 len, 0xfe, 0x41 Roland, 0x0a dev id undeclared
+libreac	src/reac_ctrlblk.c:787	18	NEW:DT1_ADDR_LO_OFF (headamp CH at block[18])	no	frame [36:39]
+libreac	src/reac_ctrlblk.c:788	3	HEADAMP_SWEEP_RECORDS_PER_CH	yes	CH,PARAM,VALUE count; bypasses NPARAMS
+libreac	src/reac_ctrlblk.c:789	16	NEW:DT1_TAG_OFF (record TAG..CKSUM at block[16])	no	record checksum span start
+libreac	src/reac_ctrlblk.c:790	6	NEW:HEADAMP_RECORD_LEN	no	TAG(2)+CH+PARAM+VALUE+CKSUM
+libreac	src/reac_ctrlblk.c:832	/ 2, 2*k	DERIVED:CTRL_BLOCK_LEN/2	derived	descriptor word pairs
+libreac	src/reac_ctrlblk.c:893	2, & 1	NEW:BOX_WIDTH_EVEN_MIN2	no	n_ch must be even 2..40; protocol? braid pairs
+libreac	src/reac_ctrlblk.c:920	len - 2, len - 1	DERIVED:FRAME_OVERHEAD-AUDIO_OFFSET	derived	end marker placement
+libreac	src/reac_ctrlblk.c:971	0xcd, 0xea	TYPE_CONTROL	yes	type word bytes (also 995,1003,1027,1030,1033,1036,1042,1049)
+libreac	src/reac_ctrlblk.c:977	0x00, 0x00	TYPE_FILLER	yes	type word bytes (also 988)
+libreac	src/reac_ctrlblk.c:1117	0x80 in BLK8/BLK16 [4]	SUB_0103_DECLARATION_ALT	yes	box-as-master declaration arrays (fixture-like)
+libreac	src/reac_ctrlblk.c:1129	16	NEW:MODEL_S1608 in_ch	no	width threshold picks S-1608 vs S-0808 block
+libreac	src/reac_ctrlblk.c:1134	32	CTRL_BLOCK_LEN	yes	literal
+libreac	src/reac_ctrlblk.c:1155	0x03	NEW:HEAD_MARK_BODY	no	head-mark record body 03 00 00 00
+libreac	src/reac_ctrlblk.c:1157	+ 16	NEW:DT1_TAG_OFF	no	record offset in block
+libreac	src/reac_ctrlblk.c:1233	0x01	NEW:HEADAMP_FLAG_MAX	no	phantom/pad value 0|1 (YAML prose)
+libreac	src/reac_ctrlblk.c:1296	34, 6	DERIVED:CTRL_BLOCK_OFF+NEW:DT1_TAG_OFF / NEW:HEADAMP_RECORD_LEN	no	frame+34 record start, 6 bytes
+libreac	src/reac_ctrlblk.c:1300	GRANT_HEAD_ACK[34]	TYPED_BLOCK_LEN	yes	array dim 34 (also 1308,1318,1331,1337,1386,1390,1392)
+libreac	src/reac_ctrlblk.c:1317	6	NEW:GRANT_GROUPB_RECORDS	no	DUPLICATE #define of header's REAC_GRANT_GROUPB_LEN
+libreac	src/reac_ctrlblk.c:1337	16	TYPED_BLOCK_OFF	yes	scratch + 16
+libreac	src/reac_ctrl.c:16	14	DERIVED:HDR_COUNTER_OFF (Ethernet header length)	derived	private ETH_HDR, duplicate of reac_ctrlblk.c:15
+libreac	src/reac_ctrl.c:17	14	HDR_COUNTER_OFF	yes	private CNT_OFF duplicate
+libreac	src/reac_ctrl.c:18	16	TYPED_BLOCK_OFF	yes	private TYPE_OFF duplicate
+libreac	src/reac_ctrl.c:19	50	AUDIO_OFFSET	yes	private AUDIO_OFF duplicate
+libreac	src/reac_ctrl.c:20	0x00	NEW:FILLER_DESC_WORD_HI	no	duplicate of reac_ctrlblk.c:19
+libreac	src/reac_ctrl.c:21	0x7a	NEW:FILLER_DESC_WORD_LO	no	duplicate of reac_ctrlblk.c:20
+libreac	src/reac_ctrl.c:28	0x88, 0x19	ETHERTYPE	yes	dead put_hdr duplicate writes ethertype bytes
+libreac	src/reac_ctrl.c:43	0x00, 0x40, 0xab	NEW:ROLAND_OUI (00:40:ab)	no	box src MAC OUI filter; YAML evidence MACs all 00:40:ab
+libreac	src/reac_ctrl.c:66	0x00	SUB_0403_DT1_RECORD	yes	block[4]==0 for DT1 container
+libreac	src/reac_decode.c:21	0x88, 0x19	ETHERTYPE	yes	ethertype bytes open-coded
+libreac	src/reac_decode.c:26	raw[14], raw[15]	HDR_COUNTER_OFF	yes	counter offset open-coded (reac_frame_counter exists)
+libreac	src/reac_decode.c:70	& 1	NEW:BOX_WIDTH_EVEN	no	even channel count
+libreac	src/reac_disco.c:42	0x00	SUB_0403_DT1_RECORD	yes	block[4]==0 DT1 container; duplicate of reac_ctrl.c:66
+libreac	src/reac_encode.c:38	b[3]	RESOLUTION	yes	sample byte count literal (also pos[3] in reac_upstream.c:52, reac_decode.c:77)
+libreac	src/reac_encode.c:59	(REAC_ETHERTYPE >> 8)	ETHERTYPE	yes	uses macro (fine); listed for completeness of split
+libreac	src/reac_encode.c:74	- 2, - 1	DERIVED:FRAME_OVERHEAD-AUDIO_OFFSET	derived	end-marker position
+libreac	src/reac_fsm.c:9	8000	NEW:PKT_RATE_96K	no	heartbeat period = fps @96k (1/s box heartbeat)
+libreac	src/reac_headamp_tx.c:19	0x01	NEW:HEADAMP_FLAG_MAX	no	phantom/pad 0|1; duplicate of reac_ctrlblk.c:1233
+libreac	src/reac_headamp_tx.c:53	0x20	NEW:HEADAMP_DEFAULT_SENS	no	policy default; M-200 arms its input 1 with it; operator-confirmed 2026-07-23
+libreac	src/reac_identity.c:25	4	NEW:IDENTITY_FIRMWARE_BYTES=4	no	4 decimal digits; reac.ksy
+libreac	src/reac_identity.c:28	9	NEW:IDENTITY_FIRMWARE_DIGIT_MAX	no	one decimal digit per byte
+libreac	src/reac_identity.c:30	1000, 100, 10	DERIVED:NEW:IDENTITY_FIRMWARE_BYTES (decimal digit weights)	no	reac.ksy firmware formula
+libreac	src/reac_identity.c:40	2, - 1	NEW:IDENTITY_NAME_KIND len=1	no	drop name_kind byte
+libreac	src/reac_identity.c:86	+ 2, + 4, + 6	NEW:IDENTITY_REAC_VERSION_BYTES (u16be x4; major +2 minor +4 patch +6)	no	reac version field offsets
+libreac	src/reac_link.c:14	32	CTRL_BLOCK_LEN	yes	memset literal
+libreac	src/reac_link.c:17	16	DERIVED:CTRL_BLOCK_LEN/2	derived	descriptor word count
+libreac	src/reac_link.c:18	0x00	NEW:FILLER_DESC_WORD_HI	no	fourth copy of the 00 xx descriptor pair
+libreac	src/reac_macaddr.c:41	0x00, 0x40, 0xab	NEW:ROLAND_OUI	no	Roland OUI stand-in MAC; duplicate of reac_ctrl.c:43
+libreac	src/reac_master.c:49	11	NEW:ANNOUNCE_MAC_OFF (block[9], typed idx 11)	no	cfea master-MAC field; m300-s1608 capture 2026-07-10
+libreac	src/reac_master.c:54	blk[34]	TYPED_BLOCK_LEN	yes	array dim
+libreac	src/reac_master.c:56	blk + 2	DERIVED:CTRL_BLOCK_OFF-TYPED_BLOCK_OFF	derived	block inside typed block
+libreac	src/reac_master.c:67	ENROLL_BLK[34] cd ea 01 03 00 0d 10 04 00 41..c3..	TYPE_CONTROL,LINK_CONTROL,SEG_SINGLE,LEN_SUB_ENROLL_GROUP_MAP,SUB_0103_ENROLL_GROUP_MAP,ENROLL_GROUP_IN/OUT	yes	captured M-200 enroll block (matrix-m200-s0808); spelled as bytes
+libreac	src/reac_master.c:68	0x04 (blk[7])	NEW:ENROLL_GROUP_MAP_FIELD_04	no	enroll block byte block[5]=0x04; comment 115-117 shows "04 00 41.."
+libreac	src/reac_master.c:72	8	NEW:ENROLL_PACE_CODE_OFF (block[6], typed idx 8)	no	enroll pace-code byte position
+libreac	src/reac_master.c:90	0	NEW:PACE_CODE_48K	no	default pace code
+libreac	src/reac_master.c:100	32	NEW:ENROLL_DEFAULT_WIDTH	no	implementation default? cites S-4000 enrol 4x41+1xc3
+libreac	src/reac_master.c:134	16, 8	DERIVED:HEADAMP_APPLY_GROUP_CHANNELS (8 ch/group); 16 = S-1608 one-group rule	derived	group count rule; 16-input gets 1 group (group_map_scan 2026-09-13)
+libreac	src/reac_master.c:136	5	ENROLL_GROUPS	yes	clamp to 5 groups, literal
+libreac	src/reac_master.c:137	5	ENROLL_GROUPS	yes	loop bound literal
+libreac	src/reac_master.c:138	9, 0x41	NEW:ENROLL_IN_REGION_OFF=9 / ENROLL_GROUP_IN	no	block[7:12] input region (typed 9:14)
+libreac	src/reac_master.c:139	14, 0xc3	NEW:ENROLL_OUT_REGION_OFF=14 / ENROLL_GROUP_OUT	no	output region (typed 14:19)
+libreac	src/reac_master.c:151	1	NEW:PACE_CODE_96K	no	M-5000 profile default pace code
+libreac	src/reac_master.c:190	48000	NEW:SAMPLE_RATE_48K	no	default rate
+libreac	src/reac_master.c:198	44100, 48000, 96000	NEW:SAMPLE_RATE_44K1/48K/96K	no	legal rate set
+libreac	src/reac_master.c:201	48000	NEW:SAMPLE_RATE_48K	no	fallback
+libreac	src/reac_master.c:214	blk[34], 34	TYPED_BLOCK_LEN	yes	also line 218
+libreac	src/reac_master.c:219	33	DERIVED:CTRL_CKSUM_OFF-TYPED_BLOCK_OFF	derived	filler descriptor = scene step checksum byte
+libreac	src/reac_master.c:261	cf ea ff ff 01 00 01 03 0d 01 04	TYPE_ANNOUNCE + OP_ANNOUNCE + NEW:ANNOUNCE_HEAD	no	cfea fixed head; 0xffff=OP_ANNOUNCE; rest undeclared (m300-s1608 capture)
+libreac	src/reac_master.c:262	34	TYPED_BLOCK_LEN	yes	memset
+libreac	src/reac_master.c:265	0x28	MAX_CHANNELS (NEW:ANNOUNCE_SLOT_TOTAL_OFF=17)	yes	40-slot total in cfea[17]; literal
+libreac	src/reac_master.c:266	out[18]	NEW:ANNOUNCE_WIDTH_OFF=18	no	cfea upstream-width byte; announce-bytes analysis 2026-09-13
+libreac	src/reac_master.c:268	out[19]	NEW:ANNOUNCE_PACE_CODE_OFF=19	no	cfea[19] pace code; YAML CONSOLE_FIELD_GATES_RATE prose names cfea[19]
+libreac	src/reac_master.c:280	out[20], out[21]	NEW:ANNOUNCE_BOX_COUNT_OFF=20	no	enrolled-box count BE; blink fix 2026-07-12
+libreac	src/reac_master.c:310	0xfe	CHANMAP_ID_IDENTITY	yes	ring marker; hand-written copy
+libreac	src/reac_master.c:311	8	CHANMAP_RECS_PER_FRAME	yes	hand-written copy
+libreac	src/reac_master.c:328	- 1	DERIVED:CHANMAP_RING_LEN-1 (=SLOT_SPACE)	derived	marker window index
+libreac	src/reac_master.c:330	7, 6	DERIVED:CHANMAP_RECS_PER_FRAME-1, SLOT_SPACE/CHANMAP_RECS_PER_FRAME	derived	desk window emit order (M-200 measured)
+libreac	src/reac_master.c:331	6	DERIVED:SLOT_SPACE/CHANMAP_RECS_PER_FRAME	derived	
+libreac	src/reac_master.c:332	8	CHANMAP_RECS_PER_FRAME	yes	stride literal
+libreac	src/reac_master.c:358	34	TYPED_BLOCK_LEN	yes	memset
+libreac	src/reac_master.c:359	0xcd, 0xea	TYPE_CONTROL	yes	type bytes
+libreac	src/reac_master.c:360	0x01, 0x03	LINK_CONTROL, SEG_SINGLE	yes	open-coded
+libreac	src/reac_master.c:361	0x00, 0x19	LEN_SUB_CHANMAP	yes	chanmap record length 25 open-coded
+libreac	src/reac_master.c:362	0x01	SUB_0103_SLOT_MAP	yes	subtype open-coded
+libreac	src/reac_master.c:366	7, 3	DERIVED:TYPED 2+SEG_CONT_PAYLOAD_OFF / CHANMAP_REC_BYTES	derived	records start block[5]; 3-byte record
+libreac	src/reac_master.c:368	0xfe, 0x00	CHANMAP_ID_IDENTITY	yes	marker record fe <pace> 00
+libreac	src/reac_master.c:372	0x28, 0x2f, 0x38, 0x28	NEW:CHANMAP_FLAGS_LOW=0x28 / NEW:CHANMAP_FLAGS_HIGH_BANK=0x38 / DERIVED:MAX_CHANNELS..SLOT_SPACE-1	no	slot flags per bank; M-200 capture 2026-07-11
+libreac	src/reac_master.c:376	blk[31], blk[32]	NEW:CHANMAP_TERMINATOR (block[29:31])	no	terminator after 8 records
+libreac	src/reac_master.c:507	20	NEW?:DECLARE_SETTLE 50 ms	no	implementation settle (fps/20); likely tunable
+libreac	src/reac_master.c:602	REAC_M_BURST_PER_SEC	NEW:SCENE_BURST_CHUNKS_PER_SEC=500	no	via macro defined in reac_master.h:158
+libreac	src/reac_master.c:645	8000	NEW:PKT_RATE_96K	no	default fps
+libreac	src/reac_master.c:653	10778, 4000	NEW:CONTROL_CYCLE_SLOTS_AT_4000=10778 / NEW:PKT_RATE_48K	no	desk cycle measured M-300/S-1608 at 4000 fps
+libreac	src/reac_master.c:667	5953, 4000	NEW:CONTROL_CYCLE_CHANMAP_SLOT=5953 / NEW:PKT_RATE_48K	no	chanmap slot in desk cycle
+libreac	src/reac_master.c:668	5	NEW:CONTROL_CYCLE_SUB01_FROM_END=5	no	scene header 5 slots before wrap
+libreac	src/reac_master.c:670	15, 100	NEW:GRANT_WINDOW_MS=150	no	~150 ms grant window
+libreac	src/reac_master.c:683	10	DERIVED:REAC_M_GRANT_DWELL_SECONDS_X10 scale	derived	see reac_master.h:167
+libreac	src/reac_master.c:716	10	DERIVED:REAC_M_LINKCHECK_SECONDS_X10 scale	derived	see reac_master.h:149
+libreac	src/reac_master.c:726	34	TYPED_BLOCK_LEN	yes	memcpy size
+libreac	src/reac_master.c:767	+ 1, 0x00	NEW:SCENE_REVISION_BYTES=2 (u16le)	no	revision high byte
+libreac	src/reac_master.c:905	3 / 4	NEW?:ANNOUNCE_PHASE	no	cadence phase; implementation choice
+libreac	src/reac_master.c:907	/ 4	NEW?:CHANMAP_PHASE	no	implementation phase offset
+libreac	src/reac_master.c:954	32	CTRL_BLOCK_LEN	yes	memcpy literal (also 1075)
+libreac	src/reac_master.c:1209	m->fps	NEW:CHANMAP_PERIOD_S=1	no	chanmap 1/s in established/granting (also 1233,1237,1293,1357,1398 announce 1/s)
+libreac	src/reac_master.c:1482	16	TYPED_BLOCK_OFF	yes	private REAC_TYPE_OFF copy
+libreac	src/reac_master.c:1486	34	TYPED_BLOCK_LEN	yes	memcpy
+libreac	src/reac_master.c:1510	0x00	NEW:FILLER_DESC_WORD_HI	no	filler descriptor 00 xx
+libreac	src/reac_ports.c:9	block[32]	CTRL_BLOCK_LEN	yes	param dim (also 49)
+libreac	src/reac_ports.c:17	block[0], block[1]	HDR_LINK_OFF / HDR_SEG_OFF	yes	open-coded header offsets (also 55)
+libreac	src/reac_ports.c:19	block[4]	HDR_OPCODE_OFF	yes	open-coded (also 57)
+libreac	src/reac_scene_body.c:16	reac_scene_placeholder[8904] bytes	fixture data	no	captured M-200i scene body (generated); not itemised
+libreac	src/reac_upstream.c:21	2 *	NEW:BOX_WIDTH_EVEN_MIN2	no	minimum 2-channel upstream
+libreac	src/reac_upstream.c:26	& 1	NEW:BOX_WIDTH_EVEN (braid carries pairs)	no	even-width rule; third copy
+libreac	src/reac_upstream.c:40	0x88, 0x19	ETHERTYPE	yes	ethertype bytes open-coded
+libreac	tests/abi-layout.inc:1	(whole file)	not protocol	-	GENERATED ABI offsets/sizes; excluded
+libreac	tests/box_0832_fixtures.inc:38	head[50]	REAC_L2_HEADER_LEN	yes	struct field size
+libreac	tests/box_0832_fixtures.inc:41	(rows 340 / 1204, bytes)	fixture data	-	captured vlan13-0832.pcap frames; not itemised
+libreac	tests/corpus-baseline.txt:1	(whole file)	fixture data	-	corpus census counts; not itemised
+libreac	tests/ctrl_fixtures.inc:20	[34] (every FX_* array)	REAC_TYPED_BLOCK_LEN	yes	array sizes; bodies are fixture data (captured [16:50] windows)
+libreac	tests/reac_facts_assert.h:1	(whole file)	generated from YAML	-	GENERATED by gen-facts.py; literals are the YAML's own emission, not copies
+libreac	tests/test_box_0832.c:55	out[f->len - 2] = 0xc2	REAC_END_MARKER_0	yes	end marker literal, macro exists
+libreac	tests/test_box_0832.c:56	out[f->len - 1] = 0xea	REAC_END_MARKER_1	yes	end marker literal, macro exists
+libreac	tests/test_box_0832.c:65	h[16] == 0xcd && h[17] == 0xea	REAC_TYPED_BLOCK_OFF / REAC_TYPE_CONTROL	yes	type word by hand
+libreac	tests/test_box_0832.c:77	340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	8-ch carrier
+libreac	tests/test_box_0832.c:80	8	NEW:REAC_S4000H_IN_CHANNELS	no	0832 declared inputs
+libreac	tests/test_box_0832.c:81	32	NEW:REAC_S4000H_OUT_CHANNELS	no	0832 declared outputs
+libreac	tests/test_box_0832.c:82	0x00	REAC_PLACEMENT base 0x00 (strap 0)	yes	
+libreac	tests/test_box_0832.c:86	1204 / 32	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL; NEW:REAC_S4000S_CHANNELS	derived	
+libreac	tests/test_box_0832.c:87	8	NEW:REAC_S0808_CHANNELS (width of 340)	no	
+libreac	tests/test_box_0832.c:93	8 / 32	NEW:REAC_S4000H_IN_CHANNELS / NEW:REAC_S4000H_OUT_CHANNELS	no	
+libreac	tests/test_box_0832.c:97	8	NEW:REAC_S4000H_UPSTREAM_WIDTH	no	granted return measured on M-200 (217 905 frames of 340 B)
+libreac	tests/test_box_0832.c:103	a[32], b[32]	REAC_CTRL_BLOCK_LEN	yes	also 106, 109
+libreac	tests/test_box_0832.c:117	8	NEW:REAC_S0808_CHANNELS	no	width -> s0808 row
+libreac	tests/test_box_0832.c:120	8	NEW:REAC_S0808_CHANNELS	no	
+libreac	tests/test_box_0832.c:149	32	NEW:REAC_S4000S_CHANNELS	no	widest heard (ungranted flood)
+libreac	tests/test_box_0832.c:152	fps = 8000	NEW:REAC_PPS_96K	no	
+libreac	tests/test_box_0832.c:176	8	NEW:REAC_S4000H_IN_CHANNELS	no	allocated width
+libreac	tests/test_box_0832.c:177	0x00	REAC_PLACEMENT base 0x00	yes	
+libreac	tests/test_box_0832.c:192	1204	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_box_0832.c:194	head[16] == 0x00	REAC_TYPED_BLOCK_OFF / REAC_TYPE_FILLER	yes	
+libreac	tests/test_box_0832.c:198	1204	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_box_0832.c:211	8	NEW:REAC_S4000H_IN_CHANNELS	no	
+libreac	tests/test_box_0832.c:212	8	NEW:REAC_S4000H_IN_CHANNELS	no	cfea width byte = box declared inputs
+libreac	tests/test_box_table.c:43	i < 32	REAC_CTRL_BLOCK_LEN	yes	block compare length
+libreac	tests/test_box_table.c:62	blk[32]	REAC_CTRL_BLOCK_LEN	yes	also 88, 90, 101, 149, 215, 247
+libreac	tests/test_box_table.c:99	* 0x10	REAC_HEADAMP_BASE_MULTIPLIER	yes	strap to base
+libreac	tests/test_box_table.c:103	(sum & 0xff) == 0	REAC_CTRL_BLOCK_SUM	yes	block checksum rule restated
+libreac	tests/test_box_table.c:123	% 4	REAC_PORTS_CH_PER_SLOT	yes	geometry legality
+libreac	tests/test_box_table.c:135	blk + 20, 4	DERIVED:NEW:REAC_DT1_TAG_OFF+REAC_IDENTITY_ADDR_BYTES / NEW:REAC_IDENTITY_FW_BYTES	no	identity payload at block[20]
+libreac	tests/test_box_table.c:138	blk + 20	DERIVED:NEW:REAC_DT1_TAG_OFF+REAC_IDENTITY_ADDR_BYTES	derived	
+libreac	tests/test_box_table.c:149	page[17]	DERIVED:1+REAC_IDENTITY_NAME_FIELD_BYTES	derived	name_kind + 16-byte name
+libreac	tests/test_box_table.c:152	first[20]	DERIVED:NEW:REAC_DT1_TAG_OFF+REAC_IDENTITY_ADDR_BYTES	derived	name_kind position
+libreac	tests/test_box_table.c:153	first + 21, 10	NEW:REAC_IDENTITY_NAME_FIRST_FRAG_BYTES	no	10 name bytes in 0x0401 fragment; comment line 146
+libreac	tests/test_box_table.c:154	last + 9, 6	NEW:REAC_IDENTITY_NAME_LAST_FRAG_BYTES / NEW:REAC_DT1_SYSEX_OFF(9)	no	6 name bytes in 0x0402 fragment at block[9]
+libreac	tests/test_box_table.c:155	0x01	NEW:REAC_IDENTITY_NAME_KIND	no	YAML prose IDENTITY_ADDR_MODEL_NAME: 0x01 on every observation
+libreac	tests/test_box_table.c:181	in_ch == 32, out_ch == 8	NEW:REAC_S4000S_CHANNELS / NEW:REAC_S4000S_OUT_CHANNELS	no	captured row
+libreac	tests/test_box_table.c:183	in_ch == 8, out_ch == 32	NEW:REAC_S4000H_IN_CHANNELS / NEW:REAC_S4000H_OUT_CHANNELS	no	0832 split, captured
+libreac	tests/test_box_table.c:188	== 8	NEW:REAC_S4000H_UPSTREAM_WIDTH	no	0832 granted return measured 8 ch (vlan13-0832.pcap)
+libreac	tests/test_box_table.c:193	in_ch == 40	REAC_MAX_CHANNELS	yes	fabric width row
+libreac	tests/test_box_table.c:195	out_ch == 40	REAC_MAX_CHANNELS	yes	
+libreac	tests/test_box_table.c:201	16	NEW:REAC_S1608_CHANNELS	no	width -> captured row
+libreac	tests/test_box_table.c:203	8	NEW:REAC_S0808_CHANNELS	no	
+libreac	tests/test_box_table.c:205	32	NEW:REAC_S4000S_CHANNELS	no	
+libreac	tests/test_box_table.c:206	40	REAC_MAX_CHANNELS	yes	
+libreac	tests/test_box_table.c:213	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	also 214
+libreac	tests/test_box_table.c:217	40	REAC_MAX_CHANNELS	yes	
+libreac	tests/test_box_table.c:220	40	REAC_MAX_CHANNELS	yes	
+libreac	tests/test_box_table.c:222	frame + 18, 32	REAC_CTRL_BLOCK_OFF / REAC_CTRL_BLOCK_LEN	yes	also 235
+libreac	tests/test_box_table.c:227	frame + 18 + 21	DERIVED:REAC_CTRL_BLOCK_OFF+NEW:REAC_DT1_TAG_OFF+REAC_IDENTITY_ADDR_BYTES+1	derived	name after name_kind
+libreac	tests/test_box_table.c:242	16	NEW:REAC_S1608_CHANNELS	no	
+libreac	tests/test_braid.c:45	size_t pos[3]; i < 3	REAC_RESOLUTION	yes	bytes per sample
+libreac	tests/test_braid.c:62	3 / 0 / 1	NEW:REAC_BRAID_EVEN_BYTE_MAP	no	even ch lo,mid,hi at group[3,0,1]; obs-h8819 convert_to_pcm24lep, reac_braid.h
+libreac	tests/test_braid.c:64	4 / 5 / 2	NEW:REAC_BRAID_ODD_BYTE_MAP	no	odd ch lo,mid,hi at group[4,5,2]
+libreac	tests/test_braid.c:66	2 * 3 + 3 ...	DERIVED:pair group stride 2*REAC_RESOLUTION + BRAID map	derived	next pair group
+libreac	tests/test_braid.c:68	16 * 3 + 3 ...	DERIVED:n_ch*REAC_RESOLUTION + BRAID map	derived	sample stride
+libreac	tests/test_braid.c:69	40	REAC_MAX_CHANNELS	yes	downstream width spot check
+libreac	tests/test_braid.c:70	(2 * 40 + 6) * 3 + 4	DERIVED:(s*REAC_MAX_CHANNELS+ch&~1)*REAC_RESOLUTION+BRAID_ODD[0]	derived	40 and 3 restated
+libreac	tests/test_braid.c:74	-8388608 / 8388607	DERIVED:+-2^(8*REAC_RESOLUTION-1)	derived	s24 range
+libreac	tests/test_braid.c:86	0xFF 0xFF 0x7F	DERIVED:s24 max	derived	24-bit rail
+libreac	tests/test_braid.c:88	0x00 0x00 0x80	DERIVED:s24 min	derived	24-bit rail
+libreac	tests/test_braid.c:92	1206 / 1204	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL(+2)	derived	S-4000S trailered/clean
+libreac	tests/test_braid.c:93	630 / 628	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL(+2)	derived	S-1608 trailered/clean
+libreac	tests/test_braid.c:94	1492	REAC_FRAME_BYTES	yes	clean downstream literal
+libreac	tests/test_braid.c:95	628	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_braid.c:96	340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_braid.c:97	629	DERIVED:628+1	derived	non-trailer probe
+libreac	tests/test_braid.c:99	53	DERIVED:REAC_FRAME_OVERHEAD+1	derived	short-length probe
+libreac	tests/test_braid.c:105	1206	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL+2	derived	unstripped probe
+libreac	tests/test_braid.c:106	1204 / 32	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL; NEW:REAC_S4000S_CHANNELS	derived	
+libreac	tests/test_braid.c:107	630	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL+2	derived	unstripped probe
+libreac	tests/test_braid.c:108	628 / 16	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL; NEW:REAC_S1608_CHANNELS	derived	
+libreac	tests/test_braid.c:109	342	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL+2	derived	unstripped probe
+libreac	tests/test_braid.c:110	340 / 8	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL; NEW:REAC_S0808_CHANNELS	derived	
+libreac	tests/test_capture.c:35	#define FRAME_LEN 340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	S-0808 upstream shape, hand-written macro
+libreac	tests/test_capture.c:41	f[12] = 0x88; f[13] = 0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_capture.c:42	f[14], f[15]	REAC_HDR_COUNTER_OFF	yes	LE counter
+libreac	tests/test_capture.c:43	f[FRAME_LEN - 2] = 0xC2; f[FRAME_LEN - 1] = 0xEA	REAC_END_MARKER_0 / REAC_END_MARKER_1	yes	end marker literals, macros exist
+libreac	tests/test_capture.c:160	FRAME_LEN + 4	NEW:ETH_VLAN_TAG_LEN (IEEE 802.1Q)	no	Ethernet, not REAC; REAC is carried tagged on trunks
+libreac	tests/test_capture.c:162	0x81 0x00	NEW:ETH_P_8021Q (IEEE 802.1Q TPID)	no	Ethernet, not REAC; no YAML fact for tagged REAC framing
+libreac	tests/test_ctrl.c:32	win[34]	REAC_TYPED_BLOCK_LEN	yes	[16:50] window length
+libreac	tests/test_ctrl.c:35	f[12] = 0x88; f[13] = 0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_ctrl.c:36	f + 16, 34	REAC_TYPED_BLOCK_OFF / REAC_TYPED_BLOCK_LEN	yes	window placement
+libreac	tests/test_ctrl.c:39	win[34]	REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:85	0x0018	REAC_SEG_FIRST_MAX (=REAC_SCENE_HEAD_BYTES)	yes	bulk FIRST length
+libreac	tests/test_ctrl.c:87	0x001a	REAC_SEG_CONT_MAX (=REAC_SCENE_CHUNK_BYTES)	yes	bulk MIDDLE length
+libreac	tests/test_ctrl.c:89	0x000e	REAC_SCENE_TAIL_BYTES	yes	bulk LAST length
+libreac	tests/test_ctrl.c:92	0x0019	REAC_LEN_SUB_CHANMAP	yes	slot-map record length
+libreac	tests/test_ctrl.c:109	shortened[34]	REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:111	shortened[2 + 2], [2 + 3]	DERIVED:(REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF)+REAC_HDR_LEN_OFF	derived	window->block offset 2 plus length field
+libreac	tests/test_ctrl.c:123	f[34 + 2]	DERIVED:REAC_CTRL_BLOCK_OFF+NEW:REAC_DT1_TAG_OFF	no	34 = frame offset of block[16], DT1 TAG
+libreac	tests/test_ctrl.c:142	forged[34]	REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:145	i = 18; i < 24	DERIVED:2+NEW:REAC_DT1_TAG_OFF	no	window[18]=block[16] TAG; six record bytes
+libreac	tests/test_ctrl.c:147	256 / 0x80	REAC_CTRL_RECORD_SUM	yes	record checksum target
+libreac	tests/test_ctrl.c:148	0x80 - six % 256	REAC_CTRL_RECORD_SUM	yes	record checksum target
+libreac	tests/test_ctrl.c:156	f + 34	DERIVED:REAC_CTRL_BLOCK_OFF+NEW:REAC_DT1_TAG_OFF	no	record start in frame
+libreac	tests/test_ctrl.c:171	i = 18; i < 33	DERIVED:2+NEW:REAC_DT1_TAG_OFF .. 2+REAC_CTRL_CKSUM_OFF_IN_BLOCK	derived	TAG through byte before outer cksum
+libreac	tests/test_ctrl.c:174	2 + 9 ; i < 34	DERIVED:(REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF)+9 / REAC_TYPED_BLOCK_LEN	derived	last-fragment payload scan start
+libreac	tests/test_ctrl.c:175	0xf7	NEW:REAC_SYSEX_EOX	no	Roland SysEx terminator closing a DT1 record; reac_ctrlblk.h DT1 docs
+libreac	tests/test_ctrl.c:176	2 + 9	DERIVED:(REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF)+9	derived	
+libreac	tests/test_ctrl.c:177	2 + 9	DERIVED:(REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF)+9	derived	
+libreac	tests/test_ctrl.c:180	128 - sum % 128	REAC_CTRL_RECORD_SUM	yes	Roland DT1 checksum modulus
+libreac	tests/test_ctrl.c:185	i = 18; i < 33	DERIVED:2+NEW:REAC_DT1_TAG_OFF .. 2+REAC_CTRL_CKSUM_OFF_IN_BLOCK	derived	
+libreac	tests/test_ctrl.c:187	128	REAC_CTRL_RECORD_SUM	yes	
+libreac	tests/test_ctrl.c:194	in_ch == 16, out_ch == 8	NEW:REAC_S1608_CHANNELS / NEW:REAC_S1608_OUT_CHANNELS	no	S-1608 16 in / 8 out from ports table
+libreac	tests/test_ctrl.c:197	in_ch == 8, out_ch == 8	NEW:REAC_S0808_CHANNELS / NEW:REAC_S0808_OUT_CHANNELS	no	S-0808 8 in / 8 out
+libreac	tests/test_ctrl.c:211	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	source MAC OUI
+libreac	tests/test_ctrl.c:213	8	NEW:REAC_S0808_CHANNELS	no	identity record sent by 8-in model
+libreac	tests/test_ctrl.c:214	8	NEW:REAC_S0808_CHANNELS	no	
+libreac	tests/test_ctrl.c:216	a + 16, 34	REAC_TYPED_BLOCK_OFF / REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:217	b + 16, 34	REAC_TYPED_BLOCK_OFF / REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:223	16	NEW:REAC_S1608_CHANNELS	no	model width selects matrix row
+libreac	tests/test_ctrl.c:224	16	NEW:REAC_S1608_CHANNELS	no	
+libreac	tests/test_ctrl.c:225	32	NEW:REAC_S4000S_CHANNELS	no	
+libreac	tests/test_ctrl.c:226	32	NEW:REAC_S4000S_CHANNELS	no	
+libreac	tests/test_ctrl.c:244	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	captured MAC
+libreac	tests/test_ctrl.c:245	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	captured MAC
+libreac	tests/test_ctrl.c:248	8	NEW:REAC_S0808_CHANNELS	no	n_ch
+libreac	tests/test_ctrl.c:249	340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	expected frame length
+libreac	tests/test_ctrl.c:250	i < 34	REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:251	f[16 + i]	REAC_TYPED_BLOCK_OFF	yes	
+libreac	tests/test_ctrl.c:252	"cdea0403..."	fixture data	-	captured hex expectation (fixture), not itemised
+libreac	tests/test_ctrl.c:254	+ 16, 7	DERIVED:REAC_CTRL_BLOCK_OFF+NEW:REAC_DT1_TAG_OFF	no	record span in block
+libreac	tests/test_ctrl.c:259	8 / 340	NEW:REAC_S0808_CHANNELS; DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_ctrl.c:260	+ 16, 34	REAC_TYPED_BLOCK_OFF / REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:265	8	NEW:REAC_S0808_CHANNELS	no	
+libreac	tests/test_ctrl.c:266	340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_ctrl.c:267	i < 34	REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:268	f[16 + i]	REAC_TYPED_BLOCK_OFF	yes	
+libreac	tests/test_ctrl.c:276	16	NEW:REAC_S1608_CHANNELS	no	
+libreac	tests/test_ctrl.c:277	628	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_ctrl.c:278	i < 34	REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ctrl.c:279	f[16 + i]	REAC_TYPED_BLOCK_OFF	yes	
+libreac	tests/test_decode.c:56	8388608.0f	DERIVED:2^(8*REAC_RESOLUTION-1)	derived	S24_SCALE
+libreac	tests/test_decode.c:58	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	source MAC OUI
+libreac	tests/test_decode.c:61	* 3	REAC_RESOLUTION	yes	pcm buffer size
+libreac	tests/test_decode.c:68	* 3	REAC_RESOLUTION	yes	s24 stride
+libreac	tests/test_decode.c:70	0x00800000 / 0x00FFFFFF	DERIVED:REAC_RESOLUTION*8 bit sign-extension	derived	24-bit sign extend
+libreac	tests/test_decode.c:100	8, 32	NEW:REAC_S0808_CHANNELS / NEW:REAC_S4000S_CHANNELS	no	corpus source widths
+libreac	tests/test_decode.c:210	* 3	REAC_RESOLUTION	yes	s24 stride; line above uses the macro
+libreac	tests/test_decode.c:211	3	REAC_RESOLUTION	yes	memcmp width
+libreac	tests/test_decode.c:227	48000	NEW:REAC_RATE_48K	no	mode literal
+libreac	tests/test_decode.c:228	48000	NEW:REAC_RATE_48K	no	mode literal
+libreac	tests/test_decode.c:229	48000	NEW:REAC_RATE_48K	no	mode literal
+libreac	tests/test_decode.c:230	48000	NEW:REAC_RATE_48K	no	mode literal
+libreac	tests/test_decode.c:237	bad[12]	DERIVED:REAC_HDR_COUNTER_OFF-2 (ethertype offset)	derived	ethertype byte offset 12
+libreac	tests/test_decode.c:240	0x88	REAC_ETHERTYPE	yes	ethertype high byte restored
+libreac	tests/test_encode.c:103	8, 16, 32, 40	REAC_MAX_CHANNELS (+NEW model widths 8/16/32)	yes	golden corpus channel set
+libreac	tests/test_encode.c:117	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	Roland MAC OUI 00:40:ab on every captured box/desk
+libreac	tests/test_encode.c:130	* 3	REAC_RESOLUTION	yes	bytes per sample
+libreac	tests/test_encode.c:132	0x00800000 / 0x00FFFFFF	DERIVED:REAC_RESOLUTION*8 bit sign-extension	derived	24-bit sign extend
+libreac	tests/test_encode.c:154	* 3	REAC_RESOLUTION	yes	buffer size (REAC_RESOLUTION exists)
+libreac	tests/test_encode.c:167	frame[12] = 0x88; frame[13] = 0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_encode.c:168	len - 2	DERIVED:REAC_FRAME_OVERHEAD-REAC_L2_HEADER_LEN	derived	end-marker position (2 bytes)
+libreac	tests/test_encode.c:169	len - 1	DERIVED:REAC_FRAME_OVERHEAD-REAC_L2_HEADER_LEN	derived	end-marker position
+libreac	tests/test_encode.c:177	8388608.0f	DERIVED:2^(8*REAC_RESOLUTION-1)	derived	s24 full scale
+libreac	tests/test_encode.c:247	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	source MAC OUI
+libreac	tests/test_encode.c:260	0x88 / 0x19	REAC_ETHERTYPE	yes	ethertype expectation
+libreac	tests/test_encode.c:263	f[16], f[17] == 0x00	REAC_TYPED_BLOCK_OFF / REAC_TYPE_FILLER	yes	type word offset + filler type
+libreac	tests/test_encode.c:264	18	REAC_CTRL_BLOCK_OFF	yes	control block start
+libreac	tests/test_encode.c:266	- 2	DERIVED:REAC_FRAME_OVERHEAD-REAC_L2_HEADER_LEN	derived	end-marker position
+libreac	tests/test_encode.c:267	- 1	DERIVED:REAC_FRAME_OVERHEAD-REAC_L2_HEADER_LEN	derived	end-marker position
+libreac	tests/test_identity.c:24	FW_S0808[4] (+FW_S1608/FW_S4000S)	NEW:REAC_IDENTITY_FW_BYTES	no	firmware reply = 4 decimal-digit bytes; YAML prose of IDENTITY_ADDR_FIRMWARE_VERSION only
+libreac	tests/test_identity.c:30	NAME_S0808[11]	fixture data	-	captured name body (fixture); NAME_FIELD_BYTES=16 is the declared width
+libreac	tests/test_identity.c:36	VER_S0808[8] (+VER_S1608/VER_S4000S)	NEW:REAC_IDENTITY_REAC_VERSION_BYTES	no	8 bytes = four u16be; YAML prose of IDENTITY_ADDR_REAC_VERSION; libreac REAC_IDENTITY_REAC_VER_LEN 8u
+libreac	tests/test_identity.c:54	frame[12] = 0x88; frame[13] = 0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_identity.c:55	frame[16]=0xcd; frame[17]=0xea	REAC_TYPED_BLOCK_OFF / REAC_TYPE_CONTROL	yes	type word hand-written
+libreac	tests/test_identity.c:57	13 + plen	NEW:REAC_DT1_SYSEX_OVERHEAD	no	f0 41 0a 00 00 12 12 tag addr_lo .. cksum f7 framing bytes
+libreac	tests/test_identity.c:58	b[0] = 0x04	REAC_HDR_LINK_OFF / REAC_LINK_RECORD	yes	link 4
+libreac	tests/test_identity.c:59	b[2], b[3], + 5	REAC_HDR_LEN_OFF / DERIVED:REAC_CTRL_RECLEN_BASE+..	derived	length field; +5 is container prefix
+libreac	tests/test_identity.c:60	b[4] = 0x00	REAC_SUB_0403_OFF / REAC_SUB_0403_DT1_RECORD	yes	DT1 record discriminator
+libreac	tests/test_identity.c:61	b[8]	NEW:REAC_DT1_SYSEX_LEN_OFF	no	block[8] = SysEx length
+libreac	tests/test_identity.c:62	b[9] = 0xf0	NEW:REAC_SYSEX_SOX / NEW:REAC_DT1_SYSEX_OFF(9)	no	SysEx start at block[9]
+libreac	tests/test_identity.c:63	b[14] = 0x12	NEW:REAC_DT1_MODEL_LO	no	libreac REAC_DT1_MODEL_LO hand-written in reac_ctrlblk.h:108
+libreac	tests/test_identity.c:64	b[16]=0x05; b[17]=0x00	REAC_DT1_TAG_IDENTITY at NEW:REAC_DT1_TAG_OFF(16)	yes	tag 0x0500; offset undeclared
+libreac	tests/test_identity.c:65	b[18], b[19]	DERIVED:NEW:REAC_DT1_TAG_OFF+2 / REAC_IDENTITY_ADDR_LO_BYTES	derived	addr_lo position
+libreac	tests/test_identity.c:67	b[20 + i]	DERIVED:NEW:REAC_DT1_TAG_OFF+REAC_IDENTITY_ADDR_BYTES	derived	payload start
+libreac	tests/test_identity.c:68	b[20 + plen]	DERIVED:NEW:REAC_DT1_TAG_OFF+REAC_IDENTITY_ADDR_BYTES	derived	record checksum position
+libreac	tests/test_identity.c:69	0xf7 / 21 + plen	NEW:REAC_SYSEX_EOX	no	SysEx terminator
+libreac	tests/test_identity.c:116	4	NEW:REAC_IDENTITY_FW_BYTES	no	payload length
+libreac	tests/test_identity.c:124	8	NEW:REAC_IDENTITY_REAC_VERSION_BYTES	no	payload length (also 125)
+libreac	tests/test_identity.c:134	4	NEW:REAC_IDENTITY_FW_BYTES	no	
+libreac	tests/test_identity.c:137	8	NEW:REAC_IDENTITY_REAC_VERSION_BYTES	no	also 138
+libreac	tests/test_identity.c:147	4	NEW:REAC_IDENTITY_FW_BYTES	no	
+libreac	tests/test_identity.c:150	8	NEW:REAC_IDENTITY_REAC_VERSION_BYTES	no	also 151
+libreac	tests/test_identity.c:171	bad_fw[4]	NEW:REAC_IDENTITY_FW_BYTES	no	also 172
+libreac	tests/test_identity.c:176	3	DERIVED:NEW:REAC_IDENTITY_FW_BYTES-1	no	short-reply probe
+libreac	tests/test_identity.c:185	7	DERIVED:NEW:REAC_IDENTITY_REAC_VERSION_BYTES-1	no	short-block probe
+libreac	tests/test_identity.c:189	4	NEW:REAC_IDENTITY_FW_BYTES	no	also 190, 204, 205
+libreac	tests/test_identity.c:217	4	NEW:REAC_IDENTITY_FW_BYTES	no	also 219
+libreac	tests/test_identity.c:225	8	NEW:REAC_IDENTITY_REAC_VERSION_BYTES	no	also 227, 229
+libreac	tests/test_identity.c:232	4	NEW:REAC_IDENTITY_FW_BYTES	no	
+libreac	tests/test_identity.c:233	REAC_CTRL_BLOCK_OFF + 15	NEW:REAC_DT1_CMD_OFF	no	block[15] DT1 command; reac_ctrlblk.h:104 comment
+libreac	tests/test_identity.c:238	frame[12] = 0x88; frame[13] = 0x19	REAC_ETHERTYPE	yes	
+libreac	tests/test_identity.c:255	4 / 8	NEW:REAC_IDENTITY_FW_BYTES / NEW:REAC_IDENTITY_REAC_VERSION_BYTES	no	also 256, 266, 267
+libreac	tests/test_link.c:23	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	also 24
+libreac	tests/test_link.c:31	WANT[3] hex strings	fixture data	-	captured burst goldens (box-to-box 2026-09-09); not itemised
+libreac	tests/test_link.c:37	8	NEW:REAC_S0808_CHANNELS	no	joiner width
+libreac	tests/test_link.c:38	340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_link.c:41	f[16 + i]	REAC_TYPED_BLOCK_OFF	yes	
+libreac	tests/test_link.c:46	8	NEW:REAC_S0808_CHANNELS	no	
+libreac	tests/test_link.c:49	8 / 340	NEW:REAC_S0808_CHANNELS; DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_link.c:50	i < 34; f[16 + i]	REAC_TYPED_BLOCK_LEN / REAC_TYPED_BLOCK_OFF	yes	
+libreac	tests/test_link.c:51	"cdea0103...0052"	fixture data	-	captured config-announce golden
+libreac	tests/test_link.c:60	i < 16	DERIVED:REAC_CTRL_BLOCK_LEN/2	derived	descriptor u16 words
+libreac	tests/test_link.c:61	0x00	NEW:REAC_FILLER_DESC_REQUESTING (hi byte)	no	filler descriptor word 0x0052; reac_link.h:58 (granted S-0808 replay)
+libreac	tests/test_link.c:62	0x52	NEW:REAC_FILLER_DESC_REQUESTING	no	libreac enum REAC_LINK_DESC_REQUESTING=0x52 (reac_link.h:63) hand-written
+libreac	tests/test_link.c:65	i < 32	REAC_CTRL_BLOCK_LEN	yes	
+libreac	tests/test_link.c:73	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	
+libreac	tests/test_link.c:75	0x0040ab123456ull	NEW:REAC_ROLAND_OUI	no	packed MAC containing OUI
+libreac	tests/test_link.c:93	FPS = 3675	NEW:REAC_PPS_44K1	no	comment derives 44100/12
+libreac	tests/test_link.c:94	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	M-200 MAC
+libreac	tests/test_link.c:131	7.148	NEW:REAC_DESK_SESSION_HOLD_S	no	desk box-session hold measured; box-boot-with-slave-analysis.md section 3
+libreac	tests/test_master_capture.c:64	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	our MAC OUI
+libreac	tests/test_master_capture.c:66	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	box MAC (captured)
+libreac	tests/test_master_capture.c:72	COMMIT_REPORT[32]	REAC_CTRL_BLOCK_LEN	yes	array size; body is fixture data (desk-arrival-slice.pcap)
+libreac	tests/test_master_capture.c:84	JOIN_BURST[3][32]	REAC_CTRL_BLOCK_LEN	yes	array size; body is fixture data
+libreac	tests/test_master_capture.c:104	DESK_FIRST16[16]	fixture data	-	captured block[0:16]; size is a test choice
+libreac	tests/test_master_capture.c:118	3675	NEW:REAC_PPS_44K1	no	burst table fps
+libreac	tests/test_master_capture.c:119	4000	NEW:REAC_PPS_48K	no	burst table fps
+libreac	tests/test_master_capture.c:120	8000	NEW:REAC_PPS_96K	no	burst table fps
+libreac	tests/test_master_capture.c:126	blk[32]	REAC_CTRL_BLOCK_LEN	yes	
+libreac	tests/test_master_capture.c:132	out[12] = 0x88; out[13] = 0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_master_capture.c:133	out[16]=0xcd; out[17]=0xea	REAC_TYPED_BLOCK_OFF / REAC_TYPE_CONTROL	yes	type word hand-written
+libreac	tests/test_master_capture.c:134	out + 18, 32	REAC_CTRL_BLOCK_OFF / REAC_CTRL_BLOCK_LEN	yes	
+libreac	tests/test_master_capture.c:135	len - 2	DERIVED:REAC_FRAME_OVERHEAD-REAC_L2_HEADER_LEN	derived	end marker position
+libreac	tests/test_master_capture.c:136	len - 1	DERIVED:REAC_FRAME_OVERHEAD-REAC_L2_HEADER_LEN	derived	end marker position
+libreac	tests/test_master_capture.c:166	scene_blk + 2, 16	DERIVED:REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF	derived	type-word skip into block
+libreac	tests/test_master_capture.c:180	scene_blk + 2, 16	DERIVED:REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF	derived	
+libreac	tests/test_master_capture.c:200	5	NEW:REAC_SCENE_HEAD_LEAD_SLOTS	no	header goes out 5 slots before the chunk cycle; M-300/M-200 goldens
+libreac	tests/test_master_capture.c:207	8.4	NEW:REAC_COMMIT_REPORT_DELAY_MS	no	box commit report +8.4 ms after LAST; desk-arrival-slice.pcap
+libreac	tests/test_master_capture.c:209	1.489	NEW:REAC_JOIN_BURST_DELAY_S	no	box 04 03 burst after group map; desk-arrival-slice.pcap
+libreac	tests/test_master_capture.c:229	8	NEW:REAC_BOX_PREENROLL_WIDTH	no	box returns 8 ch before ENROLL group map widens it; same capture
+libreac	tests/test_master_capture.c:262	8	NEW:REAC_BOX_PREENROLL_WIDTH	no	
+libreac	tests/test_master_capture.c:274	in_ch == 32, out_ch == 8	NEW:REAC_S4000S_CHANNELS / NEW:REAC_S4000S_OUT_CHANNELS	no	S-4000S-3208 32 in / 8 out
+libreac	tests/test_master_capture.c:275	0x00	REAC_PLACEMENT row in_ch=32 base=0x00	yes	head-amp base
+libreac	tests/test_master_capture.c:296	8	NEW:REAC_BOX_PREENROLL_WIDTH	no	
+libreac	tests/test_master_capture.c:331	0.210	NEW:REAC_ENROLL_GROUP_MAP_DELAY_S	no	desk group map ~210 ms after commit report; desk-arrival-slice.pcap
+libreac	tests/test_master_capture.c:335	32	NEW:REAC_S4000S_CHANNELS	no	allocated width
+libreac	tests/test_master_carriers.c:42	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	our MAC OUI
+libreac	tests/test_master_carriers.c:45	#define ENROLL_CONSOLE 8	NEW:REAC_ENROLL_CONSOLE_OFF	no	ENROLL console/pace byte, block[6] = template[8]; hand-written test macro
+libreac	tests/test_master_carriers.c:50	tmpl[34]	REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_master_carriers.c:54	tmpl[2 + i]	DERIVED:REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF	derived	type-word skip
+libreac	tests/test_master_carriers.c:55	(sum & 0xff) == 0	REAC_CTRL_BLOCK_SUM	yes	block checksum rule restated
+libreac	tests/test_master_carriers.c:65	announce_blk[19]	NEW:REAC_ANNOUNCE_PACE_OFF	no	cfea[19] console_field; YAML prose CONSOLE_FIELD_GATES_RATE, no offset fact
+libreac	tests/test_master_carriers.c:76	sl < 8	REAC_CHANMAP_RECS_PER_FRAME	yes	
+libreac	tests/test_master_carriers.c:77	+ 7 + sl * 3	DERIVED:(REAC_CTRL_BLOCK_OFF-REAC_TYPED_BLOCK_OFF)+REAC_SUB_0103_OFF+1 ; REAC_CHANMAP_REC_BYTES	derived	chanmap records at block[5], 3 bytes each
+libreac	tests/test_master_carriers.c:78	0xfe	REAC_CHANMAP_ID_IDENTITY	yes	section marker id
+libreac	tests/test_master_carriers.c:84	markers == 8	DERIVED:REAC_CHANMAP_RECS_PER_FRAME	derived	0xfe appears in 8 of 49 windows
+libreac	tests/test_master_carriers.c:99	announce_blk[20], [21]	NEW:REAC_ANNOUNCE_BOX_COUNT_OFF	no	u16be box count, block[18:20]; 2026-09-13 corpus pass
+libreac	tests/test_master_carriers.c:126	4000	NEW:REAC_PPS_48K	no	
+libreac	tests/test_master_carriers.c:133	4000	NEW:REAC_PPS_48K	no	
+libreac	tests/test_master_carriers.c:136	announce_blk[18] == 0x08	NEW:REAC_ANNOUNCE_WIDTH_OFF / NEW:REAC_ANNOUNCE_IDLE_WIDTH	no	cfea width byte block[16]; idle 0x08; m200-enrol-441k-2026-09-13
+libreac	tests/test_master_carriers.c:147	[18] == 0x08	NEW:REAC_ANNOUNCE_WIDTH_OFF / NEW:REAC_ANNOUNCE_IDLE_WIDTH	no	
+libreac	tests/test_master_carriers.c:151	16, 8, 0x20	NEW:REAC_S1608_CHANNELS / NEW:REAC_S1608_OUT_CHANNELS / REAC_PLACEMENT in_ch=16 base=0x20	no	S-1608 set_box
+libreac	tests/test_master_carriers.c:153	[18] == 0x10	NEW:REAC_ANNOUNCE_WIDTH_OFF / NEW:REAC_S1608_CHANNELS	no	
+libreac	tests/test_master_carriers.c:155	[19], 4000	NEW:REAC_ANNOUNCE_PACE_OFF / NEW:REAC_PPS_48K	no	
+libreac	tests/test_master_carriers.c:166	[18] == 0x10	NEW:REAC_ANNOUNCE_WIDTH_OFF / NEW:REAC_S1608_CHANNELS	no	
+libreac	tests/test_master_carriers.c:175	[18] == 0x08	NEW:REAC_ANNOUNCE_WIDTH_OFF / NEW:REAC_ANNOUNCE_IDLE_WIDTH	no	
+libreac	tests/test_master_carriers.c:181	8, 16, 32	NEW:REAC_S0808/S1608/S4000S_CHANNELS	no	declared widths
+libreac	tests/test_master_carriers.c:184	4000	NEW:REAC_PPS_48K	no	
+libreac	tests/test_master_carriers.c:185	8, 0x00	NEW:REAC_*_OUT_CHANNELS / REAC_PLACEMENT base 0x00	no	
+libreac	tests/test_master_carriers.c:186	[18]	NEW:REAC_ANNOUNCE_WIDTH_OFF	no	
+libreac	tests/test_master_carriers.c:198	3675 -> 2	NEW:REAC_PPS_44K1 / NEW:REAC_PACE_CODE_44K1	no	pace code 2; YAML prose SCENE_REVISION_OFF
+libreac	tests/test_master_carriers.c:199	4000 -> 0	NEW:REAC_PPS_48K / NEW:REAC_PACE_CODE_48K	no	pace code 0
+libreac	tests/test_master_carriers.c:200	8000 -> 1	NEW:REAC_PPS_96K / NEW:REAC_PACE_CODE_96K	no	pace code 1
+libreac	tests/test_master_carriers.c:202	4000	NEW:REAC_PPS_48K	no	
+libreac	tests/test_master_carriers.c:203	8000	NEW:REAC_PPS_96K	no	
+libreac	tests/test_master_carriers.c:204	3675	NEW:REAC_PPS_44K1	no	
+libreac	tests/test_master_carriers.c:214	4000, 0x00	NEW:REAC_PPS_48K / NEW:REAC_PACE_CODE_48K	no	measured table; 2026-09-13-announce-bytes-and-headamp-base.md
+libreac	tests/test_master_carriers.c:215	8000, 0x01	NEW:REAC_PPS_96K / NEW:REAC_PACE_CODE_96K	no	
+libreac	tests/test_master_carriers.c:216	3675, 0x02	NEW:REAC_PPS_44K1 / NEW:REAC_PACE_CODE_44K1	no	
+libreac	tests/test_master_carriers.c:225	announce_blk[19]	NEW:REAC_ANNOUNCE_PACE_OFF	no	
+libreac	tests/test_master_carriers.c:236	console_field = 0	NEW:REAC_PACE_CODE_48K	no	
+libreac	tests/test_master_carriers.c:237	console_field = 2	NEW:REAC_PACE_CODE_44K1	no	
+libreac	tests/test_master_carriers.c:239	4000	NEW:REAC_PPS_48K	no	
+libreac	tests/test_master_carriers.c:240	3675	NEW:REAC_PPS_44K1	no	
+libreac	tests/test_master_carriers.c:241	announce_blk[19]	NEW:REAC_ANNOUNCE_PACE_OFF	no	
+libreac	tests/test_master_carriers.c:244	34	REAC_TYPED_BLOCK_LEN	yes	chanmap window compare
+libreac	tests/test_master_carriers.c:266	8 / "cdea0103000d...c3c3c3c3...8e"	NEW:REAC_S0808_CHANNELS; golden = fixture data	no	ENROLL golden (captured); 0x41/0xc3 = REAC_ENROLL_GROUP_IN/OUT
+libreac	tests/test_master_carriers.c:270	16 / golden	NEW:REAC_S1608_CHANNELS; fixture data	no	
+libreac	tests/test_master_carriers.c:271	32 / golden	NEW:REAC_S4000S_CHANNELS; fixture data	no	
+libreac	tests/test_master_carriers.c:277	4000	NEW:REAC_PPS_48K	no	
+libreac	tests/test_master_carriers.c:278	8, 0x00	NEW:REAC_*_OUT_CHANNELS / REAC_PLACEMENT base 0x00	no	
+libreac	tests/test_master_carriers.c:279	j < 34	REAC_TYPED_BLOCK_LEN	yes	
+libreac	tests/test_ports.c:18	BLK_S1608[32] (+BLK_S0808/S4000S/S4000H)	REAC_CTRL_BLOCK_LEN	yes	array sizes; bodies are fixture data (captured config-announce blocks)
+libreac	tests/test_ports.c:57	in_ch == 16, out_ch == 8	NEW:REAC_S1608_CHANNELS / NEW:REAC_S1608_OUT_CHANNELS	no	decoded widths
+libreac	tests/test_ports.c:59	in_ch == 8, out_ch == 8	NEW:REAC_S0808_CHANNELS / NEW:REAC_S0808_OUT_CHANNELS	no	
+libreac	tests/test_ports.c:61	in_ch == 32, out_ch == 8	NEW:REAC_S4000S_CHANNELS / NEW:REAC_S4000S_OUT_CHANNELS	no	
+libreac	tests/test_ports.c:70	in_ch == 8, out_ch == 32	NEW:REAC_S4000H_IN_CHANNELS / NEW:REAC_S4000H_OUT_CHANNELS	no	S-4000H-0832 8 in/32 out; vlan13-0832.pcap
+libreac	tests/test_ports.c:71	0x00	REAC_PLACEMENT base 0x00 (strap 0)	yes	
+libreac	tests/test_ports.c:75	unnamed[32]; memcpy 32	REAC_CTRL_BLOCK_LEN	yes	also 76, 86-87, 90, 93, 96, 104, 109, 119, 125, 136, 166, 168, 175, 182, 191-193
+libreac	tests/test_ports.c:79	in_ch == 32, out_ch == 8	NEW:REAC_S4000S_CHANNELS / NEW:REAC_S4000S_OUT_CHANNELS	no	
+libreac	tests/test_ports.c:88	wrong[4]	REAC_HDR_OPCODE_OFF	yes	opcode offset (also 120)
+libreac	tests/test_ports.c:91	wrong[0]	REAC_HDR_LINK_OFF	yes	link offset (also 137)
+libreac	tests/test_ports.c:94	wrong[1]	REAC_HDR_SEG_OFF	yes	segment offset
+libreac	tests/test_ports.c:97	wrong[3]	DERIVED:REAC_HDR_LEN_OFF+1	derived	length low byte
+libreac	tests/test_ports.c:107	in_ch == 8, out_ch == 8	NEW:REAC_S0808_CHANNELS	no	
+libreac	tests/test_ports.c:108	== 4	REAC_PORTS_CH_PER_SLOT	yes	unknown group = 4 channels (also 113)
+libreac	tests/test_ports.c:112	in_ch == 12	DERIVED:16-REAC_PORTS_CH_PER_SLOT	derived	
+libreac	tests/test_ports.c:128	in_ch == 20	DERIVED:16+REAC_PORTS_CH_PER_SLOT	derived	
+libreac	tests/test_ports.c:149	0x00	REAC_PLACEMENT in_ch=8 base=0x00	yes	
+libreac	tests/test_ports.c:151	0x20	REAC_PLACEMENT in_ch=16 base=0x20	yes	
+libreac	tests/test_ports.c:153	0x00	REAC_PLACEMENT in_ch=32 base=0x00	yes	
+libreac	tests/test_ports.c:171	16	NEW:REAC_S1608_CHANNELS	no	
+libreac	tests/test_ports.c:172	0x10	DERIVED:1*REAC_HEADAMP_BASE_MULTIPLIER	derived	
+libreac	tests/test_ports.c:173	0x20	REAC_PLACEMENT in_ch=16 base=0x20	yes	
+libreac	tests/test_ports.c:178	8	NEW:REAC_S0808_CHANNELS	no	
+libreac	tests/test_ports.c:179	0x20	DERIVED:2*REAC_HEADAMP_BASE_MULTIPLIER	derived	
+libreac	tests/test_ports.c:185	32	NEW:REAC_S4000S_CHANNELS	no	
+libreac	tests/test_ports.c:186	0x30	DERIVED:3*REAC_HEADAMP_BASE_MULTIPLIER	derived	
+libreac	tests/test_ports.c:196	8 / 32	NEW:REAC_S0808_CHANNELS / NEW:REAC_S4000S_CHANNELS	no	
+libreac	tests/test_ports.c:201	0x10	REAC_HEADAMP_BASE_MULTIPLIER	yes	test restates schema value (reac_facts_assert.h already binds it)
+libreac	tests/test_ports.c:202	7	NEW:REAC_HEADAMP_BASE_OFF	no	config-announce block[7]; only implied by YAML name HEADAMP_BASE_FROM_CONFIG_BYTE7
+libreac	tests/test_ports.c:203	1	REAC_HEADAMP_BASE_FROM_CONFIG_BYTE7	yes	restates schema value
+libreac	tests/test_ports.c:204	1	REAC_HEADAMP_BASE_IS_CHASSIS_NOT_GRANT	yes	restates schema value
+libreac	tests/test_ports.c:207	8	REAC_HEADAMP_APPLY_UNIT_SLOTS	yes	restates schema value
+libreac	tests/test_reac.c:16	3675	NEW:REAC_PPS_44K1	no	44.1k packet rate; YAML prose only (m200-enrol-441k-2026-09-13, 3675 fps)
+libreac	tests/test_reac.c:17	4000	NEW:REAC_PPS_48K	no	48k packet rate = 48000/12
+libreac	tests/test_reac.c:18	8000	NEW:REAC_PPS_96K	no	96k packet rate = 96000/12
+libreac	tests/test_reac.c:19	3837 / 44100	DERIVED:(REAC_PPS_44K1+REAC_PPS_48K)/2	no	snap midpoint edge, from undeclared rates
+libreac	tests/test_reac.c:20	3838 / 48000	DERIVED:(REAC_PPS_44K1+REAC_PPS_48K)/2	no	snap midpoint edge
+libreac	tests/test_reac.c:21	5999 / 48000	DERIVED:(REAC_PPS_48K+REAC_PPS_96K)/2	no	snap midpoint edge
+libreac	tests/test_reac.c:22	6001 / 96000	DERIVED:(REAC_PPS_48K+REAC_PPS_96K)/2	no	snap midpoint edge
+libreac	tests/test_reac.c:23	96000	NEW:REAC_RATE_96K	no	jitter snap expectation
+libreac	tests/test_reac.c:26	48000	NEW:REAC_RATE_48K	no	mode_for input
+libreac	tests/test_reac.c:27	96000	NEW:REAC_RATE_96K	no	mode_for input
+libreac	tests/test_reac.c:28	44100	NEW:REAC_RATE_44K1	no	mode_for input
+libreac	tests/test_reac.c:30	40	REAC_MAX_CHANNELS	yes	96k mode channel count expectation
+libreac	tests/test_reac.c:35	f[12]=0x88; f[13]=0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_reac.c:36	f[14], f[15]	REAC_HDR_COUNTER_OFF	yes	counter offset hand-indexed
+libreac	tests/test_reac.c:41	0x19	REAC_ETHERTYPE	yes	ethertype low byte restored
+libreac	tests/test_reac.c:52	-1000	REAC_HEADAMP_SENS_REF_CDB	yes	SENS 0x00 pad off
+libreac	tests/test_reac.c:53	0x37	REAC_HEADAMP_SENS_MAX	yes	max sens step
+libreac	tests/test_reac.c:54	1000	DERIVED:REAC_HEADAMP_SENS_REF_CDB+REAC_HEADAMP_PAD_CDB	derived	pad on at step 0
+libreac	tests/test_reac.c:55	0x37 / -4500	DERIVED:REAC_HEADAMP_SENS_REF_CDB-REAC_HEADAMP_SENS_MAX*REAC_HEADAMP_SENS_STEP_CDB+REAC_HEADAMP_PAD_CDB	derived	pad on at max step
+libreac	tests/test_reac.c:56	0x37 / -65	DERIVED:(REAC_HEADAMP_SENS_REF_CDB-REAC_HEADAMP_SENS_MAX*REAC_HEADAMP_SENS_STEP_CDB)/100	derived	whole-dB endpoint
+libreac	tests/test_reac.c:61	100	REAC_HEADAMP_SENS_STEP_CDB	yes	per-step delta expectation
+libreac	tests/test_reac.c:64	7 / 8	REAC_HEADAMP_SENS_STAGE_BREAK_1	yes	stage break pair
+libreac	tests/test_reac.c:65	23 / 24	REAC_HEADAMP_SENS_STAGE_BREAK_2	yes	stage break pair
+libreac	tests/test_reac.c:66	39 / 40	REAC_HEADAMP_SENS_STAGE_BREAK_3	yes	stage break pair
+libreac	tests/test_reac.c:75	0x00	DERIVED:min SENS step	derived	clamp floor (step 0)
+libreac	tests/test_reac.c:76	0x37	REAC_HEADAMP_SENS_MAX	yes	clamp ceiling
+libreac	tests/test_reac.c:90	-(10 + v) * 100	DERIVED:REAC_HEADAMP_SENS_REF_CDB-v*REAC_HEADAMP_SENS_STEP_CDB	derived	10 and 100 restate REF and STEP
+libreac	tests/test_reac.c:136	1204	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL	derived	S-4000S upstream length
+libreac	tests/test_reac.c:137	628	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL	derived	S-1608 upstream length
+libreac	tests/test_reac.c:138	340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	S-0808 upstream length
+libreac	tests/test_reac.c:141	40	REAC_MAX_CHANNELS	yes	width of 1492
+libreac	tests/test_reac.c:142	1204	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_reac.c:143	628	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_reac.c:144	340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_reac.c:146	51	DERIVED:REAC_FRAME_OVERHEAD-1	derived	below-header length probe
+libreac	tests/test_reac_etf.c:109	fps = 3675	NEW:REAC_PPS_44K1	no	
+libreac	tests/test_reac_etf.c:128	272108.0	DERIVED:1e9/NEW:REAC_PPS_44K1	no	slot period ns
+libreac	tests/test_reac_etf.c:136	3675	NEW:REAC_PPS_44K1	no	also 137
+libreac	tests/test_reac_etf.c:332	3675, 4000, 8000	NEW:REAC_PPS_44K1 / NEW:REAC_PPS_48K / NEW:REAC_PPS_96K	no	rate list
+libreac	tests/test_reac_knock.c:131	3675ULL	NEW:REAC_PPS_44K1	no	slowest rate on closed list
+libreac	tests/test_reac_knock.c:140	250000ULL	DERIVED:1e9/NEW:REAC_PPS_48K	no	250 us box frame period at 48k; REAC_FSM_FLOOD_BURST 5460 defined literally in include/reac/reac_fsm.h:49
+libreac	tests/test_rx_twin.c:91	out[14]	REAC_HDR_COUNTER_OFF	yes	LE counter low byte
+libreac	tests/test_rx_twin.c:92	out[15]	DERIVED:REAC_HDR_COUNTER_OFF+1	derived	LE counter high byte
+libreac	tests/test_rx_twin.c:100	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	master MAC
+libreac	tests/test_rx_twin.c:102	out[12] = 0x88; out[13] = 0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_rx_twin.c:103	out[14], out[15]	REAC_HDR_COUNTER_OFF	yes	LE counter
+libreac	tests/test_rx_twin.c:142	sizeof UP16 + 2	DERIVED:capture FCS residue (+2)	derived	twin buffer
+libreac	tests/test_rx_twin.c:143	REAC_FRAME_BYTES + 2	DERIVED:REAC_FRAME_BYTES_OHRCA	derived	macro exists, spelled +2
+libreac	tests/test_rx_twin.c:150	REAC_FRAME_BYTES + 2	DERIVED:REAC_FRAME_BYTES_OHRCA	derived	
+libreac	tests/test_rx_twin.c:157	sizeof UP16 + 2	DERIVED:capture FCS residue (+2)	derived	
+libreac	tests/test_rx_twin.c:164	forced_rate = 48000	NEW:REAC_RATE_48K	no	
+libreac	tests/test_sniffer_binds_first.c:64	#define REAC_ETHERTYPE 0x8819	REAC_ETHERTYPE	yes	hand-written re-#define of a YAML fact inside the test
+libreac	tests/test_sniffer_binds_first.c:81	f[12] = 0x88; f[13] = 0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_tap.c:65	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	M-200 MAC (captured)
+libreac	tests/test_tap.c:66	0x00, 0x40, 0xab	NEW:REAC_ROLAND_OUI	no	S-1608 MAC (captured)
+libreac	tests/test_tap.c:69	#define BOX_CH 16	NEW:REAC_S1608_CHANNELS	no	test macro restating S-1608 width
+libreac	tests/test_tap.c:83	f[12] = 0x88; f[13] = 0x19	REAC_ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tests/test_tap.c:84	f[14]	REAC_HDR_COUNTER_OFF	yes	LE counter low byte
+libreac	tests/test_tap.c:85	f[15]	DERIVED:REAC_HDR_COUNTER_OFF+1	derived	LE counter high byte
+libreac	tests/test_tap.c:86	f[clean - 2] = 0xC2	REAC_END_MARKER_0	yes	end marker literal, macro exists
+libreac	tests/test_tap.c:114	REAC_FRAME_BYTES + 2	DERIVED:REAC_FRAME_BYTES_OHRCA (capture residue)	derived	+2 FCS residue buffer
+libreac	tests/test_tap.c:123	dn[REAC_FRAME_BYTES + 1]	DERIVED:capture FCS residue (+2)	derived	
+libreac	tests/test_tap.c:124	REAC_FRAME_BYTES + 2	DERIVED:REAC_FRAME_BYTES_OHRCA	derived	macro exists, spelled as +2
+libreac	tests/test_tap.c:161	clean + 2	DERIVED:capture FCS residue (+2)	derived	
+libreac	tests/test_tap.c:165	clean + 2	DERIVED:capture FCS residue (+2)	derived	
+libreac	tests/test_tap.c:179	4000.0	NEW:REAC_PPS_48K	no	synthetic cadence
+libreac	tests/test_tap.c:190	40	REAC_MAX_CHANNELS	yes	master downstream width
+libreac	tests/test_tap.c:211	48000	NEW:REAC_RATE_48K	no	
+libreac	tests/test_tap.c:214	8000.0 / 96000	NEW:REAC_PPS_96K / NEW:REAC_RATE_96K	no	
+libreac	tests/test_tap.c:215	3675.0 / 44100	NEW:REAC_PPS_44K1 / NEW:REAC_RATE_44K1	no	
+libreac	tests/test_tap.c:270	40	REAC_MAX_CHANNELS	yes	
+libreac	tests/test_tap.c:276	48000	NEW:REAC_RATE_48K	no	
+libreac	tests/test_topo_hears_vlans.c:91	#define REAC_ETHERTYPE 0x8819	REAC_ETHERTYPE	yes	hand-written re-#define of a YAML fact inside the test (shadows reac.h name)
+libreac	tests/test_topo_hears_vlans.c:143	f[12], f[13]	DERIVED:REAC_HDR_COUNTER_OFF-2 (ethertype offset)	derived	ethertype byte offset
+libreac	tests/test_upstream.c:38	* 3	REAC_RESOLUTION	yes	s24 stride
+libreac	tests/test_upstream.c:40	0x00800000 / 0x00FFFFFF	DERIVED:REAC_RESOLUTION*8 bit sign-extension	derived	24-bit sign extend
+libreac	tests/test_upstream.c:48	628	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL	derived	S-1608 upstream length
+libreac	tests/test_upstream.c:49	340	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	S-0808 upstream length
+libreac	tests/test_upstream.c:50	1492	REAC_FRAME_BYTES	yes	downstream length hand-written
+libreac	tests/test_upstream.c:51	627	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL-1	derived	off-law probe
+libreac	tests/test_upstream.c:52	629	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL+1	derived	off-law probe
+libreac	tests/test_upstream.c:53	52	REAC_FRAME_OVERHEAD	yes	zero-width frame
+libreac	tests/test_upstream.c:54	160	DERIVED:REAC_FRAME_OVERHEAD+3*REAC_BYTES_PER_CHANNEL	derived	odd-width probe
+libreac	tests/test_upstream.c:64	16	NEW:REAC_S1608_CHANNELS	no	loop bound over fixture channels
+libreac	tests/test_upstream.c:65	12	REAC_SAMPLES_PER_PKT	yes	loop bound
+libreac	tests/test_upstream.c:77	1206	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL+2	derived	+2 is capture FCS residue, not wire
+libreac	tests/test_upstream.c:78	1204	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL	derived	S-4000S upstream length
+libreac	tests/test_upstream.c:79	1205	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL+1	derived	off-law probe
+libreac	tests/test_upstream.c:80	1204	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL	derived	clean_len expectation
+libreac	tests/test_upstream.c:86	32	NEW:REAC_S4000S_CHANNELS	no	loop bound
+libreac	tests/test_upstream.c:87	12	REAC_SAMPLES_PER_PKT	yes	loop bound
+libreac	tests/test_upstream.c:95	1204	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL	derived	hand-sliced length
+libreac	tests/test_upstream.c:96	32 * 12 * 3	DERIVED:32*REAC_SAMPLES_PER_PKT*REAC_RESOLUTION	derived	S-4000S audio bytes
+libreac	tests/test_upstream.c:102	32	NEW:REAC_S4000S_CHANNELS	no	loop bound
+libreac	tests/test_upstream.c:103	12	REAC_SAMPLES_PER_PKT	yes	loop bound
+libreac	tests/test_upstream.c:112	8	NEW:REAC_S0808_CHANNELS	no	loop bound
+libreac	tests/test_upstream.c:113	12	REAC_SAMPLES_PER_PKT	yes	loop bound
+libreac	tests/test_upstream.c:119	628	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL	derived	buffer size
+libreac	tests/test_upstream.c:121	f[12]	DERIVED:REAC_HDR_COUNTER_OFF-2 (ethertype offset)	derived	ethertype byte offset
+libreac	tests/test_upstream.c:124	f[626]	DERIVED:628-(REAC_FRAME_OVERHEAD-REAC_L2_HEADER_LEN)	derived	end marker position
+libreac	tests/test_upstream.c:127	627	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL-1	derived	truncated probe
+libreac	tests/test_upstream.c:128	628	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL	derived	
+libreac	tests/test_upstream.c:132	630	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL+2	derived	+2 FCS residue probe
+libreac	tests/test_upstream.c:133	342	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL+2	derived	+2 FCS residue probe
+libreac	tests/test_upstream.c:134	630	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL+2	derived	+2 FCS residue probe
+libreac	tests/test_upstream.c:135	1494	DERIVED:REAC_FRAME_BYTES+2	derived	REAC_FRAME_BYTES_OHRCA exists; spelled literally
+libreac	tests/test_wire_invariants.c:182	origlen - 2	DERIVED:capture FCS residue (+2)	derived	tap artifact, not a wire fact; libreac REAC_FRAME_BYTES_OHRCA uses same +2
+libreac	tests/test_wire_invariants.c:242	+ 24	NEW:ETH_PHY_OVERHEAD (preamble+SFD+FCS+IFG)	no	Ethernet, not REAC; listed for completeness
+libreac	tests/test_wire_invariants.c:255	100e6	NEW:REAC_LINK_RATE_BPS	no	REAC runs on 100BASE-TX (file header, point 3)
+libreac	tests/test_wire_invariants.c:268	8000.0	NEW:REAC_PPS_96K	no	link-bound arithmetic
+libreac	tests/test_wire_invariants.c:269	100e6	NEW:REAC_LINK_RATE_BPS	no	
+libreac	tests/test_wire_invariants.c:270	100e6	NEW:REAC_LINK_RATE_BPS	no	
+libreac	tests/upstream_fixtures.inc:1	UP16[628]	DERIVED:REAC_FRAME_OVERHEAD+16*REAC_BYTES_PER_CHANNEL	derived	array size; body fixture data
+libreac	tests/upstream_fixtures.inc:44	UP16_PCM[16][12]	NEW:REAC_S1608_CHANNELS / REAC_SAMPLES_PER_PKT	no	array dims; body fixture data
+libreac	tests/upstream_fixtures.inc:62	UP8[340]	DERIVED:REAC_FRAME_OVERHEAD+8*REAC_BYTES_PER_CHANNEL	derived	array size
+libreac	tests/upstream_fixtures.inc:87	UP8_PCM[8][12]	NEW:REAC_S0808_CHANNELS / REAC_SAMPLES_PER_PKT	no	array dims
+libreac	tests/upstream_fixtures.inc:105	UP32A[1206]	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL+2	derived	captured with +2 FCS residue
+libreac	tests/upstream_fixtures.inc:184	UP32A_PCM[32][12]	NEW:REAC_S4000S_CHANNELS / REAC_SAMPLES_PER_PKT	no	array dims
+libreac	tests/upstream_fixtures.inc:218	UP32B[1206]	DERIVED:REAC_FRAME_OVERHEAD+32*REAC_BYTES_PER_CHANNEL+2	derived	
+libreac	tests/upstream_fixtures.inc:297	UP32B_PCM[32][12]	NEW:REAC_S4000S_CHANNELS / REAC_SAMPLES_PER_PKT	no	
+libreac	tests/wire-invariants.inc:1	(whole file)	fixture data	-	GENERATED capture records (origlen 1492 etc.); not itemised
+libreac	tests/wire-invariants.inc:3852	48000	NEW:REAC_RATE_48K	no	generated capture table rate field (also 3858)
+libreac	tests/wire-invariants.inc:3855	96000	NEW:REAC_RATE_96K	no	generated capture table rate field
+libreac	tools/conformance-pace-harness.sh:36	NOM_US = 125	DERIVED:1e6/(NEW:REAC_RATE_96K/SAMPLES_PER_PKT)	no	synthetic capture period (also 125 at :94 :95)
+libreac	tools/conformance-pace-harness.sh:38	0040abcafe01	NEW:REAC_ROLAND_OUI	no	Roland OUI 00:40:ab in synthetic src MAC
+libreac	tools/conformance-pace-harness.sh:40	b'\x88\x19' + bytes(1478)	ETHERTYPE;DERIVED:FRAME_BYTES-14	yes	synthetic 1492 B frame
+libreac	tools/conformance-pace-harness.sh:78	--fps 8000	DERIVED:NEW:REAC_RATE_96K/SAMPLES_PER_PKT	no	also :79 :114
+libreac	tools/conformance-packet-socket.sh:87	htons(0x8819)	ETHERTYPE	yes	fixture C snippet in test heredoc
+libreac	tools/corpus_check.c:109	REAC_CTRL_BLOCK_OFF + 4	HDR_OPCODE_OFF	yes	opcode byte corrupted
+libreac	tools/corpus_check.c:113	f[16]==0xcd && f[17]==0xea	TYPED_BLOCK_OFF;TYPE_CONTROL	yes	type word test
+libreac	tools/corpus_check.c:114	f[18], f[19], f[22]	DERIVED:CTRL_BLOCK_OFF+HDR_LINK_OFF/HDR_SEG_OFF/HDR_OPCODE_OFF	derived	header triple read by absolute offsets
+libreac	tools/corpus_check.c:129	p.param < 3	DERIVED:HEADAMP_PARAM_SENS+1	derived	number of head-amp params
+libreac	tools/corpus_check.c:138	f[16]==0xcd && f[17]==0xea && f[18]==0x01	TYPED_BLOCK_OFF;TYPE_CONTROL;LINK_CONTROL	yes	ports parse gate
+libreac	tools/corpus_check.c:166	% 36	BYTES_PER_CHANNEL	yes	REAC_UPSTREAM_BYTES_PER_CH exists; overhead already via macro
+libreac	tools/etf-veth-probe.sh:27	FPS=8000	DERIVED:NEW:REAC_RATE_96K/SAMPLES_PER_PKT	no	default fps
+libreac	tools/etf_probe.c:48	#define FRAME_BYTES 1492	FRAME_BYTES	yes	probe frame sized as REAC frame; REAC_FRAME_BYTES exists
+libreac	tools/etf_probe.c:89	fps = 8000	DERIVED:NEW:REAC_RATE_96K/SAMPLES_PER_PKT	no	default probe cadence
+libreac	tools/fake_box.c:76	fixture data (BOX_MAC, COMMIT_REPORT, JOIN_BURST lines 76-96)	fixture	n/a	captured S-4000S-3208 bytes; not itemised
+libreac	tools/fake_box.c:101	#define BOX_CHANNELS 8	NEW:REAC_BOX_DECL_FRAME_CHANNELS	no	declaration frames 8ch wide regardless of box; vlan13-0832.pcap t=+1.4579
+libreac	tools/fake_box.c:102	COMMIT_DELAY_NS 8400000LL	NEW:REAC_BOX_COMMIT_REPORT_DELAY_NS	no	box commit report +8.4 ms after LAST, measured; weak, single capture
+libreac	tools/fake_box.c:103	JOIN_DELAY_NS 1489000000LL	NEW:REAC_BOX_JOIN_AFTER_GROUP_MAP_NS	no	JOIN +1.489 s after group map; YAML prose says ~1.6 s
+libreac	tools/fake_box.c:128	const uint8_t blk[32]	CTRL_BLOCK_LEN	yes	param array size (also :144 :162)
+libreac	tools/fake_box.c:135	out[12] = 0x88; out[13] = 0x19	ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tools/fake_box.c:136	out[16] = 0xcd; out[17] = 0xea	TYPED_BLOCK_OFF;TYPE_CONTROL	yes	type word offset and value hand-written
+libreac	tools/fake_box.c:137	out + 18, blk, 32	CTRL_BLOCK_OFF;CTRL_BLOCK_LEN	yes	control block copy
+libreac	tools/fake_box.c:195	0x8819	ETHERTYPE	yes	socket bind protocol literal
+libreac	tools/fake_box.c:292	i < 3	NEW:REAC_COLDCONNECT_BURST_RECORDS	no	three JOIN burst records
+libreac	tools/gen-wire-invariants.py:43	48000	NEW:REAC_RATE_48K	no	golden capture rate metadata
+libreac	tools/gen-wire-invariants.py:46	96000	NEW:REAC_RATE_96K	no	golden capture rate metadata
+libreac	tools/gen-wire-invariants.py:49	48000	NEW:REAC_RATE_48K	no	golden capture rate metadata
+libreac	tools/gen-wire-invariants.py:108	len(d) < 16 or d[12] != 0x88 or d[13] != 0x19	ETHERTYPE;DERIVED:HDR_COUNTER_OFF+2	yes	ethertype and min length by hand
+libreac	tools/gen-wire-invariants.py:116	d[14] | (d[15] << 8)	HDR_COUNTER_OFF	yes	LE counter by hand
+libreac	tools/gen-wire-invariants.py:119	d[:50]	L2_HEADER_LEN	yes	hash over header+control block
+libreac	tools/group_map_scan.c:41	#define TYPE_OFF 16	TYPED_BLOCK_OFF	yes	hand-written
+libreac	tools/group_map_scan.c:108	12	DERIVED:LEN_SUB_ENROLL_GROUP_MAP-1	derived	group map payload bytes (also :113 :238 memcpy/loop)
+libreac	tools/group_map_scan.c:154	ty[0]==0xcd && ty[1]==0xea	TYPE_CONTROL	yes	type word
+libreac	tools/group_map_scan.c:156	b[2]<<8 | b[3]	HDR_LEN_OFF	yes	BE length read by hand
+libreac	tools/group_map_scan.c:157	b[0], b[4]	HDR_LINK_OFF;HDR_OPCODE_OFF	yes	link/opcode offsets
+libreac	tools/group_map_scan.c:158	b[0]==0x01 && b[4]==0x10	LINK_CONTROL;SUB_0103_ENROLL_GROUP_MAP	yes	group map match
+libreac	tools/group_map_scan.c:159	b + 5	SEG_CONT_PAYLOAD_OFF	yes	payload after opcode
+libreac	tools/group_map_scan.c:167	j < 34	TYPED_BLOCK_LEN	yes	template dump
+libreac	tools/group_map_scan.c:182	b[0]==0x01 && b[4]==0x01 && len==0x0019	LINK_CONTROL;SUB_0103_SLOT_MAP;LEN_SUB_CHANMAP	yes	chanmap match
+libreac	tools/group_map_scan.c:183	sl < 8	CHANMAP_RECS_PER_FRAME	yes	records per frame
+libreac	tools/group_map_scan.c:184	b[5 + sl * 3] == 0xfe	SEG_CONT_PAYLOAD_OFF;CHANMAP_REC_BYTES;CHANMAP_ID_IDENTITY	yes	marker record search
+libreac	tools/group_map_scan.c:187	(b[4] & 0x80) && len == 0x0010	SUB_REPLY_BIT;LEN_SUB_COMMIT_REPORT	yes	box announce match
+libreac	tools/group_map_scan.c:191	j = 5; j < 20	DERIVED:SEG_CONT_PAYLOAD_OFF..HDR_OPCODE_OFF+LEN_SUB_COMMIT_REPORT	derived	commit report payload cells
+libreac	tools/group_map_scan.c:194	ty[0]==0xcf && ty[1]==0xea	TYPE_ANNOUNCE	yes	type word
+libreac	tools/group_map_scan.c:197	b[16]	NEW:REAC_ANNOUNCE_BOX_WIDTH_OFF	no	cfea block[16] box_in_width; tool comment template[18]
+libreac	tools/group_map_scan.c:231	j = 2; j < 12	NEW:REAC_ENROLL_GROUPS_OFF (block 7); DERIVED:LEN_SUB_ENROLL_GROUP_MAP-1	no	scans 10 cells; YAML ENROLL_GROUPS=5, check
+libreac	tools/group_map_scan.c:232	0x41	ENROLL_GROUP_IN	yes	input group code
+libreac	tools/group_map_scan.c:233	0xc3	ENROLL_GROUP_OUT	yes	output group code
+libreac	tools/group_map_scan.c:237	sh[i].b[1]	NEW:REAC_ENROLL_PACE_OFF	no	group map console/pace byte block[6] = ENROLL[8]; YAML prose
+libreac	tools/m200-compare.sh:53	ETHERTYPE=0x8819	ETHERTYPE	yes	tcpdump filter; comment cites reac.ksy
+libreac	tools/pace-compare.sh:57	FPS=8000	DERIVED:NEW:REAC_RATE_96K/SAMPLES_PER_PKT	no	default fps
+libreac	tools/pace-compare.sh:145	'ether proto 0x8819'	ETHERTYPE	yes	tcpdump filter
+libreac	tools/pace_hist.c:170	3675.0, 4000.0, 8000.0	DERIVED:NEW:REAC_RATE_{44K1,48K,96K}/SAMPLES_PER_PKT	no	legal packet-rate set
+libreac	tools/pace_hist.c:272	16	DERIVED:HDR_COUNTER_OFF+2	derived	min REAC length
+libreac	tools/pace_hist.c:370	125000	DERIVED:1e9/(NEW:REAC_RATE_96K/SAMPLES_PER_PKT)	no	self-test nominal period @8000 fps (also 125.0 in :384 :409 :428)
+libreac	tools/seq_gaps.c:38	16	DERIVED:HDR_COUNTER_OFF+2	derived	min length to read counter
+libreac	tools/seq_gaps.c:42	buf[14] | (buf[15] << 8)	HDR_COUNTER_OFF	yes	LE counter read by hand
+libreac	tools/topo_bind_probe.c:55	#define REAC_ETHERTYPE 0x8819	ETHERTYPE	yes	local redefinition of libreac macro
+libreac	tools/topo_bind_probe.c:63	f[12] = 0x88; f[13] = 0x19	ETHERTYPE	yes	ethertype bytes hand-written
+libreac	tools/wire_census.c:74	18	DERIVED:TYPED_BLOCK_OFF+2	derived	min length to read type word
+libreac	tools/wire_census.c:75	buf[16]==0xcd && buf[17]==0xea	TYPED_BLOCK_OFF;TYPE_CONTROL	yes	type word classify
+libreac	tools/wire_census.c:76	buf[16]==0xcf && buf[17]==0xea	TYPED_BLOCK_OFF;TYPE_ANNOUNCE	yes	type word classify
+libreac	tools/wire_census.c:77	buf[16]==0x00 && buf[17]==0x00	TYPED_BLOCK_OFF;TYPE_FILLER	yes	type word classify
+libreac	transport/src/reac_pacer.c:219	8000	DERIVED:NEW:REAC_RATE_96K/SAMPLES_PER_PKT	no	default fps when fps<=0 (96k packet rate)
+libreac	transport/src/reac_pacer.c:220	1000000000.0 / fps (comment 125000 @8000, 250000 @4000)	DERIVED:1e9/(RATE/SAMPLES_PER_PKT)	no	frame period computed; only comment restates rates
+libreac	transport/src/reac_pacer.c:328	const uint8_t blk[32]	CTRL_BLOCK_LEN	yes	event-log payload sized as control block; use REAC_CTRL_BLOCK_LEN
+libreac	transport/src/reac_pacer.c:340	memcpy(e->blk, blk, 32)	CTRL_BLOCK_LEN	yes	copies a whole control block into event ring
+libreac	transport/src/reac_pacer.c:660	frame + 18	CTRL_BLOCK_OFF	yes	JOIN block pointer; REAC_CTRL_BLOCK_OFF used elsewhere in same file
+libreac	transport/src/reac_pacer.c:673	frame + 18	CTRL_BLOCK_OFF	yes	JOIN event logs control block
+libreac	transport/src/reac_pacer.c:676	frame + 18	CTRL_BLOCK_OFF	yes	BYE event logs control block
+libreac	transport/src/reac_pacer.c:693	uint8_t blk[32]	CTRL_BLOCK_LEN	yes	event payload array, same 32 (also :440 :557 :1329 :1498)
+libreac	transport/src/reac_pacer.c:716	const uint8_t blk[32]	CTRL_BLOCK_LEN	yes	fmt_blk prints a control block
+libreac	transport/src/reac_pacer.c:718	i < 32	CTRL_BLOCK_LEN	yes	hex dump loop over control block
+libreac	transport/src/reac_pacer.c:1934	8000	DERIVED:NEW:REAC_RATE_96K/SAMPLES_PER_PKT	no	default pacer fps, second copy of the 96k packet rate
+libreac	transport/src/reac_rx.c:117	* 3	RESOLUTION	yes	24-bit sample stride; REAC_RESOLUTION used 37 lines above
+libreac	transport/src/reac_rx.c:485	48000	NEW:REAC_RATE_48K	no	default sample rate when no traffic detected
+libreac	transport/src/reac_rx.c:493	48000	NEW:REAC_RATE_48K	no	offline default sample rate
+libreac	transport/src/reac_slave.c:96	0x10	HEADAMP_BASE_MULTIPLIER	yes	strap*0x10; libreac macro REAC_HEADAMP_BASE_MULTIPLIER exists
+libreac	transport/src/reac_slave.c:97	16	PLACEMENT(in_ch=16)	yes	S-1608 width selects legacy base
+libreac	transport/src/reac_slave.c:411	16	DERIVED:CTRL_BLOCK_LEN/2	derived	descriptor written as 16 u16 pairs over control area
+libreac	transport/src/reac_slave.c:412	18	CTRL_BLOCK_OFF	yes	descriptor fill start = control block offset
+libreac	transport/src/reac_slave.c:429	0x52	NEW:REAC_FILLER_DESC_REQUESTING	no	filler control-area descriptor announce->grant; box-to-box-enroll.pcap
+libreac	transport/src/reac_slave.c:430	0x7a	NEW:REAC_FILLER_DESC_ESTABLISHED	no	filler descriptor after grant; box-to-box-enroll.pcap, 8691 frames
+libreac	transport/src/reac_slave.c:480	frame + 16, ctl + 16, 34	TYPED_BLOCK_OFF;TYPED_BLOCK_LEN	yes	copies type word + block window [16:50]
+libreac	transport/src/reac_slave.c:589	3	NEW:REAC_COLDCONNECT_BURST_RECORDS	no	burst of three distinct records (tags 0100,0000,0302), spec/reac.ksy
+libreac	transport/src/reac_slave.c:622	3	NEW:REAC_COLDCONNECT_BURST_RECORDS	no	arms 3-frame burst
+libreac	transport/src/reac_slave.c:653	3	NEW:REAC_COLDCONNECT_BURST_RECORDS	no	arms 3-frame burst
+libreac	transport/src/reac_slave.c:755	3	NEW:REAC_COLDCONNECT_BURST_RECORDS	no	arms 3-frame burst (desk path)
+libreac	transport/src/reac_topo.c:24	#define REAC_ETHERTYPE 0x8819	ETHERTYPE	yes	local redefinition of libreac macro; include reac.h instead
+libreac	transport/src/reac_topo.c:25	#define VLAN_CTAG 0x8100	ETHERNET:ETH_P_8021Q	n/a	IEEE 802.1Q TPID, not a REAC fact; use linux/if_ether.h
+libreac	transport/src/reac_topo.c:26	#define VLAN_STAG 0x88a8	ETHERNET:ETH_P_8021AD	n/a	IEEE 802.1ad TPID, not a REAC fact; use linux/if_ether.h
