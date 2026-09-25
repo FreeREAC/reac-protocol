@@ -366,8 +366,9 @@ instances:
     value: (raw_len - 52) / 36
     doc: |
       Channel width DERIVED from the frame size — REAC carries no width field in
-      the audio frame. 40 is the downstream broadcast; an even 2..38 is a box's
-      upstream return. This is the width the audio region is laid out at; it is
+      the audio frame. The downstream broadcast is 40 wide; a box's upstream
+      return is its own even width, 2..40 (BOX_MIN_CHANNELS..BOX_MAX_CHANNELS),
+      so width alone never says which side sent a frame. This is the width the audio region is laid out at; it is
       NOT the head-amp channel space (48 slots, 0x00..0x2f), and conflating the
       two silently drops the top half of a 16-input box.
 
