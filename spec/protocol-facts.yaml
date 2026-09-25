@@ -59,6 +59,21 @@ meta:
   title: REAC protocol facts — generated, do not hand-edit
   ksy_id: reac_facts
   ksy_title: REAC protocol constants, shared by reac.ksy and libreac
+  # Relations the protocol has that no single `derived:` expresses. They hold
+  # on the real values (facts_fresh_xcheck.py asserts it), and gen-facts.py
+  # --perturb keeps them holding on the moved ones, so a consumer that fails
+  # against a perturbed set fails on a COPY and never on a contradiction.
+  perturb_laws:
+    - HDR_LINK_OFF < HDR_SEG_OFF < HDR_LEN_OFF < HDR_OPCODE_OFF
+    - HDR_OPCODE_OFF < SEG_CONT_PAYLOAD_OFF < SEG_FIRST_PAYLOAD_OFF < CTRL_CKSUM_OFF_IN_BLOCK
+    - DT1_TAG_OFF + 2 <= CTRL_CKSUM_OFF_IN_BLOCK
+    - ANNOUNCE_BOX_COUNT_OFF + 2 <= CTRL_CKSUM_OFF_IN_BLOCK
+    - ENROLL_OUT_GROUPS_OFF + ENROLL_GROUPS <= CTRL_CKSUM_OFF_IN_BLOCK
+    - MAX_CHANNELS < SLOT_SPACE <= SLOT_TABLE_RECORDS
+    - SCENE_TAG_ID_OFF < SCENE_REVISION_OFF < SCENE_SLOTS_OFF
+    - SCENE_SLOTS_OFF + SCENE_SLOT_COUNT * SCENE_SLOT_BYTES <= SCENE_MAC_OFF
+    - SCENE_MAC_OFF + ETH_ADDR_BYTES <= SCENE_TAG_SYSP_OFF < SCENE_TAG_SCEN_OFF < SCENE_BYTES
+    - PKT_RATE_44K1 < PKT_RATE_48K < PKT_RATE_96K
 
 groups:
 
@@ -91,6 +106,7 @@ groups:
         value: 50
         why: 14 eth + 2 counter + 2 type word + 32 control block.
         evidence: EVIDENCED (corpus).
+        derived: CTRL_BLOCK_END
       - name: AUDIO_OFFSET
         libreac: REAC_AUDIO_OFFSET
         value: 50
@@ -98,6 +114,7 @@ groups:
           and it is the same fact.
         evidence: EVIDENCED (corpus) — a golden offset scan decodes real desk
           program as noise at every other offset.
+        derived: L2_HEADER_LEN
       - name: HDR_COUNTER_OFF
         libreac: REAC_HDR_COUNTER_OFF
         value: 14
@@ -107,6 +124,7 @@ groups:
         ksy: seq/3/type
         ksy_as: literal
         ksy_value: u2le
+        derived: ETHERTYPE_OFF + 2
       - name: FRAME_OVERHEAD
         libreac: REAC_UPSTREAM_OVERHEAD
         value: 52
@@ -116,6 +134,7 @@ groups:
         ksy: instances/len_audio/value
         ksy_as: substring
         ksy_value: "raw_len - 52"
+        derived: L2_HEADER_LEN + END_MARKER_BYTES
       - name: PACE_IS_THE_MASTERS
         value: true
         why: |
@@ -195,6 +214,7 @@ groups:
         ksy: instances/num_channels/value
         ksy_as: substring
         ksy_value: ") / 36"
+        derived: SAMPLES_PER_PKT * RESOLUTION
       - name: SAMPLES_PER_PKT
         libreac: REAC_SAMPLES_PER_PKT
         value: 12
@@ -262,6 +282,7 @@ groups:
         value: 18
         why: Frame offset of the control block.
         evidence: EVIDENCED (corpus).
+        derived: TYPED_BLOCK_OFF + TYPE_WORD_BYTES
       - name: CTRL_BLOCK_END
         libreac: REAC_CTRL_BLOCK_END
         value: 50
@@ -286,6 +307,7 @@ groups:
           32-byte block indexes.
         evidence: EVIDENCED (corpus).
         ksy: types/control_block/instances/block_checksum/pos
+        derived: CTRL_BLOCK_LEN - 1
       - name: CTRL_BLOCK_SUM
         value: 0x00
         fmt: hex2
@@ -302,11 +324,12 @@ groups:
         why: Frame offset of the type word — the start of the [16:50] window
           the goldens store and the C tests use.
         evidence: EVIDENCED (corpus).
+        derived: HDR_COUNTER_OFF + HDR_COUNTER_BYTES
       - name: TYPED_BLOCK_LEN
         value: 34
         why: Type word (2) + control block (32).
         evidence: EVIDENCED (corpus).
-        derived: 2 + CTRL_BLOCK_LEN
+        derived: TYPE_WORD_BYTES + CTRL_BLOCK_LEN
         ksy: seq/4/size
 
   - id: frame_type
@@ -419,30 +442,39 @@ groups:
         value: 0
         why: block[0] — the link selector.
         evidence: EVIDENCED (image) — every builder writes it first.
+        ksy: types/control_block/instances/link/pos
       - name: HDR_SEG_OFF
         value: 1
         why: block[1] — the segment flags.
         evidence: EVIDENCED (image).
+        ksy: types/control_block/instances/seg/pos
       - name: HDR_LEN_OFF
         value: 2
         why: block[2:4] — the big-endian length.
         evidence: EVIDENCED (image).
+        ksy: types/typed_block/instances/op_len_raw/pos
+        ksy_offset: -2
       - name: HDR_OPCODE_OFF
         value: 4
         why: block[4] — the opcode, and the base the length counts from on
           every family except a link-1 bulk transfer.
         evidence: EVIDENCED (image) — FUN_0c002c70 @0c002c70 writes 25 for
           eight three-byte records at block[5:29], and 25 = 1 + 8*3.
+        ksy: types/control_block/instances/opcode/pos
       - name: SEG_FIRST_BIT
         value: 0x01
         fmt: hex2
         why: block[1] bit 0 — the frame opens a transfer and carries its total.
         evidence: EVIDENCED (image).
+        ksy_enum: seg_state
+        ksy_name: first
       - name: SEG_LAST_BIT
         value: 0x02
         fmt: hex2
         why: block[1] bit 1 — the frame closes a transfer.
         evidence: EVIDENCED (image).
+        ksy_enum: seg_state
+        ksy_name: last
       - name: SEG_SINGLE
         value: 0x03
         fmt: hex2
@@ -450,12 +482,16 @@ groups:
           chanmap, heartbeat, declaration and single-frame record is.
         evidence: EVIDENCED (image + corpus).
         derived: SEG_FIRST_BIT + SEG_LAST_BIT
+        ksy_enum: seg_state
+        ksy_name: single
       - name: LINK_CONTROL
         value: 0x01
         fmt: hex2
         why: The stagebox control link — the scene transfer, the chanmap, the
           heartbeat and the declarations.
         evidence: EVIDENCED (image + corpus).
+        ksy_enum: reac_link
+        ksy_name: control
       - name: LINK_AUX_S4000S
         value: 0x02
         fmt: hex2
@@ -463,16 +499,21 @@ groups:
           has no code for at all.
         evidence: EVIDENCED (image) — FUN_0c0128b8 @0c0128b8 (S-4000S).
           NEVER OBSERVED on the wire.
+        ksy_enum: reac_link
+        ksy_name: aux_s4000s
       - name: LINK_RECORD
         value: 0x04
         fmt: hex2
         why: The record link — the Roland DT1 container and its two fragments.
         evidence: EVIDENCED (corpus).
+        ksy_enum: reac_link
+        ksy_name: record
       - name: SEG_FIRST_PAYLOAD_OFF
         value: 7
         why: A link-1 bulk FIRST frame puts its declared total at block[5:7] and
           its payload at block[7].
         evidence: EVIDENCED (image + corpus).
+        derived: SCENE_HEAD_PAY_OFF
       - name: SEG_CONT_PAYLOAD_OFF
         value: 5
         why: Every other bulk frame puts its payload at block[5].
@@ -498,6 +539,7 @@ groups:
           it is not, and the exception is the commonest record on the wire.
           See RECLEN_BULK_EXCEPTION.
         evidence: EVIDENCED (image + corpus).
+        derived: HDR_OPCODE_OFF
       - name: RECLEN_BULK_EXCEPTION
         value: 0
         fmt: hex2
@@ -514,6 +556,7 @@ groups:
           fills block+7 or block+5.
         evidence: EVIDENCED (image, S-1608 FUN_0c003398 @0c003398) + the
           reassembly arithmetic, asserted both ways in spec/reac_xcheck.py.
+        derived: SUB_0103_SCENE
 
   - id: chanmap_record
     title: The chanmap's three-byte record and the table it writes
@@ -535,6 +578,7 @@ groups:
         value: 8
         why: One window of the ring per frame.
         evidence: EVIDENCED (image + corpus).
+        ksy: types/chanmap_page/seq/1/repeat-expr
       - name: CHANMAP_RING_LEN
         value: 49
         why: 48 slots plus the one non-channel record id, which the box's cursor
@@ -591,6 +635,9 @@ groups:
           identity cell and its change detector. Read out of the image at
           DAT_0c002d7e and DAT_0c002e6e.
         evidence: EVIDENCED (image + corpus) — 3804 in the corpus.
+        ksy: types/chanmap_entry/instances/is_identity_record/value
+        ksy_as: substring
+        ksy_value: "== 0xfe"
       - name: CHANMAP_ID_FILLER
         value: 0xff
         fmt: hex2
@@ -598,6 +645,9 @@ groups:
           of the image at DAT_0c002d80.
         evidence: EVIDENCED (image). NEVER OBSERVED — the cursor wraps at 0x30,
           so the branch is unreachable on that path.
+        ksy: types/chanmap_entry/instances/is_filler_record/value
+        ksy_as: substring
+        ksy_value: "== 0xff"
 
   - id: commit
     title: The state-4 commit — what it flushes
@@ -667,12 +717,14 @@ groups:
           map ingest gates slot < 0x30) but the table it lives in is 80 deep and
           the head-amp apply walks ten groups of eight over it.
         evidence: EVIDENCED (image, S-1608 FUN_0c003c8a + S-4000 same loop).
+        derived: SLOT_TABLE_RECORDS
       - name: COMMIT_SLOT_RECORD_BYTES
         value: 10
         why: Stride of the staging and active slot tables. Fields +2 sens,
           +4/+6/+8 the three per-slot booleans; +0 is not copied and is read at
           four-slot stride as the group's inventory cell.
         evidence: EVIDENCED (image, S-1608 FUN_0c003c8a + FUN_0c002d42).
+        derived: SLOT_RECORD_STRIDE
       - name: COMMIT_MASTER_ID_BYTES
         value: 6
         why: The granted master's identity, copied staging -> active by the
@@ -680,6 +732,7 @@ groups:
           observed master forces the FSM to state 0 (FUN_0c0045ec), which is
           why a takeover resets the box's head-amp.
         evidence: EVIDENCED (image).
+        derived: ETH_ADDR_BYTES
       - name: HEADAMP_APPLY_GROUP_CHANNELS
         value: 8
         why: |
@@ -689,11 +742,13 @@ groups:
           four-channel inventory cell. Confusing the two is how "twelve
           phantom groups" got written down.
         evidence: EVIDENCED (image, S-1608 FUN_0c007fbc).
+        derived: HEADAMP_BANK_CHANNELS
       - name: HEADAMP_APPLY_GROUPS
         value: 10
         why: Groups of eight the apply accepts, 0..9, covering the 80-slot
           active table.
         evidence: EVIDENCED (image, S-1608 FUN_0c007fbc).
+        derived: SLOT_TABLE_RECORDS / HEADAMP_APPLY_GROUP_CHANNELS
 
   - id: page_0103
     title: op-0103 sub-pages and subtypes
@@ -717,6 +772,7 @@ groups:
           Record length of the master's slot-map window — the subtype byte plus
           eight 3-byte slot records. S-1608 FUN_0c002c70 builds it.
         evidence: EVIDENCED (corpus).
+        derived: 1 + CHANMAP_RECS_PER_FRAME * CHANMAP_REC_BYTES
       - name: LEN_SUB_COMMIT_REPORT
         value: 0x0010
         fmt: hex4
@@ -725,6 +781,7 @@ groups:
           two zero bytes, the board-configuration code, twelve inventory cells.
           S-1608 FUN_0c003c8a builds it; S-4000 has the same shape.
         evidence: EVIDENCED (corpus).
+        derived: PORTS_TABLE_OFF - SUB_0103_OFF + PORTS_TABLE_SLOTS
       - name: LEN_SUB_ENROLL_GROUP_MAP
         value: 0x000d
         fmt: hex4
@@ -743,12 +800,15 @@ groups:
         evidence: EVIDENCED (executed trace).
         ksy: types/page_0103/instances/subtype/pos
         ksy_offset: 4
+        derived: HDR_OPCODE_OFF
       - name: SUB_0103_SCENE
         value: 0x00
         fmt: hex2
         why: Subtype 0 — scene. A scene frame requires this byte to be zero and
           the box refuses the frame otherwise.
         evidence: EVIDENCED (executed trace, image).
+        ksy_enum: link1_opcode
+        ksy_name: bulk_transfer
       - name: SUB_0103_SLOT_MAP
         value: 0x01
         fmt: hex2
@@ -763,6 +823,8 @@ groups:
           active-table field the head-amp apply FUN_0c007fbc reads back. So it
           IS a channel map and it DOES carry head-amp state.
         evidence: EVIDENCED (image, S-1608 FUN_0c002d42 + FUN_0c002bb2).
+        ksy_enum: link1_opcode
+        ksy_name: chanmap
       - name: SUB_REPLY_BIT
         value: 0x80
         fmt: hex2
@@ -772,18 +834,25 @@ groups:
           commit report) and no master-built one does (0x00 scene, 0x01 slot
           map, 0x10 enroll group map).
         evidence: EVIDENCED (image + corpus).
+        ksy: types/page_0103/instances/is_reply/value
+        ksy_as: substring
+        ksy_value: "& 0x80"
       - name: SUB_0103_LINK_ACK
         value: 0x81
         fmt: hex2
         why: The box's link-check ack, S-1608 FUN_0c003fe2, from scene-FSM
           state 7. It was called SLAVE_ANNOUNCE4 in the inherited dissector.
         evidence: EVIDENCED (image + corpus).
+        ksy_enum: link1_opcode
+        ksy_name: heartbeat_reply
       - name: SUB_0103_ENROLL_GROUP_MAP
         value: 0x10
         fmt: hex2
         why: The master's prepare-to-grant frame, once about 1.6 s before the
           grant burst.
         evidence: EVIDENCED (corpus).
+        ksy_enum: link1_opcode
+        ksy_name: group_map
       - name: SUB_0103_COMMIT_REPORT
         value: 0x82
         fmt: hex2
@@ -806,6 +875,8 @@ groups:
           family with SUB_REPLY_BIT, not the literal.
         evidence: EVIDENCED (image, S-1608 FUN_0c003c8a + S-4000 same shape;
           corpus, three box models).
+        ksy_enum: link1_opcode
+        ksy_name: declaration_82
       - name: SUB_0103_DECLARATION_ALT
         value: 0x80
         fmt: hex2
@@ -816,6 +887,8 @@ groups:
           also forces block[7] to zero. FIRMWARE-ONLY: no capture carries one,
           so what selects it (FUN_0c00f9f2 @0c00f9f2) is unresolved.
         evidence: EVIDENCED (image). NEVER OBSERVED.
+        ksy_enum: link1_opcode
+        ksy_name: declaration_80
       - name: SUB_0103_COMMIT_REPORT_83
         value: 0x83
         fmt: hex2
@@ -828,12 +901,15 @@ groups:
         why: The commit report from the S-0808 and S-4000S family. No S-1608
           code emits it either — the S-1608 image holds only 0x82 and 0x80.
         evidence: EVIDENCED (corpus) — 44 frames in 14 captures.
+        ksy_enum: link1_opcode
+        ksy_name: declaration_84
       - name: SUB_0403_OFF
         value: 4
         why: The SAME block position discriminates op-0403's two forms.
         evidence: EVIDENCED (corpus).
         ksy: types/container_0403/instances/subtype/pos
         ksy_offset: 4
+        derived: SUB_0103_OFF
       - name: SUB_0403_DT1_RECORD
         value: 0x00
         fmt: hex2
@@ -952,6 +1028,8 @@ groups:
           literal `2.200` at 0x9254. Capture
           captures/m200i-s0808-48k-mirror__m200-BIDIR-coldboot-2026-07-11.pcap
           frame 3475.
+        ksy_enum: identity_addr
+        ksy_name: firmware_version
       - name: IDENTITY_ADDR_REAC_VERSION
         value: 0x0600
         fmt: hex4
@@ -974,6 +1052,8 @@ groups:
           PREDICTED — no display has been read for one. An earlier reading, that
           the second u16 tracked the REAC port count, is a coincidence of three
           models and is dropped.
+        ksy_enum: identity_addr
+        ksy_name: reac_version
       - name: IDENTITY_ADDR_MODEL_NAME
         value: 0x1000
         fmt: hex4
@@ -994,6 +1074,8 @@ groups:
           358, 0x1a completes it to 0x80 mod 256). The image agrees with the
           silence: S-1608.BIN's page-0x0500 address table uses
           third-address-byte 0x00..0x08 only — there is no 0x10 or 0x11 entry.
+        ksy_enum: identity_addr
+        ksy_name: model_name
       - name: IDENTITY_NAME_FIELD_BYTES
         value: 16
         why: The model-name field is fixed width and NUL-padded — "S-0808" plus
@@ -1035,6 +1117,7 @@ groups:
           value.
         evidence: EVIDENCED (image, both sides) — the same constant resolved out
           of the S-1608's own image and out of the master's.
+        derived: SCENE_HEAD_BYTES + SCENE_CHUNKS * SCENE_CHUNK_BYTES + SCENE_TAIL_BYTES
       - name: SCENE_HEAD_BYTES
         libreac: REAC_SCENE_HEAD_BYTES
         value: 24
@@ -1059,7 +1142,6 @@ groups:
         why: op-0100 count for a whole body.
         evidence: EVIDENCED (corpus) — measured back-to-back in 0.680 s on a
           real M-200i driving an S-1608.
-        derived: (SCENE_BYTES - SCENE_HEAD_BYTES - SCENE_TAIL_BYTES) / SCENE_CHUNK_BYTES
       - name: SCENE_STEPS
         libreac: REAC_SCENE_STEPS
         value: 343
@@ -1070,25 +1152,30 @@ groups:
         value: 0
         why: Block offset of the op word.
         evidence: EVIDENCED (image).
+        derived: HDR_LINK_OFF
       - name: SCENE_LEN_OFF
         value: 2
         why: Block offset of the BE payload length.
         evidence: EVIDENCED (image) — a big-endian 16-bit store from the same
           variable the master passes to the memcpy that fills the payload.
+        derived: HDR_LEN_OFF
       - name: SCENE_SUB_OFF
         value: 4
         why: Block offset of the reserved/subtype byte. Zero on every scene
           step; the box refuses the frame otherwise.
         evidence: EVIDENCED (image + executed trace).
+        derived: SUB_0103_OFF
       - name: SCENE_CHUNK_PAY_OFF
         value: 5
         why: Block offset of a chunk's and the final's body bytes.
         evidence: EVIDENCED (image).
+        derived: SEG_CONT_PAYLOAD_OFF
       - name: SCENE_HEAD_TOTAL_OFF
         value: 5
         why: Block offset of the header's BE declared total. The header's
           payload therefore starts two bytes later than a continuation's.
         evidence: EVIDENCED (image) — `movi20 #0x22c8` then a BE 16-bit store.
+        derived: SEG_CONT_PAYLOAD_OFF
       - name: SCENE_HEAD_PAY_OFF
         value: 7
         why: Block offset of the header's 24 body bytes — which is why a capture
@@ -1162,12 +1249,14 @@ groups:
           channel.
         evidence: EVIDENCED (executed trace).
         ksy: types/scene_body/seq/7/repeat-expr
+        derived: SLOT_TABLE_RECORDS
       - name: SCENE_SLOT_BYTES
         value: 10
         why: The scene record stride. 26 mod 10 = 6 and gcd(26,10) = 2 is the
           whole of the "period-10 probe rotation with a phase step of +6" that
           was read as a master state for a year.
         evidence: EVIDENCED (image + corpus).
+        derived: SLOT_RECORD_STRIDE
       - name: SCENE_UNIT_MAP_SELECT
         value: 0x0001
         fmt: hex4
@@ -1254,6 +1343,7 @@ groups:
         fmt: hex4
         why: The DT1 register page for head-amp.
         evidence: EVIDENCED (corpus).
+        derived: DT1_TAG_HEAD_AMP
       - name: HEADAMP_PARAM_PHANTOM
         value: 0x00
         fmt: hex2
@@ -1261,16 +1351,22 @@ groups:
           NAME, NOT THE FIRMWARE'S — the mapping comes from the corpus and the
           rig, explicitly NOT from the image.
         evidence: EVIDENCED (corpus + rig).
+        ksy_enum: head_amp_param
+        ksy_name: phantom_48v
       - name: HEADAMP_PARAM_PAD
         value: 0x01
         fmt: hex2
         why: -20 dB pad, value 0 or 1.
         evidence: EVIDENCED (corpus + rig).
+        ksy_enum: head_amp_param
+        ksy_name: pad_minus_20db
       - name: HEADAMP_PARAM_SENS
         value: 0x02
         fmt: hex2
         why: Sensitivity step.
         evidence: EVIDENCED (corpus + rig).
+        ksy_enum: head_amp_param
+        ksy_name: sens
       - name: HEADAMP_SENS_MAX
         libreac: REAC_HEADAMP_SENS_MAX
         value: 0x37
@@ -1291,6 +1387,7 @@ groups:
           fabric — a table bounded by 40 silently rejects a 16-input box based
           at 0x20, so its inputs 9..16 can never be given phantom, pad or sens.
         evidence: EVIDENCED (corpus).
+        derived: SLOT_SPACE
       - name: HEADAMP_GRAN_SENS_SHIFT
         value: 0
         libreac: REAC_HEADAMP_GRAN_SENS_SHIFT
@@ -1425,6 +1522,7 @@ groups:
           rts, absent from the 1395-entry map, reached by a plain bsr), for
           `group == ch >> 3`. Supersedes the earlier UNRESOLVED note that the
           caller could not be traced.
+        derived: 1 << HEADAMP_BANK_SHIFT
       - name: HEADAMP_BANK_SHIFT
         value: 3
         why: |
@@ -1461,6 +1559,7 @@ groups:
           0x0c003c8a sets buf[7] = FUN_0c00f6a8() = *0x0c080918. Corroborated on 29 captures in
           reac-captures/analysis/placement_table.csv (S-0808 0x00->0x00, S-1608 0x02->0x20,
           S-4000S 0x00->0x00) across M-200i, M-300 and M-5000.
+        perturb: false
       - name: HEADAMP_BASE_MULTIPLIER
         libreac: REAC_HEADAMP_BASE_MULTIPLIER
         value: 0x10
@@ -1501,6 +1600,7 @@ groups:
       # always straps 2, so it is wrong in the one way nothing downstream can detect, which is
       # how it survived. A model that breaks that collinearity breaks it, and that is precisely
       # the "blocks any new box model" gap these rows exist to close.
+        perturb: false
       - name: HEADAMP_APPLY_UNIT_SLOTS
         libreac: REAC_HEADAMP_APPLY_UNIT_SLOTS
         value: 8
@@ -1512,6 +1612,7 @@ groups:
         evidence: |
           RESOLVED (firmware) — S-1608.BIN: FUN_0c007fbc at 0x0c007fbc, slot = group << 3, eight
           iterations.
+        derived: HEADAMP_BANK_CHANNELS
 
   - id: headamp_sens
     title: The SENS step -> sensitivity curve
@@ -1628,6 +1729,16 @@ groups:
       0 is carried over unchanged from every source that already agreed on it, and
       -65 at 0x37 is what the measured span then makes it. Raw data:
       reac-pw docs/measurements/sens-sweep-2026-08-23-*.csv.
+
+      REMOVED 2026-09-25 as dead facts (docs/audits/2026-09-25-contract-copies.md):
+      four rows describing the firmware's analog STAGES, read by no consumer,
+      no grammar and no copy in any of the three repos. What they recorded:
+      the step table selects between 4 coarse analog ranges, driven onto two
+      GPIO pins per channel by FUN_0c00af2a (EVIDENCED image), whose first
+      steps are 0x08, 0x18 and 0x28; those three breaks are the only places a
+      uniform step could fail, and the rig measured all three at about a
+      decibel (EVIDENCED image + rig) - which is what HEADAMP_SENS_STEP_CDB
+      rests on. Restore them from git history if a consumer ever needs them.
     facts:
       - name: HEADAMP_SENS_REF_CDB
         libreac: REAC_HEADAMP_SENS_REF_CDB
@@ -1665,28 +1776,7 @@ groups:
         evidence: EVIDENCED (image, S-1608 0x0c0327a0 = file 0x527a0; the same
           112 bytes at S-0808 file 0x45ec8 as a raw byte match, not a
           disassembly — there is no S-0808 decompilation).
-      - name: HEADAMP_SENS_STAGES
-        value: 4
-        why: Coarse analog ranges the table selects between, driven onto two
-          GPIO pins per channel by FUN_0c00af2a.
-        evidence: EVIDENCED (image).
-      - name: HEADAMP_SENS_STAGE_BREAK_1
-        value: 0x08
-        fmt: hex2
-        why: First step of the second range. The three breaks are the only
-          places a uniform step could fail, and the rig measured all three
-          at about a decibel.
-        evidence: EVIDENCED (image + rig).
-      - name: HEADAMP_SENS_STAGE_BREAK_2
-        value: 0x18
-        fmt: hex2
-        why: First step of the third range.
-        evidence: EVIDENCED (image + rig).
-      - name: HEADAMP_SENS_STAGE_BREAK_3
-        value: 0x28
-        fmt: hex2
-        why: First step of the fourth range.
-        evidence: EVIDENCED (image + rig).
+        derived: HEADAMP_SENS_MAX + 1
       - name: HEADAMP_PAD_CDB
         libreac: REAC_HEADAMP_PAD_CDB
         value: 2000
@@ -1716,6 +1806,7 @@ groups:
       (and so both based) at 0x00, which is what rules out width as the law.
     kind: table
     columns: [in_ch, base]
+    perturb_row_law: base + in_ch <= HEADAMP_CH_SPAN
     rows:
       - in_ch: 8
         base: 0x00
@@ -1831,3 +1922,547 @@ groups:
         why: Five groups of 8 span exactly the 40-slot audio fabric.
         evidence: EVIDENCED (image + corpus).
         ksy: types/enroll_group_map/seq/3/repeat-expr
+        derived: MAX_CHANNELS / ENROLL_GROUP_CHANNELS
+
+  # ===========================================================================
+  # Declared 2026-09-25 from the contract-copies audit
+  # (docs/audits/2026-09-25-contract-copies.md): every group below is a number
+  # libreac, reac-pw or reac.ksy spelled by hand while this file did not
+  # declare it. Each row says which copies it replaces.
+  # ===========================================================================
+
+  - id: frame_fields
+    title: Frame field widths the geometry is built from
+    doc: |
+      The widths the header offsets above are sums of. They were literals in
+      the `derived:` expressions of this very file (`2 + CTRL_BLOCK_LEN`) and
+      in every consumer that computed an offset (`frame + 16`, `50 + 2`), so
+      the offsets are now derived from them and a perturbation moves them
+      together.
+    facts:
+      - name: ETHERTYPE_OFF
+        value: 12
+        why: Frame offset of the EtherType, after the two 6-byte MAC addresses.
+          libreac and reac-pw tools open-code `frame[12] == 0x88 && frame[13]
+          == 0x19` rather than naming the position.
+        evidence: EVIDENCED (corpus) — every frame in 72 captures; reac.ksy
+          seq/0..2 (6 + 6, then the contents).
+        derived: 2 * ETH_ADDR_BYTES
+      - name: ETH_ADDR_BYTES
+        value: 6
+        why: A MAC address — the frame's destination and source, the scene's
+          master_id and peer ids, and the config announce's master MAC.
+        evidence: EVIDENCED (corpus).
+        ksy: seq/0/size
+      - name: HDR_COUNTER_BYTES
+        value: 2
+        why: Width of the little-endian frame counter at HDR_COUNTER_OFF.
+        evidence: EVIDENCED (corpus).
+      - name: TYPE_WORD_BYTES
+        value: 2
+        why: Width of the big-endian type word at TYPED_BLOCK_OFF, the 2 in
+          TYPED_BLOCK_LEN = 2 + 32 and in every two-byte `pos` of typed_block.
+        evidence: EVIDENCED (corpus).
+        ksy: types/typed_block/instances/raw_block/pos
+      - name: END_MARKER_BYTES
+        value: 2
+        why: The two end-marker bytes, END_MARKER_0 and END_MARKER_1 — the 2 in
+          FRAME_OVERHEAD = 50 + 2.
+        evidence: EVIDENCED (corpus).
+      - name: BRAID_PAIR_CHANNELS
+        value: 2
+        why: |
+          The braid carries channels in PAIRS — one 6-byte pair group per two
+          channels per sample time — so every legal audio width is even. The
+          byte permutation inside a pair stays libreac's (see the header of
+          this file); the pairing itself is spelled by reac.ksy's
+          `num_channels / 2` and by every even-width check in libreac and
+          reac-pw, so it is shared.
+        evidence: EVIDENCED (corpus) — reac.ksy time_sample, validated against
+          libreac's upstream goldens by reac_xcheck.py.
+        ksy: types/time_sample/seq/0/repeat-expr
+        ksy_as: substring
+        ksy_value: "num_channels / 2"
+      - name: SEG_MIDDLE
+        value: 0x00
+        fmt: hex2
+        ksy_enum: seg_state
+        ksy_name: middle
+        why: Neither segment bit — a frame in the middle of a bulk transfer.
+        evidence: EVIDENCED (image) — FUN_0c003398 writes block[1] = 0 for a
+          middle frame (control_header group doc).
+      - name: LINK_ANNOUNCE
+        value: 0xff
+        fmt: hex2
+        ksy_enum: reac_link
+        ksy_name: announce_link
+        why: block[0] of a master announce (type word 0xcfea, op 0xffff).
+        evidence: EVIDENCED (corpus).
+
+  - id: pace
+    title: Pace — packet rates, sample rates and the pace code
+    doc: |
+      The master sets the pace (PACE_IS_THE_MASTERS) and there are exactly
+      three. A packet carries SAMPLES_PER_PKT samples per channel, so the
+      packet rate is the quantity on the wire and the sample rate is derived
+      from it. The PACE CODE is the one byte by which the master declares and
+      records the class, on four carriers (CONSOLE_FIELD_GATES_RATE):
+      ANNOUNCE_PACE_OFF, SCENE_REVISION_OFF, the chanmap marker's flags and
+      ENROLL_PACE_OFF.
+
+      libreac (reac.c, reac_master.c, reac_cfg.h), reac-pw (reac_rate_cfg.c,
+      main.c, reac_sink_node.c) and a dozen tools spelled 44100/48000/96000
+      and 3675/4000/8000 and 0/1/2 themselves; this is the first place they
+      are declared.
+    facts:
+      - name: PKT_RATE_48K
+        value: 4000
+        why: Frames per second at 48 kHz.
+        evidence: EVIDENCED (corpus) — pcap timestamps, every 48 kHz capture.
+      - name: PKT_RATE_96K
+        value: 8000
+        why: Frames per second at 96 kHz.
+        evidence: EVIDENCED (corpus + rig) — 96 kHz windows measured at 8000
+          fps (CONSOLE_FIELD_GATES_RATE evidence).
+      - name: PKT_RATE_44K1
+        value: 3675
+        why: Frames per second at 44.1 kHz.
+        evidence: EVIDENCED (corpus) — m200-enrol-441k-2026-09-13 and
+          m200-enrol-s4000-441k-2026-09-13, 3675 fps from the pcap timestamps.
+      - name: SAMPLE_RATE_48K
+        value: 48000
+        why: The 48 kHz class.
+        evidence: derived — 4000 frames x 12 samples.
+        derived: PKT_RATE_48K * SAMPLES_PER_PKT
+      - name: SAMPLE_RATE_96K
+        value: 96000
+        why: The 96 kHz class.
+        evidence: derived — 8000 frames x 12 samples.
+        derived: PKT_RATE_96K * SAMPLES_PER_PKT
+      - name: SAMPLE_RATE_44K1
+        value: 44100
+        why: The 44.1 kHz class.
+        evidence: derived — 3675 frames x 12 samples.
+        derived: PKT_RATE_44K1 * SAMPLES_PER_PKT
+
+  - id: pace_code
+    title: The pace code
+    doc: The byte the four rate carriers hold (see the pace group).
+    kind: enum
+    facts:
+      - name: PACE_CODE_48K
+        value: 0x00
+        fmt: hex2
+        why: 48 kHz. Was called the V-Mixer family.
+        evidence: RIG-VERIFIED (2026-08-27) and WIRE-CAPTURED (2026-09-13) —
+          see CONSOLE_FIELD_GATES_RATE.
+      - name: PACE_CODE_96K
+        value: 0x01
+        fmt: hex2
+        why: 96 kHz. Was called the OHRCA family.
+        evidence: RIG-VERIFIED (2026-08-27) — see CONSOLE_FIELD_GATES_RATE.
+      - name: PACE_CODE_44K1
+        value: 0x02
+        fmt: hex2
+        why: 44.1 kHz.
+        evidence: WIRE-CAPTURED (2026-09-13) — an M-200 at 44.1 kHz writes 0x02
+          on all four carriers. RULED (operator, 2026-09-13).
+
+  - id: filler_descriptor
+    title: The filler descriptor
+    doc: |
+      An upstream FILLER's 32-byte control area is not always zero: a box
+      stamps `00 <desc>` sixteen times across it, and a real S-1608 REFUSES an
+      enrolment whose filler window is zeroed. libreac's reac_link.h,
+      reac_ctrlblk.c, reac_ctrl.c, reac_master.c and transport/reac_slave.c
+      and reac-pw's pcap-variants.py each spelled the three values.
+    kind: enum
+    facts:
+      - name: FILLER_DESC_NONE
+        value: 0x00
+        fmt: hex2
+        why: Before the box has asked — the first frames after link-up.
+        evidence: EVIDENCED (corpus) — the granted S-0808 sent 48 zero frames
+          first (wire, 2026-09-09).
+      - name: FILLER_DESC_REQUESTING
+        value: 0x52
+        fmt: hex2
+        why: Announce sent, grant not yet received.
+        evidence: EVIDENCED (corpus + replay) — 8691 frames between the
+          S-0808's announce and its grant (wire, 2026-09-09;
+          box-to-box-enroll.pcap).
+      - name: FILLER_DESC_ESTABLISHED
+        value: 0x7a
+        fmt: hex2
+        why: Granted. Claiming it before the grant gets the enrolment refused.
+        evidence: EVIDENCED (corpus + replay) — from t=7.619 in
+          box-to-box-enroll.pcap.
+
+  - id: dt1_frame
+    title: The Roland DT1 record inside op-0403
+    doc: |
+      The link-4 container's record, byte for byte. reac.ksy spells it as
+      `dt1_record` contents; libreac's reac_ctrlblk.c and reac_box_synth.c
+      wrote the same bytes and block offsets as literals (`out[9] = 0xf0`,
+      `blk[15] == 0x12`), and reac-pw's pcap-variants.py a third time. Block
+      offsets are block-relative, like every offset in this file.
+    facts:
+      - name: DT1_WRAPPER
+        value: 0x000200fe
+        fmt: hex8
+        why: The four bytes at block[4:8] ahead of every DT1 record and record
+          fragment. Its tail `02 00 fe` is the box-return marker's too, which
+          is why SUB_0403_OFF alone discriminates them.
+        evidence: EVIDENCED (corpus).
+        ksy: types/dt1_record/seq/0/contents
+        ksy_as: bytes_be
+      - name: DT1_WRAPPER_BYTES
+        value: 4
+        why: Width of DT1_WRAPPER.
+        evidence: EVIDENCED (corpus).
+      - name: DT1_LEN_ECHO_OFF
+        value: 8
+        why: Block offset of the SysEx length echo, right after the wrapper.
+        evidence: EVIDENCED (corpus).
+        derived: SUB_0403_OFF + DT1_WRAPPER_BYTES
+      - name: DT1_SYSEX_OFF
+        value: 9
+        why: Block offset of SYSEX_START.
+        evidence: EVIDENCED (corpus).
+        derived: DT1_LEN_ECHO_OFF + 1
+      - name: SYSEX_START
+        value: 0xf0
+        fmt: hex2
+        why: MIDI SysEx start.
+        evidence: EVIDENCED (corpus).
+        ksy: types/dt1_record/seq/2/contents
+        ksy_as: byte0
+      - name: ROLAND_ID
+        value: 0x41
+        fmt: hex2
+        why: Roland's SysEx manufacturer id.
+        evidence: EVIDENCED (corpus).
+        ksy: types/dt1_record/seq/3/contents
+        ksy_as: byte0
+      - name: DT1_DEVICE_ID
+        value: 0x0a
+        fmt: hex2
+        why: The device id byte every captured box-built record carries.
+        evidence: EVIDENCED (corpus) — the cold-connect records of
+          matrix-m200-s1608 and matrix-m200-s0808 (2026-07-11). reac.ksy parses
+          it as a free u1 and does not validate it.
+      - name: DT1_SYSEX_HEAD_BYTES
+        value: 3
+        why: SYSEX_START, ROLAND_ID and the device id — the bytes before the
+          model id.
+        evidence: EVIDENCED (corpus).
+      - name: DT1_MODEL_ID_BYTES
+        value: 3
+        why: The Roland model id, `00 00 12`.
+        evidence: EVIDENCED (corpus).
+        ksy: types/dt1_record/seq/5/size
+      - name: DT1_MODEL_ID_LO
+        value: 0x12
+        fmt: hex2
+        why: The model id's low byte, which the classifier checks to tell a
+          genuine DT1 record from the look-alikes.
+        evidence: EVIDENCED (corpus).
+        ksy: types/typed_block/instances/ctrl_kind/value
+        ksy_as: substring
+        ksy_value: "dt1_model_lo == 0x12"
+      - name: DT1_MODEL_LO_OFF
+        value: 14
+        why: Block offset of DT1_MODEL_ID_LO.
+        evidence: EVIDENCED (corpus).
+        derived: DT1_SYSEX_OFF + DT1_SYSEX_HEAD_BYTES + DT1_MODEL_ID_BYTES - 1
+        ksy: types/typed_block/instances/dt1_model_lo/pos
+        ksy_offset: -2
+      - name: DT1_CMD_OFF
+        value: 15
+        why: Block offset of the command byte, DT_CMD_RQ1 or DT_CMD_DT1.
+        evidence: EVIDENCED (corpus).
+        derived: DT1_SYSEX_OFF + DT1_SYSEX_HEAD_BYTES + DT1_MODEL_ID_BYTES
+        ksy: types/typed_block/instances/dt1_command/pos
+        ksy_offset: -2
+      - name: DT1_TAG_OFF
+        value: 16
+        why: Block offset of the big-endian register-page tag (the dt1_tag
+          group).
+        evidence: EVIDENCED (corpus).
+        derived: DT1_CMD_OFF + 1
+        ksy: types/typed_block/instances/dt1_tag/pos
+        ksy_offset: -2
+      - name: DT_CMD_RQ1
+        value: 0x11
+        fmt: hex2
+        ksy_enum: dt_command
+        ksy_name: rq1_request
+        why: Roland RQ1 — a read request (the identity poll).
+        evidence: EVIDENCED (corpus).
+      - name: DT_CMD_DT1
+        value: 0x12
+        fmt: hex2
+        ksy_enum: dt_command
+        ksy_name: dt1_set
+        why: Roland DT1 — data set.
+        evidence: EVIDENCED (corpus).
+      - name: SYSEX_END
+        value: 0xf7
+        fmt: hex2
+        why: MIDI SysEx end, after the inner checksum.
+        evidence: EVIDENCED (corpus).
+        ksy: types/dt1_record/seq/10/contents
+        ksy_as: byte0
+      - name: DT1_RECORD_OVERHEAD
+        value: 0x0d
+        fmt: hex2
+        why: rec_len minus the SysEx record's own length.
+        evidence: EVIDENCED (corpus).
+        ksy: types/dt1_record/instances/record_len/value
+        ksy_as: substring
+        ksy_value: "rec_len - 0x0d"
+      - name: DT1_DATA_OVERHEAD
+        value: 0x10
+        fmt: hex2
+        why: rec_len minus the record's data bytes.
+        evidence: EVIDENCED (corpus).
+        ksy: types/dt1_record/instances/data_len/value
+        ksy_as: substring
+        ksy_value: "rec_len - 0x10"
+
+  - id: identity_fields
+    title: Identity page fields reac.ksy parses and libreac builds
+    doc: |
+      The rest of the identity_addr enum reac.ksy dispatches on, and the reply
+      sizes its `if:` guards test, which libreac's reac_identity.c and
+      reac_box_synth.c and reac-pw's test DT1 builders spelled as literals.
+    facts:
+      - name: IDENTITY_ADDR_MODEL_NAME_EXT
+        value: 0x1011
+        fmt: hex4
+        ksy_enum: identity_addr
+        ksy_name: model_name_ext
+        why: The model-name continuation address.
+        evidence: EVIDENCED (corpus).
+      - name: IDENTITY_ADDR_MODEL_NAME_SLOT_B
+        value: 0x1100
+        fmt: hex4
+        ksy_enum: identity_addr
+        ksy_name: model_name_slot_b
+        why: The second model-name slot.
+        evidence: EVIDENCED (corpus).
+      - name: IDENTITY_ADDR_MODEL_NAME_SLOT_B_EXT
+        value: 0x1111
+        fmt: hex4
+        ksy_enum: identity_addr
+        ksy_name: model_name_slot_b_ext
+        why: The second slot's continuation.
+        evidence: EVIDENCED (corpus).
+      - name: IDENTITY_FIRMWARE_BYTES
+        value: 4
+        why: The firmware version reply — four bytes, one decimal digit each
+          (2200 is `02 02 00 00`).
+        evidence: EVIDENCED (corpus).
+        ksy: types/identity_data/instances/firmware_version/if
+        ksy_as: substring
+        ksy_value: "payload.size >= 4"
+      - name: IDENTITY_REAC_VERSION_BYTES
+        value: 8
+        why: The REAC version reply — four big-endian u16s, reserved / major /
+          minor / patch.
+        evidence: EVIDENCED (corpus).
+        ksy: types/identity_data/instances/reac_version_major/if
+        ksy_as: substring
+        ksy_value: "payload.size >= 8"
+
+  - id: announce_fields
+    title: The config announce and the enroll group map, field by field
+    doc: |
+      Block offsets of the fields reac.ksy's `cfea_payload` and
+      `enroll_group_map` parse by sequence and libreac's reac_master.c /
+      tools/group_map_scan.c index by literal. The pace code sits at
+      ANNOUNCE_PACE_OFF (the "cfea[19]" of the prose above, which counts from
+      the type word) and at ENROLL_PACE_OFF ("ENROLL[8]").
+    facts:
+      - name: ANNOUNCE_HEAD_BYTES
+        value: 5
+        why: The fixed `01 03 0d 01 04` after the op word.
+        evidence: EVIDENCED (corpus) — 17,040 announces, 2026-09-13.
+      - name: ANNOUNCE_MAC_OFF
+        value: 9
+        why: The master's MAC.
+        evidence: EVIDENCED (corpus).
+        derived: HDR_OPCODE_OFF + ANNOUNCE_HEAD_BYTES
+      - name: ANNOUNCE_TOTAL_SLOTS_OFF
+        value: 15
+        why: The fabric's slot total (0x28 on every capture).
+        evidence: EVIDENCED (corpus).
+        derived: ANNOUNCE_MAC_OFF + ETH_ADDR_BYTES
+      - name: ANNOUNCE_BOX_IN_WIDTH_OFF
+        value: 16
+        why: The announced box input width.
+        evidence: EVIDENCED (corpus).
+        derived: ANNOUNCE_TOTAL_SLOTS_OFF + 1
+      - name: ANNOUNCE_PACE_OFF
+        value: 17
+        why: console_field — the pace code.
+        evidence: EVIDENCED (corpus + rig) — see CONSOLE_FIELD_GATES_RATE.
+        derived: ANNOUNCE_BOX_IN_WIDTH_OFF + 1
+      - name: ANNOUNCE_BOX_COUNT_OFF
+        value: 18
+        why: The big-endian box count.
+        evidence: EVIDENCED (corpus).
+        derived: ANNOUNCE_PACE_OFF + 1
+      - name: BOARD_CONFIG_OFF
+        value: 7
+        why: Block offset of the commit report's board-configuration code —
+          the chassis strap HEADAMP_BASE_FROM_CONFIG_BYTE7 names, which libreac
+          (reac_ports.h, reac_box_synth.c) and its tests index as a bare 7.
+          After the subtype and two zero bytes, right before the inventory.
+        evidence: EVIDENCED (image + corpus) — S-1608 FUN_0c003c8a; see
+          LEN_SUB_COMMIT_REPORT.
+        derived: PORTS_TABLE_OFF - 1
+      - name: ENROLL_PACE_OFF
+        value: 6
+        why: The enroll group map's console byte — the pace code.
+        evidence: EVIDENCED (corpus) — m200-enrol-441k-2026-09-13.
+        derived: SUB_0103_OFF + 2
+      - name: ENROLL_IN_GROUPS_OFF
+        value: 7
+        why: First of ENROLL_GROUPS input-group cells.
+        evidence: EVIDENCED (image + corpus).
+        derived: ENROLL_PACE_OFF + 1
+      - name: ENROLL_OUT_GROUPS_OFF
+        value: 12
+        why: First of ENROLL_GROUPS output-group cells. Five in plus five out
+          is the ten-cell run tools/group_map_scan.c scans.
+        evidence: EVIDENCED (image + corpus).
+        derived: ENROLL_IN_GROUPS_OFF + ENROLL_GROUPS
+      - name: ENROLL_GROUP_CHANNELS
+        value: 8
+        why: Channels per enroll group — ENROLL_GROUP_IN counts eight inputs.
+        evidence: EVIDENCED (image + corpus).
+        ksy: types/enroll_group_map/instances/enrolled_in_channels/value
+        ksy_as: substring
+        ksy_value: "== 0x41 ? 8 : 0"
+
+  - id: scene_tags
+    title: The scene body's tag words
+    doc: |
+      Only their OFFSETS were declared (scene_body group). The four ASCII bytes
+      at each were spelled again by reac.ksy's contents, libreac's
+      reac_ctrlblk.c / reac_master.c and reac-pw's recover-scene.py, as
+      strings. Declared as big-endian u32 so every target can carry them.
+    facts:
+      - name: SCENE_TAG_ID
+        value: 0x31323334
+        fmt: hex8
+        why: '"1234" at SCENE_TAG_ID_OFF.'
+        evidence: EVIDENCED (corpus) — 27 real-desk bodies.
+        ksy: types/scene_body/seq/0/contents
+        ksy_as: bytes_be
+      - name: SCENE_TAG_SYSP
+        value: 0x53595350
+        fmt: hex8
+        why: '"SYSP" at SCENE_TAG_SYSP_OFF.'
+        evidence: EVIDENCED (corpus).
+        ksy: types/scene_sysp/seq/0/contents
+        ksy_as: bytes_be
+      - name: SCENE_TAG_SCEN
+        value: 0x5343454e
+        fmt: hex8
+        why: '"SCEN" at SCENE_TAG_SCEN_OFF.'
+        evidence: EVIDENCED (corpus).
+        ksy: types/scene_scen/seq/0/contents
+        ksy_as: bytes_be
+      - name: SCENE_REVISION_BYTES
+        value: 2
+        why: The little-endian `revision` at SCENE_REVISION_OFF — the pace
+          code's scene carrier.
+        evidence: EVIDENCED (corpus + rig).
+        ksy: types/scene_body/seq/5/type
+        ksy_as: literal
+        ksy_value: u2le
+
+  - id: box_models
+    title: What each box model declares
+    doc: |
+      A box's geometry is READ FROM ITS DECLARATION (the inventory group) and
+      nothing may key behaviour on a model. But emulators, fixtures and tests
+      in libreac (reac_ctrlblk.c box table, transport/reac_slave.h) and
+      reac-pw spell what each model declares, and those counts are protocol
+      observations, so they are declared once here rather than per consumer.
+    facts:
+      - name: BOX_S0808_IN
+        value: 8
+        why: S-0808 analog inputs.
+        evidence: EVIDENCED (corpus) — config-announce inventory,
+          fixtures/control.json; 24-record head-amp sweeps.
+      - name: BOX_S0808_OUT
+        value: 8
+        why: S-0808 outputs.
+        evidence: EVIDENCED (corpus) — config-announce inventory.
+      - name: BOX_S1608_IN
+        value: 16
+        why: S-1608 analog inputs.
+        evidence: EVIDENCED (corpus) — inventory; 48-record sweeps.
+      - name: BOX_S1608_OUT
+        value: 8
+        why: S-1608 outputs.
+        evidence: EVIDENCED (corpus) — config-announce inventory.
+      - name: BOX_S4000S_3208_IN
+        value: 32
+        why: S-4000S in its 32-in/8-out configuration.
+        evidence: EVIDENCED (corpus) — inventory; 96-record sweeps.
+      - name: BOX_S4000S_3208_OUT
+        value: 8
+        why: S-4000S 32x8 outputs.
+        evidence: EVIDENCED (corpus).
+      - name: BOX_S4000S_0832_IN
+        value: 8
+        why: S-4000S in its 8-in/32-out configuration.
+        evidence: EVIDENCED (corpus) — vlan13-0832.pcap.
+      - name: BOX_S4000S_0832_OUT
+        value: 32
+        why: S-4000S 8x32 outputs.
+        evidence: EVIDENCED (corpus) — vlan13-0832.pcap.
+
+  - id: timing
+    title: Timing a second implementation has to match
+    doc: |
+      Periods and budgets a box or a desk FIXES and a peer must honour, as
+      opposed to this project's own tunables (which live in libreac's
+      reac_tunables.h and are not protocol). Each was a literal in libreac's
+      reac_fsm.h / reac_master.h / reac_master.c.
+    facts:
+      - name: BOX_LINKCHECK_RELOAD_FRAMES
+        value: 600
+        fmt: dec_hex
+        why: The box firmware's established link-check reload, in frames.
+        evidence: EVIDENCED (image) — 0x0258 in the S-1608 image.
+      - name: ANNOUNCE_PERIOD_MS
+        value: 1000
+        why: A master announces, and while established sends one chanmap
+          window, once a second.
+        evidence: EVIDENCED (corpus + rig) — at the hunt rate (~0.37/s) the
+          box's link light kept blinking (rig, 2026-07-12).
+      - name: SCENE_BURST_CHUNKS_PER_SEC
+        value: 500
+        why: A desk's scene push rate — 341 chunks in ~0.68 s.
+        evidence: EVIDENCED (corpus) — M-200i -> S-1608, SCENE_CHUNKS evidence.
+      - name: GRANT_STRIDE_SLOTS
+        value: 12
+        why: One echoed grant per twelve frame slots across the ~150 ms grant
+          burst.
+        evidence: EVIDENCED (corpus) — the transcribed real burst.
+      - name: ENROLL_GRANT_DWELL_MS
+        value: 1600
+        why: A desk's dwell between the enroll group map and the grant burst.
+        evidence: EVIDENCED (corpus) — 1503 ms on matrix-m200-s0808 and
+          1717 ms on matrix-m200-s1608 (2026-07-11); nominal.
+      - name: MASTER_LINK_HOLD_MS
+        value: 6500
+        why: How long a desk rides through box silence before it reverts to
+          hunting.
+        evidence: EVIDENCED (rig) — one M-200i reboot measurement, 2026-07-11
+          (heartbeat stops t=16.0 s, first probe t=22.47 s).
