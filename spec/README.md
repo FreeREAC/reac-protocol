@@ -49,7 +49,7 @@ committed, never linked and never shipped.
 `reac.ksy` and libreac each wrote out the frame geometry, the scene sizes, the validated
 tag offsets, the checksum rules, the op codes and the head-amp granularities
 independently, and nothing noticed a constant changed in one and not the other.
-[`protocol-facts.yaml`](protocol-facts.yaml) holds them once — 90 rows, each with what
+[`protocol-facts.yaml`](protocol-facts.yaml) holds them once — 226 rows, each with what
 the number is and how it was evidenced — and [`gen-facts.py`](gen-facts.py) writes three
 artefacts from it into [`generated/`](generated/):
 
@@ -63,6 +63,14 @@ Every generated file says it is generated on its first lines. The generator read
 but the schema — no clock, no environment, no path outside the repo — because a generator
 that varies between two runs over one input regresses the file it maintains on every
 regeneration. `make facts-idempotent` generates twice into a scratch tree and diffs.
+
+`make check` also runs [`facts_fresh_xcheck.py`](facts_fresh_xcheck.py): regenerating from the
+schema must be byte-identical to the tracked `generated/`, with a positive control and two
+sabotage controls (a hand-edited generated value, and a schema moved without regenerating, each
+go red). `gen-facts.py --perturb SEED --outdir DIR` (`make facts-perturb`) writes a FICTIONAL but
+self-consistent fact set, with every free number moved and every derivation and
+`meta: perturb_laws` law kept. A consumer built against it fails exactly where it spells a fact
+by hand. See [`docs/audits/2026-09-25-contract-copies.md`](../docs/audits/2026-09-25-contract-copies.md).
 
 Kaitai cannot close this on its own: it has no plain-C backend and it emits parsers rather
 than serialisers. So the convergence is not "compile the ksy into libreac" — it is this
