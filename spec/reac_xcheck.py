@@ -22,7 +22,10 @@ Two kinds of assertion are made, and the difference matters:
     disagree, one of them is wrong.
 
 Offline and deterministic: no network, no capture files, no rig. Everything it
-reads is committed next to it.
+reads is committed next to it, except the two recovered desk scene bodies: they
+are vendor captures, kept in freereac-ops and read through tools/freereac_ops.py,
+and the tests that need them skip as OPS-ABSENT without that checkout (fail
+under FREEREAC_REQUIRE_OPS=1). synthetic_scene.py holds the layout without them.
 
     make -C spec check          # regenerate the parser, then run this
 """
@@ -30,8 +33,13 @@ import collections
 import json
 import pathlib
 
+import sys
+
+import kaitaistruct
 import pytest
 from kaitaistruct import BytesIO, KaitaiStream
+
+import synthetic_scene
 
 try:
     import reac as R
@@ -44,6 +52,8 @@ except ImportError:  # pragma: no cover - the generated parser is not committed
     )
 
 HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / "tools"))
+import freereac_ops  # noqa: E402  the one reader of the freereac-ops checkout
 UPSTREAM = json.loads((HERE / "fixtures" / "upstream.json").read_text())
 CONTROL = json.loads((HERE / "fixtures" / "control.json").read_text())
 
@@ -600,19 +610,41 @@ def test_head_amp_params_and_value_ranges():
 # the establishment ops
 # --------------------------------------------------------------------------
 
-SCENE_BODY = (pathlib.Path(__file__).parent / "fixtures" / "scene-m200i-8904.bin").read_bytes()
+def vendor_scene(slug):
+    """A recovered desk scene body. They are vendor captures, so they live in
+    freereac-ops (reac-protocol/spec/fixtures/), read through the resolver. With
+    no ops checkout the test skips by name, OPS-ABSENT <slug>, as it must in a
+    public clone and in this repo's own CI; FREEREAC_REQUIRE_OPS=1 makes that a
+    failure. The layout itself is held without them, on synthetic_scene."""
+    body = freereac_ops.read_ops(slug)
+    if body is None:
+        why = freereac_ops.absent_reason(slug)
+        if freereac_ops.ops_required():
+            pytest.fail(why)
+        pytest.skip(why)
+    return body
 
 
-def test_scene_body_fixture_is_a_complete_transfer():
+@pytest.fixture
+def scene_body():
+    return vendor_scene("scene-m200i-8904")
+
+
+@pytest.fixture
+def scene_body_m5000():
+    return vendor_scene("scene-m5000-8904")
+
+
+def test_scene_body_fixture_is_a_complete_transfer(scene_body):
     """The recovered body must be exactly what the master declares, or every
     offset asserted below is measured against a truncated capture. 8904 is not a
     magic number here: it is 0x37c + 8 + 800*10 + 4, the SCEN block's own
     arithmetic, and the box carries the 800 independently in its literal pool."""
-    assert len(SCENE_BODY) == 0x22c8 == 8904
-    assert 0x37c + 8 + 800 * 10 + 4 == len(SCENE_BODY)
+    assert len(scene_body) == 0x22c8 == 8904
+    assert 0x37c + 8 + 800 * 10 + 4 == len(scene_body)
 
 
-def test_scene_chunks_are_slices_of_the_body():
+def test_scene_chunks_are_slices_of_the_body(scene_body):
     """Every op-0100 payload in the corpus is a literal 26-byte slice of the
     scene body at 24 + 26k. This is the whole case that op-0100 is a scene
     continuation and not a probe, and it is a VALUE test across the boundary:
@@ -621,7 +653,7 @@ def test_scene_chunks_are_slices_of_the_body():
 
     The negative control matters as much as the positive: a payload that is NOT
     in the body must not be found, or the test would pass on any input."""
-    chunks = {SCENE_BODY[24 + 26 * k:24 + 26 * k + 26] for k in range(341)}
+    chunks = {scene_body[24 + 26 * k:24 + 26 * k + 26] for k in range(341)}
     assert len(chunks) == 15, "the corpus catalogued 15 distinct op-0100 payloads"
 
     seen_cells = set()
@@ -645,27 +677,27 @@ def test_scene_chunks_are_slices_of_the_body():
     assert bytes(range(0x40, 0x40 + 26)) not in chunks   # negative control
 
 
-def test_scene_header_declares_the_total_not_a_model_constant():
+def test_scene_header_declares_the_total_not_a_model_constant(scene_body):
     t = parse_block(next(b for n, b in BLOCKS if n == "sub01")["hex"])
     p = t.block.payload
     assert t.op_raw == 0x0101
     assert t.op_len_raw == 0x0018 == 24, "rec_len is this chunk's length"
-    assert p.scene_total_len == len(SCENE_BODY) == 0x22c8
-    assert bytes(p.body_head) == SCENE_BODY[:24]
+    assert p.scene_total_len == len(scene_body) == 0x22c8
+    assert bytes(p.body_head) == scene_body[:24]
     assert bytes(p.body_head)[:4] == b"1234"
 
 
-def test_scene_final_carries_the_tail():
+def test_scene_final_carries_the_tail(scene_body):
     t = parse_block(next(b for n, b in BLOCKS if n == "sub02")["hex"])
     assert t.op_raw == 0x0102
     assert t.op_len_raw == 0x000e == 14 == (8904 - 24) % 26
-    assert bytes(t.block.payload.chunk)[:14] == SCENE_BODY[-14:]
+    assert bytes(t.block.payload.chunk)[:14] == scene_body[-14:]
 
 
-def test_scene_body_parses_and_its_offsets_are_where_the_box_reads_them():
+def test_scene_body_parses_and_its_offsets_are_where_the_box_reads_them(scene_body):
     """The S-1608 resolves these offsets out of its own literal pool against one
     staging base. Parsing must land each field on the same byte."""
-    b = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY)))
+    b = R.Reac.SceneBody(KaitaiStream(BytesIO(scene_body)))
     assert bytes(b.magic) == b"1234"
     assert b.unit_map_select == 1            # +0x04, every desk, every box
     assert b.map_a_arg == 4                  # +0x08
@@ -676,17 +708,16 @@ def test_scene_body_parses_and_its_offsets_are_where_the_box_reads_them():
     assert bytes(b.scen.tag) == b"SCEN"      # +0x37c
     assert len(b.scen.entries) == 800
     # the offsets themselves, so a layout drift cannot pass quietly
-    assert SCENE_BODY[0x1a:0x1a + 800] == b"".join(
-        SCENE_BODY[0x1a + 10 * i:0x1a + 10 * i + 10] for i in range(80))
-    assert SCENE_BODY[0x340:0x346] == bytes(b.master_id)
-    assert SCENE_BODY[0x368:0x36c] == b"SYSP"
-    assert SCENE_BODY[0x37c:0x380] == b"SCEN"
+    assert scene_body[0x1a:0x1a + 800] == b"".join(
+        scene_body[0x1a + 10 * i:0x1a + 10 * i + 10] for i in range(80))
+    assert scene_body[0x340:0x346] == bytes(b.master_id)
+    assert scene_body[0x368:0x36c] == b"SYSP"
+    assert scene_body[0x37c:0x380] == b"SCEN"
 
 
-SCENE_BODY_M5000 = (pathlib.Path(__file__).parent / "fixtures" / "scene-m5000-8904.bin").read_bytes()
 
 
-def test_scene_is_the_desks_not_the_boxs():
+def test_scene_is_the_desks_not_the_boxs(scene_body, scene_body_m5000):
     """Two desk generations, and the bytes that differ are countable.
 
     Across the whole capture corpus 8 of 8904 bytes vary between real desks: the
@@ -694,7 +725,7 @@ def test_scene_is_the_desks_not_the_boxs():
     that change between that desk's own runs. An emitter therefore fills in two
     fields and copies the rest — which is the whole reason this grammar can be
     instantiated from rather than only parsed with."""
-    a, b = SCENE_BODY, SCENE_BODY_M5000
+    a, b = scene_body, scene_body_m5000
     assert len(a) == len(b) == 8904
     differ = {i for i in range(8904) if a[i] != b[i]}
     assert differ == {0x14, 0x343, 0x344, 0x345, 0x366, 0x367, 0x22c6, 0x22c7}
@@ -706,8 +737,8 @@ def test_scene_is_the_desks_not_the_boxs():
     assert a[0x384:0x384 + 8000] == b[0x384:0x384 + 8000]
 
 
-def test_scene_body_parses_on_a_second_desk_generation():
-    m = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY_M5000)))
+def test_scene_body_parses_on_a_second_desk_generation(scene_body_m5000):
+    m = R.Reac.SceneBody(KaitaiStream(BytesIO(scene_body_m5000)))
     assert bytes(m.magic) == b"1234"
     assert m.unit_map_select == 1
     assert m.revision == 1                       # 0 on a V-Mixer desk
@@ -715,7 +746,7 @@ def test_scene_body_parses_on_a_second_desk_generation():
     assert bytes(m.sysp.tag) == b"SYSP" and bytes(m.scen.tag) == b"SCEN"
 
 
-def test_only_three_tags_are_validated_by_the_box():
+def test_only_three_tags_are_validated_by_the_box(scene_body):
     """The box's commit checks three four-byte tags and nothing else.
 
     Run the box's own code over real capture data with the body zeroed in
@@ -726,22 +757,22 @@ def test_only_three_tags_are_validated_by_the_box():
 
     The consequence for an emitter is the point: twelve bytes are checked and
     8892 are not, so a wrong value anywhere else is promoted silently."""
-    b = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY)))
+    b = R.Reac.SceneBody(KaitaiStream(BytesIO(scene_body)))
     tags = {0x000: bytes(b.magic), 0x368: bytes(b.sysp.tag), 0x37c: bytes(b.scen.tag)}
     assert tags == {0x000: b"1234", 0x368: b"SYSP", 0x37c: b"SCEN"}
     for off, want in tags.items():
-        assert SCENE_BODY[off:off + 4] == want
+        assert scene_body[off:off + 4] == want
     windows = {o // 128 for off in tags for o in range(off, off + 4)}
     assert windows == {0, 6}
-    assert -(-len(SCENE_BODY) // 128) == 70
+    assert -(-len(scene_body) // 128) == 70
 
 
-def test_scene_declares_twelve_inventory_cells_like_the_box_does():
+def test_scene_declares_twelve_inventory_cells_like_the_box_does(scene_body):
     """The box's commit walks twelve cells at a stride of 0x28 over the slot
     table — four records each — so the desk declares its inventory in exactly the
     vocabulary the box declares its own in commit_report_page. An M-200i sends
     eight analog-input cells and four absent: 32 declared inputs."""
-    b = R.Reac.SceneBody(KaitaiStream(BytesIO(SCENE_BODY)))
+    b = R.Reac.SceneBody(KaitaiStream(BytesIO(scene_body)))
     cells = [b.slots[4 * i].cell for i in range(12)]
     assert cells.count(R.Reac.InventoryCell.analog_input) == 8
     assert cells.count(R.Reac.InventoryCell.absent) == 4
@@ -749,6 +780,92 @@ def test_scene_declares_twelve_inventory_cells_like_the_box_does():
     # the scene carries no per-channel head-amp values: the commit is the GATE,
     # the values arrive as op-0403 TAG 0x0101 records.
     assert {(s.field_2, s.field_4, s.field_6, s.field_8) for s in b.slots} == {(0, 1, 0, 0)}
+
+
+# --------------------------------------------------------------------------
+# the scene body's layout, on a SYNTHETIC body (synthetic_scene.py)
+#
+# The recovered desk bodies are vendor captures in freereac-ops; the tests
+# above that need their exact bytes skip as OPS-ABSENT without it. These need
+# no capture: the body is built field by field from the layout, with values
+# that read differently at any other offset, width or byte order, so the
+# grammar's offsets are held in a bare clone too.
+# --------------------------------------------------------------------------
+
+def parse_scene(body):
+    return R.Reac.SceneBody(KaitaiStream(BytesIO(body)))
+
+
+def test_synthetic_scene_is_the_scen_arithmetic():
+    body = synthetic_scene.build()
+    assert len(body) == synthetic_scene.SIZE == 0x37c + 8 + 800 * 10 + 4 == 8904
+    head, chunks, final = synthetic_scene.transfer(body)
+    assert len(head) == 24 and len(chunks) == 341 and len(final) == 14 == (8904 - 24) % 26
+    assert head + b"".join(chunks) + final == body
+
+
+def test_synthetic_scene_fields_land_where_the_box_reads_them():
+    f = synthetic_scene.FIELDS
+    body = synthetic_scene.build(revision=0x0302)
+    b = parse_scene(body)
+    assert bytes(b.magic) == b"1234"
+    assert b.unit_map_select == f["unit_map_select"]          # +0x04, little-endian
+    assert b.map_a_arg == f["map_a_arg"]                      # +0x08
+    assert b.revision == 0x0302 and body[0x14:0x16] == b"\x02\x03"
+    assert bytes(b.master_id) == synthetic_scene.MASTER_ID == body[0x340:0x346]
+    assert bytes(b.peer_id_1) == body[0x34a:0x350] == bytes.fromhex("02000000aa01")
+    assert bytes(b.peer_id_2) == body[0x354:0x35a] == bytes.fromhex("02000000bb02")
+    assert (b.sysp.version, b.sysp.key, b.sysp.flag) == (
+        f["sysp_version"], f["sysp_key"], f["sysp_flag"])
+    assert (b.scen.version, b.scen.key) == (f["scen_version"], f["scen_key"])
+    assert bytes(b.scen.trailer) == body[-4:]
+
+
+def test_synthetic_scene_records_are_read_at_their_stride():
+    b = parse_scene(synthetic_scene.build())
+    assert len(b.slots) == 80 and len(b.scen.entries) == 800
+    for k, s in enumerate(b.slots):
+        assert (s.field_2, s.field_4, s.field_6, s.field_8) == (
+            0x1000 | k, 0x2000 | k, 0x3000 | k, 0x4000 | k), f"slot {k}"
+    for k in (0, 1, 399, 799):
+        e = b.scen.entries[k]
+        assert (e.cell, e.field_2, e.field_8) == (R.Reac.InventoryCell(k % 4), 0x1000 | k, 0x4000 | k)
+    cells = [b.slots[4 * i].cell for i in range(12)]
+    assert cells == [R.Reac.InventoryCell(c) for c in synthetic_scene.CELLS]
+
+
+def test_synthetic_scene_tags_fall_in_two_of_seventy_windows():
+    body = synthetic_scene.build()
+    b = parse_scene(body)
+    tags = {0x000: bytes(b.magic), 0x368: bytes(b.sysp.tag), 0x37c: bytes(b.scen.tag)}
+    assert tags == synthetic_scene.TAGS
+    windows = {o // 128 for off in tags for o in range(off, off + 4)}
+    assert windows == {0, 6}
+    assert -(-len(body) // 128) == 70
+
+
+def test_synthetic_scene_the_desk_fields_are_the_only_difference():
+    """An emitter fills in revision and master_id and copies the rest: two bodies
+    built for two desks differ in exactly those bytes."""
+    a = synthetic_scene.build(revision=0)
+    b = synthetic_scene.build(revision=1, master_id=synthetic_scene.MASTER_ID[:3] + b"\x00\x00\x02")
+    assert {i for i in range(len(a)) if a[i] != b[i]} == {0x14, 0x343, 0x344, 0x345}
+    assert (parse_scene(a).revision, parse_scene(b).revision) == (0, 1)
+
+
+@pytest.mark.parametrize("off", sorted(synthetic_scene.TAGS))
+def test_synthetic_scene_a_broken_tag_does_not_parse(off):
+    """The negative control: each tag is checked, so a body with one broken tag
+    must not parse, or the tests above would pass on any bytes."""
+    body = bytearray(synthetic_scene.build())
+    body[off] ^= 0xff
+    with pytest.raises(kaitaistruct.ValidationNotEqualError):
+        parse_scene(bytes(body))
+
+
+def test_synthetic_scene_a_short_body_does_not_parse():
+    with pytest.raises(kaitaistruct.EndOfStreamError):
+        parse_scene(synthetic_scene.build()[:-5])
 
 
 def test_chanmap_ring_is_identical_for_every_box():

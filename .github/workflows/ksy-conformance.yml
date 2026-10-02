@@ -1,9 +1,9 @@
 name: ksy-conformance
 on:
   push:
-    paths: ['spec/**', '.github/workflows/ksy-conformance.yml']
+    paths: ['spec/**', 'tools/**', '.github/workflows/ksy-conformance.yml']
   pull_request:
-    paths: ['spec/**', '.github/workflows/ksy-conformance.yml']
+    paths: ['spec/**', 'tools/**', '.github/workflows/ksy-conformance.yml']
 jobs:
   ksy:
     runs-on: ubuntu-latest
