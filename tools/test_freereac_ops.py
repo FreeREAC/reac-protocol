@@ -235,7 +235,13 @@ class Export(Fixture):
 
 
 class RealTree(unittest.TestCase):
-    """This repository: the move list is exactly the rule applied at its base."""
+    """This repository: the move list is exactly the rule applied at its base, and the tree is clean."""
+
+    def test_the_public_tree_is_clean(self):
+        env = {k: v for k, v in os.environ.items() if k != 'FREEREAC_REQUIRE_OPS'}
+        with mock.patch.dict(os.environ, env, clear=True):
+            buf = io.StringIO()
+            self.assertEqual(fo.check(out=buf), 0, buf.getvalue())
 
     def test_the_list_is_the_rule_at_base(self):
         base, paths = fo.read_moves()

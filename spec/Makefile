@@ -11,7 +11,7 @@
 #   make facts-perturb SEED=n OUT=dir
 #                 write a PERTURBED fact set to OUT: every free number moved
 #                 within its legal range. Build libreac / reac-pw against it
-#                 to find hand-written copies (docs/audits/2026-09-25-contract-copies.md)
+#                 to find hand-written copies (audit 2026-09-25-contract-copies)
 #   make facts-idempotent
 #                 generate twice and diff — a generator that varies between two
 #                 runs over one input regresses the file it maintains

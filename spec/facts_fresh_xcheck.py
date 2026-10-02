@@ -17,7 +17,7 @@ consumers would build against it without anything noticing. So:
     generated value goes red, and so does a schema moved without regenerating.
 
 And the PERTURBATION mode the consumers build against (see gen-facts.py and
-docs/audits/2026-09-25-contract-copies.md) is held to its own contract here:
+audit 2026-09-25-contract-copies) is held to its own contract here:
 deterministic per seed, every free number moved, every derived fact and every
 law still holding, and never written over generated/.
 """
