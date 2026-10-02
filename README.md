@@ -42,6 +42,12 @@ Communications*.
   tcpdump filter, frame validation, de-interleave, rate sanity-checks, and the traps
   (VLAN tags, level correctness).
 
+## Building and checking
+
+The grammar is checked, not just written: a parser generated from it is run against
+committed goldens, the declared facts and the C oracle. How to run those checks, and what
+they need, is in [BUILDING.md](BUILDING.md).
+
 ## Sources
 
 Derived from packet captures, three GPL-3.0 reverse-engineered codebases
