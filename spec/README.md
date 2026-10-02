@@ -70,7 +70,7 @@ sabotage controls (a hand-edited generated value, and a schema moved without reg
 go red). `gen-facts.py --perturb SEED --outdir DIR` (`make facts-perturb`) writes a FICTIONAL but
 self-consistent fact set, with every free number moved and every derivation and
 `meta: perturb_laws` law kept. A consumer built against it fails exactly where it spells a fact
-by hand. See [`docs/audits/2026-09-25-contract-copies.md`](../docs/audits/2026-09-25-contract-copies.md).
+by hand. See the audit `2026-09-25-contract-copies`.
 
 Kaitai cannot close this on its own: it has no plain-C backend and it emits parsers rather
 than serialisers. So the convergence is not "compile the ksy into libreac" — it is this
@@ -137,8 +137,9 @@ compares. What runs:
 
 - **the scene round trip** — libreac builds all 343 transfer steps from a body, the parser
   reads every frame, and the body is REASSEMBLED from what the parser found and compared
-  byte for byte with the input. Four bodies: the two recovered desk bodies committed in
-  `fixtures/`, the tag-only body libreac's own `reac_ctrl_scene_build()` makes, and a body
+  byte for byte with the input. Four bodies: the two recovered desk bodies (vendor captures,
+  read from freereac-ops through `tools/freereac_ops.py`; NOT COVERED by name without it), the
+  tag-only body libreac's own `reac_ctrl_scene_build()` makes, and a body
   GENERATED from the named field layout (`--make-scene PATH`). A chunk at the wrong offset,
   a header declaring the wrong total or a final carrying the wrong tail all come back as a
   byte diff with an offset on it;
@@ -284,6 +285,15 @@ word plus the checksummed block, which is the form the C goldens use), plus the 
 three link states, chanmap windows, all ten probe rotations, sub01/sub02, the enroll
 group map, and the config-announce and cold-connect inventory for the S-0808, S-1608
 and S-4000S.
+
+The two recovered desk scene bodies (`scene-m200i-8904`, `scene-m5000-8904`) are vendor
+captures and are not in this tree. They live in the private freereac-ops repository under
+`reac-protocol/spec/fixtures/`, and the one reader of that checkout is
+[`../tools/freereac_ops.py`](../tools/freereac_ops.py): `$FREEREAC_OPS`, else a sibling
+`../freereac-ops`, else absent. Absent, the tests that need their exact bytes skip as
+`OPS-ABSENT <slug>`; `FREEREAC_REQUIRE_OPS=1` makes that a failure. The scene layout is held
+without them on [`synthetic_scene.py`](synthetic_scene.py), a body built field by field from
+the grammar with values that read differently at any other offset, width or byte order.
 
 MAC addresses in both files are **synthetic stand-ins in the Roland OUI**, never
 captured console or box addresses — the cfea blocks carry a per-console stand-in at
