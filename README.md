@@ -38,21 +38,15 @@ Communications*.
   and libreac each need, written once: frame geometry, the scene transfer, the tags
   the box validates, both checksum rules, the op codes and sub-page selectors, and
   the three head-amp granularities.
-- **[firmware-protocol.md](firmware-protocol.md)** — the protocol as the device
-  firmware states it, rather than as the wire shows it: the class names the images
-  carry, the message inventory in the receive dispatch (including arms not seen on
-  the wire), the box state machine with its failure edges, the struct layouts and
-  every indexing shift as a granularity fact.
 - **[capturing.md](capturing.md)** — how to capture and decode REAC: the raw socket /
   tcpdump filter, frame validation, de-interleave, rate sanity-checks, and the traps
   (VLAN tags, level correctness).
-- **[firmware-findings.md](firmware-findings.md)** — device behaviour derived from
-  firmware reverse-engineering and live-hardware observation: on-rig verification of
-  the wire spec, slave establishment, the head-amp commit model (what arms a
-  channel), the AES/EBU crossbar, the remote-control (RCP) command surface, and
-  bidirectional-TX feasibility. Its final section goes source-level: the M-300 /
-  S-1608 connection engine — function map, the master FSMs, the box FSM, and the
-  wire-level signature of each phase.
+
+## Building and checking
+
+The grammar is checked, not just written: a parser generated from it is run against
+committed goldens, the declared facts and the C oracle. How to run those checks, and what
+they need, is in [BUILDING.md](BUILDING.md).
 
 ## Sources
 

@@ -365,8 +365,8 @@ SPLIT feature, not two unrelated modes.
 box will not join, seat the switch firmly at S and power-cycle — the power-cycle is required, not
 caution.
 
-**Reading a silent box from its own FSM** (see [firmware-findings.md](firmware-findings.md)'s
-source-level section, "9.2 BOX (stagebox / slave) FSM"). The box has three states and each has a
+**Reading a silent box from its own FSM** (see `firmware-findings`,
+its source-level section "9.2 BOX (stagebox / slave) FSM"). The box has three states and each has a
 distinct wire signature:
 
 | box state | what you see on the wire |
@@ -420,7 +420,7 @@ rate.
 A relay that only re-clocks (previous section) is necessary but not sufficient once the
 link it rides is lossy or jittery enough to threaten establishment and hold, not just
 sample timing. Distilled from the connection model above and from the source-level FSM
-in [firmware-findings.md](firmware-findings.md): a transparent REAC bridge MUST —
+in `firmware-findings`: a transparent REAC bridge MUST —
 
 1. **Preserve upstream frame timing toward the master (box→master).** The master holds
    the link via its FPGA link-check counter, refilled once per received frame, and REAC
@@ -642,7 +642,7 @@ A channel is digitally **silent** until the commit promotes head-amp into the ac
 The commit is the sole promoter: it flushes the twelve groups and replies `01 03 00 10`.
 Neither an establishment handshake nor an enrol frame arms a bank on its own. The transfer
 that carries it, and what the box validates in it, is the scene transfer — see
-[firmware-findings.md](firmware-findings.md) and the `scene` groups of
+`firmware-findings` and the `scene` groups of
 [`spec/protocol-facts.yaml`](spec/protocol-facts.yaml).
 
 Ordering, for an implementer: **establish → scene transfer → commit → head-amp records.**
@@ -979,7 +979,7 @@ which the stagebox firmware only emits after it has committed the master's scene
 4. emits FILLER keep-alive.
 
 reacdriver's own implementation of this path is incomplete; full master↔slave
-establishment is observed live (see [firmware-findings.md](firmware-findings.md), slave
+establishment is observed live (see `firmware-findings`, slave
 establishment).
 
 ## Upstream (stagebox→master) audio layout
@@ -1024,7 +1024,7 @@ are broadcast `ff:ff:ff:ff:ff:ff`, box→mixer INPUT frames are unicast to the c
 MAC); **802.1Q VLAN tag** → which REAC port/zone in a multi-zone trunk. **Not**
 derivable from the wire: which physical jack or patch point a slot maps to — the frame
 carries positional slots, no labels (resolve via a labelled-tone probe or the
-remote-control query in [firmware-findings.md](firmware-findings.md)).
+remote-control query in `firmware-findings`).
 
 ## Bandwidth / link budget
 
