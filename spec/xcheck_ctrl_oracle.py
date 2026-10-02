@@ -64,6 +64,11 @@ import sys
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent / "tools"))
+import freereac_ops  # noqa: E402  the one reader of the freereac-ops checkout
+
+# the recovered desk bodies: vendor captures, kept in freereac-ops
+VENDOR_SCENES = ("scene-m200i-8904", "scene-m5000-8904")
 
 # Below these, the run reports INCONCLUSIVE rather than PASS. They are floors on
 # what was actually COMPARED, not on the size of the corpus: a scan that finds
@@ -370,8 +375,15 @@ def main():
                                                work)
         dump, facts_tu, noise = build(libreac, work)
 
-        bodies = [(p.stem, p.read_bytes())
-                  for p in sorted((HERE / "fixtures").glob("scene-*-8904.bin"))]
+        bodies, absent = [], []
+        for slug in VENDOR_SCENES:
+            body = freereac_ops.read_ops(slug)
+            if body is None:
+                absent.append(freereac_ops.absent_reason(slug))
+            else:
+                bodies.append((slug, body))
+        if absent and freereac_ops.ops_required():
+            sys.exit("\n".join(absent) + "\n(FREEREAC_REQUIRE_OPS=1)")
         # ... plus the one libreac builds for itself, which is the refuted
         # tag-only body. It goes through the same round trip: refuted as a
         # DRIVER of real hardware is not the same as malformed, and the
@@ -416,6 +428,8 @@ def main():
     print(f"  corpus blocks   : {c.get('corpus_blocks', 0)}")
     if skipped_generator:
         print(f"  generated body  : NOT COVERED — {skipped_generator}")
+    for line in absent:
+        print(f"  desk body       : NOT COVERED — {line}")
     print(f"  field checks    : {rep.checks}")
     print(f"  mismatches      : {len(rep.failures)}")
 
