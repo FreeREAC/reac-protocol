@@ -28,11 +28,14 @@ cross-checks that hold the grammar, the declared facts and the C oracle (libreac
 
     python3 -m unittest discover -s tools -p 'test_*.py'
     python3 tools/freereac_ops.py check
+    python3 tools/freereac_ops.py history-check HEAD
 
 `make -C spec check` regenerates the parser (it is never committed), requires the generated
 fact headers to be current and reproducible, and runs `reac_xcheck.py`, `facts_xcheck.py` and
 `facts_fresh_xcheck.py`. `tools/freereac_ops.py check` keeps the public tree public: no
 internal material, no file-name citation of a moved document, no build command on the README.
+`history-check` keeps the history public too: no commit may carry a moved or internal path, not
+even one a later commit deletes. It reads every commit, so it needs a full clone.
 
 ## The declared facts
 
