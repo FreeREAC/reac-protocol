@@ -1,0 +1,13 @@
+# Paths moved to FreeREAC/freereac-ops under reac-protocol/<path> (docs-to-ops plan F1/F2,
+# RULED 2026-10-01 item 3). Taken byte-identical from the base below; their history before the
+# move is in this repo at that commit. Cite one by its bare slug (the file name without the
+# extension), never by path. tools/freereac_ops.py reads this list.
+# base 372e04e62359ee853995981ac8eeb6295cfcbbd5
+docs/audits/2026-09-25-contract-copies.md
+docs/audits/2026-09-25-contract-copies/libreac.tsv
+docs/audits/2026-09-25-contract-copies/reac-pw.tsv
+docs/audits/2026-09-25-contract-copies/reac.ksy.tsv
+firmware-findings.md
+firmware-protocol.md
+spec/fixtures/scene-m200i-8904.bin
+spec/fixtures/scene-m5000-8904.bin
