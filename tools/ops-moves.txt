@@ -1,7 +1,10 @@
 # Paths moved to FreeREAC/freereac-ops under reac-protocol/<path> (docs-to-ops plan F1/F2,
-# RULED 2026-10-01 item 3). Taken byte-identical from the base below; their history before the
-# move is in this repo at that commit. Cite one by its bare slug (the file name without the
-# extension), never by path. tools/freereac_ops.py reads this list.
+# RULED 2026-10-01 items 2 and 3). Each "# base <sha>" line names the commit the paths after it
+# are taken from, byte-identical. The last group never reached the tip: internal files that only
+# lived in this repo's history, listed so the history rewrite drops nothing without an ops copy.
+# Their history before the move is kept under the backup/pre-rewrite-2026-10-01 tags. Cite one by
+# its bare slug (the file name without the extension), never by path. tools/freereac_ops.py reads
+# this list.
 # base 372e04e62359ee853995981ac8eeb6295cfcbbd5
 docs/audits/2026-09-25-contract-copies.md
 docs/audits/2026-09-25-contract-copies/libreac.tsv
@@ -11,3 +14,9 @@ firmware-findings.md
 firmware-protocol.md
 spec/fixtures/scene-m200i-8904.bin
 spec/fixtures/scene-m5000-8904.bin
+# base c916200bd500b1d9982d77a0aaa11bfd0f85b838
+convergence-defects.md
+defect-census-2026-08-23.md
+unknowns-census.md
+# base bbe971da395aab0b32cea25d7ba54fd9fb356752
+docs/audit-2026-09-13-unknown-facts.md
