@@ -43,10 +43,10 @@ OPS_SUBDIR = 'reac-protocol'
 BRANCH = 'lane/docs-reac-protocol'
 REQUIRE_ENV = 'FREEREAC_REQUIRE_OPS'
 
-# Internal material: firmware RE write-ups, vendor binaries, audits, notes, plans, agent tooling.
+# Internal material: firmware RE write-ups, vendor binaries, audits, notes, plans.
 INTERNAL_DIRS = ('docs/audits/', 'docs/notes/', 'docs/plans/', 'docs/design/', 'notes/',
-                 'plans/', '.claude/')
-INTERNAL_NAMES = ('ROADMAP.md', 'CLAUDE.md', 'AGENTS.md')
+                 'plans/')
+INTERNAL_NAMES = ('ROADMAP.md',)
 PLAN = re.compile(r'-plan(-[^/]*)?\.md$')
 LEDGER = re.compile(r'(^|-)(audit|census)(-[^/]*)?\.md$')  # dated audits and censuses
 # Files that name the moved paths by necessity.
