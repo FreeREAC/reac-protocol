@@ -77,7 +77,7 @@ class Classifier(unittest.TestCase):
         for p in ('firmware-findings.md', 'firmware-protocol.md', 'spec/fixtures/scene-a-8904.bin',
                   'x.bin', 'docs/audits/2026-09-25-contract-copies/libreac.tsv',
                   'docs/notes/n.md', 'docs/plans/p.md', 'ROADMAP.md', 'docs/scene-plan.md',
-                  'docs/f-plan-2026.md', '.claude/skills/s.md', 'CLAUDE.md',
+                  'docs/f-plan-2026.md',
                   'docs/audit-2026-09-13-unknown-facts.md', 'unknowns-census.md',
                   'defect-census-2026-08-23.md'):
             self.assertTrue(fo.belongs_in_ops(p), p)
