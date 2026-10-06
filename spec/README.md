@@ -193,9 +193,10 @@ Everything it reads is committed beside it: no network, no capture files, no rig
 
 - **frame geometry** — the `52 + n*36` law in both directions, the channel width
   derived from the frame size (REAC carries no width field in an audio frame), and
-  the REFUSAL of anything past the end marker: a capture path's `+2` is stripped by
-  the harness's own `capture_reader()` — the reader's job, as in libreac's ingest —
-  and a residue-carrying buffer handed straight to the grammar goes red;
+  the capture residue after the end marker IGNORED: a residue-carrying buffer handed
+  straight to the grammar parses as its frame with the bytes in `capture_residue`
+  (fixtures/residue.json, a 1494 B 40-channel frame), while a buffer whose end
+  marker is off the law is still refused;
 - **the braid** — the audio region decoded through the spec's pair-group structure
   must reproduce, sample for sample, the planar s24 tables libreac's own
   `tests/test_upstream.c` asserts. The permutation itself is documented in the spec
