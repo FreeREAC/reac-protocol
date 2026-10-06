@@ -260,13 +260,12 @@ def scan_file(path, reac, kaitai, per_file, corrupt, moves=None):
         if len(data) < 52 or struct.unpack(">H", data[12:14])[0] != ETHERTYPE:
             continue
         n = len(data)
-        # THIS SCRIPT IS THE CAPTURE READER, and this is the only place the +2
-        # is handled. A mirrored/trunked tap leaves two bytes of the frame's own
-        # Ethernet FCS after the end marker; the grammar models a REAC frame and
-        # refuses a buffer carrying them (it has no residue vocabulary at all,
-        # since 2026-09-21), so a reader that skipped this line would file every
-        # mirrored frame as a grammar failure. libreac's ingest does the same
-        # thing in the same place — reac_frame_clean_len().
+        # THIS SCRIPT IS THE CAPTURE READER, and it strips the +2 here. Some
+        # capture paths (a mirrored/trunked tap, an AX88179 USB adapter) leave two
+        # bytes of the frame's own Ethernet FCS after the end marker; the grammar
+        # ignores them as capture_residue, and stripping first keeps the off-law
+        # count below about frames rather than about capture paths. libreac's
+        # ingest does the same thing in the same place — reac_frame_clean_len().
         if (n - 52) % 36 == 2:
             data, n = data[:n - 2], n - 2
         if (n - 52) % 36 != 0:
