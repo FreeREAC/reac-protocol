@@ -128,22 +128,19 @@ def check_upstream(binary, R, rep):
         name = fx["name"]
         raw = bytes.fromhex(fx["hex"])
         # THE C ORACLE IS ALSO THE READER. libreac's reac_frame_clean_len() is
-        # ingest's rule for a capture path's +2, and the grammar has no such
-        # rule — it parses REAC frames. So the oracle's own clean_len is what
-        # decides how many bytes the parser is handed, and a raw residue buffer
-        # is checked to be REFUSED below rather than tolerated.
+        # ingest's rule for a capture path's +2; the grammar ignores those bytes
+        # as capture_residue. So the stripped frame and the raw residue buffer
+        # must parse to the same frame.
         frame = raw[:c["clean_len"]]
         p = R.Reac(KaitaiStream(BytesIO(frame)))
         rep.eq(f"{name}.raw_len", p.raw_len, c["clean_len"])
         rep.eq(f"{name}.num_channels", p.num_channels, c["upstream_channels"])
         rep.eq(f"{name}.counter", p.counter, c["counter"])
         if c["raw_len"] != c["clean_len"]:
-            refused = False
-            try:
-                R.Reac(KaitaiStream(BytesIO(raw))).end_marker
-            except Exception:
-                refused = True
-            rep.eq(f"{name}.residue_buffer_refused", refused, True)
+            r = R.Reac(KaitaiStream(BytesIO(raw)))
+            rep.eq(f"{name}.residue_buffer_frame_len", r.frame_len, c["clean_len"])
+            rep.eq(f"{name}.residue_buffer_residue", len(r.capture_residue),
+                   c["raw_len"] - c["clean_len"])
         rep.eq(f"{name}.len_audio", p.len_audio,
                c["upstream_channels"] * 36)
         rep.eq(f"{name}.samples", len(p.audio.time_samples),

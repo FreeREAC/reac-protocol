@@ -56,6 +56,7 @@ sys.path.insert(0, str(HERE.parent / "tools"))
 import freereac_ops  # noqa: E402  the one reader of the freereac-ops checkout
 UPSTREAM = json.loads((HERE / "fixtures" / "upstream.json").read_text())
 CONTROL = json.loads((HERE / "fixtures" / "control.json").read_text())
+RESIDUE = json.loads((HERE / "fixtures" / "residue.json").read_text())
 
 REAC_UPSTREAM_OVERHEAD = 52      # 50 B header + 2 B end marker
 REAC_UPSTREAM_BYTES_PER_CH = 36  # 12 samples x 3 B
@@ -219,8 +220,8 @@ def capture_reader(buf):
     The residue is the capture path's, never the protocol's, so stripping it
     happens HERE — the same place libreac does it, in ingest
     (reac_frame_clean_len(), reac_rx/reac_tap), and the same place
-    corpus-check.py does it, at the pcap record. The grammar below knows
-    nothing about it and refuses a buffer that still carries it.
+    corpus-check.py does it, at the pcap record. The grammar below ignores it
+    as `capture_residue` when a reader hands it over unstripped.
     """
     return buf[:oracle_clean_len(len(buf))]
 
@@ -246,8 +247,8 @@ GRANT_CELLS = CONTROL["grant_sweep"]["head_amp_cells"]
 
 
 # --------------------------------------------------------------------------
-# frame geometry: 52 + n*36 exactly, derived width, and the refusal of anything
-# past the end marker
+# frame geometry: 52 + n*36 up to the end marker, derived width, and the capture
+# residue after it ignored
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
@@ -261,38 +262,75 @@ def test_frame_geometry_matches_oracle(name, fx):
 
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
-def test_a_buffer_with_the_capture_residue_is_refused(name, fx):
-    """A residue-carrying buffer handed STRAIGHT to the grammar must go red.
+def test_a_buffer_with_the_capture_residue_parses_and_ignores_it(name, fx):
+    """A residue-carrying buffer handed STRAIGHT to the grammar parses as its frame.
 
-    The +2 is a capture artifact, and the grammar models a REAC frame — so a
-    reader that forgets to strip gets an error, never a silently-accepted frame
-    two bytes longer than the protocol's own law. The goldens that carry the
-    residue (342 / 630 / 1206 B) are the positive side; the clean ones have
-    nothing to refuse and are skipped by name.
+    The +2 is a capture artifact (operator ruling 2026-10-06: the grammar is
+    correct AND ignores the extra bytes). The frame ends at its end marker, the
+    bytes after it are `capture_residue`, and every field reads as it does on the
+    stripped frame. The clean goldens have nothing to ignore and are skipped.
     """
     raw = bytes.fromhex(fx["hex"])
     if len(raw) == oracle_clean_len(len(raw)):
         pytest.skip("golden carries no residue")
+    p = parse_raw(raw)
+    clean = capture_reader(raw)
+    assert p.frame_len == len(clean) == len(raw) - 2
+    assert p.num_channels == fx["channels"]
+    assert bytes(p.end_marker) == b"\xc2\xea"
+    assert bytes(p.capture_residue) == raw[len(clean):]
+    # ANY bytes after the marker are ignored the same way: the residue is not
+    # read as an FCS, or as anything else
+    q = parse_raw(clean + b"\x00\x00")
+    assert q.num_channels == fx["channels"] and bytes(q.capture_residue) == b"\x00\x00"
+
+
+@pytest.mark.parametrize("name,fx", UP_FRAMES)
+def test_a_marker_off_the_law_is_still_refused(name, fx):
+    """Ignoring the residue is not tolerating a broken frame: a buffer short of
+    its frame puts the end-marker check on audio bytes and is refused."""
+    clean = capture_reader(bytes.fromhex(fx["hex"]))
     with pytest.raises(Exception):
-        parse_raw(raw)
-    # and a clean frame with ANY two extra bytes is refused the same way — the
-    # refusal is about the geometry, not about those bytes being an FCS
-    with pytest.raises(Exception):
-        parse_raw(capture_reader(raw) + b"\x00\x00")
+        parse_raw(clean[:-2])
 
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
 def test_the_grammar_carries_no_capture_vocabulary(name, fx):
-    """No residue field and no residue INSTANCE — the ratchet on the ruling.
-
-    `has_fcs_residue` and `clean_len` were computed here until 2026-09-21; they
-    are ingest's vocabulary and they are gone. A field for the bytes was never
-    declared, so nothing generated from this grammar can emit them.
-    """
+    """The residue is NAMED and nothing else: no FCS field, no residue predicate,
+    no clean length. `capture_residue` is empty on a clean frame and the frame's
+    own fields end exactly at its end marker."""
     p = parse_frame(fx["hex"])
-    assert p._io.pos() == p.raw_len == p._io.size()
+    assert p.frame_len == p.raw_len == p._io.size()
+    assert bytes(p.capture_residue) == b""
     for gone in ("fcs_residue", "ohrca_trailer", "has_fcs_residue", "clean_len"):
         assert not hasattr(p, gone)
+
+
+RESIDUE_FRAMES = [(f["name"], f) for f in RESIDUE["frames"]]
+
+
+@pytest.mark.parametrize("name,fx", RESIDUE_FRAMES)
+def test_a_1494_byte_capture_is_a_40_channel_frame_with_two_residue_bytes(name, fx):
+    """The AX88179 shape (desk, 2026-10-06): 1494 B off a direct cable, the two
+    bytes after the end marker the low 16 bits of the frame's own FCS."""
+    import zlib
+    raw = bytes.fromhex(fx["hex"])
+    assert len(raw) == fx["raw_len"] == 1494
+    p = parse_raw(raw)
+    assert p.num_channels == fx["channels"] == 40
+    assert p.is_downstream_width
+    assert p.frame_len == fx["frame_len"] == 1492
+    assert p.len_audio == 40 * REAC_UPSTREAM_BYTES_PER_CH
+    assert bytes(p.end_marker) == b"\xc2\xea"
+    assert bytes(p.capture_residue) == bytes.fromhex(fx["residue_hex"])
+    # the residue is the FCS remnant, and the grammar never needed to know it
+    fcs = zlib.crc32(raw[:p.frame_len]) & 0xffffffff
+    assert bytes(p.capture_residue) == fcs.to_bytes(4, "little")[:2]
+    # and the frame parses to the same fields with or without it
+    s = parse_raw(raw[:p.frame_len])
+    assert (s.counter, s.num_channels, s.len_audio) == (p.counter, p.num_channels, p.len_audio)
+    assert [[bytes(g) for g in ts.pair_groups] for ts in s.audio.time_samples] \
+        == [[bytes(g) for g in ts.pair_groups] for ts in p.audio.time_samples]
 
 
 @pytest.mark.parametrize("name,fx", UP_FRAMES)
@@ -321,7 +359,7 @@ def test_the_readers_strip_rule_over_the_whole_frame_family():
     """Ingest's rule, both directions — libreac reac_frame_clean_len().
 
     Transcribed here because this harness plays the reader; the grammar itself
-    has no opinion about it beyond refusing what the reader failed to strip.
+    ignores what a reader did not strip.
     """
     for width in (8, 16, 32, 40):
         clean = REAC_UPSTREAM_OVERHEAD + width * REAC_UPSTREAM_BYTES_PER_CH
@@ -333,8 +371,8 @@ def test_the_readers_strip_rule_over_the_whole_frame_family():
     assert (oracle_clean_len(340), oracle_clean_len(342)) == (340, 340)
     # the 40-ch solution is the downstream broadcast, never a box return
     assert oracle_upstream_channels(1492) == -1
-    # and a length the reader did not strip is off the law, so the PARSER side
-    # refuses it rather than quietly stripping it a second time
+    # libreac's upstream width door takes a CLEAN length and refuses a residue
+    # one; that is libreac's contract, not the grammar's
     for residue in (342, 630, 1206, 1494):
         assert oracle_upstream_channels(residue) == -1
 
