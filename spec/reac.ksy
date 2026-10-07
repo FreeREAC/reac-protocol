@@ -162,8 +162,10 @@ doc: |
   - OUTER, the control block: `Sum(frame[18..49]) mod 256 == 0`, the last byte of
     the block being the stamp. FILLER frames (type word 0x0000) are EXEMPT.
     `raw_block` and `block_checksum` expose the bytes for a checker to verify.
-  - INNER, a DT1 record: `Sum(TAG .. CKSUM) mod 256 == 0x80`, i.e. the Roland
-    Data Set 1 rule over the record only. `dt1_record.record_len` gives its span.
+  - INNER, a DT1 record: `Sum(TAG .. CKSUM) mod 128 == 0`, the Roland seven-bit
+    Data Set 1 rule over the record only. Every short record in the corpus also
+    sums to 0x80 mod 256; a record whose sum has an odd number of 128s sums to 0
+    and is just as valid. `dt1_record.record_len` gives its span.
 
   Both are asserted for every checked-in fixture by spec/reac_xcheck.py.
 
@@ -374,6 +376,17 @@ instances:
 
       36 = 12 samples x 3 bytes, per channel, at every sample rate — so a REAC
       frame's length carries its width, and only whole channels are legal.
+  is_broadcast:
+    value: eth_dst == [0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+  broadcast_width:
+    value: 'is_broadcast ? num_channels : 0'
+    doc: |
+      The width a BROADCAST sender puts on the wire, 0 for a unicast frame. A desk
+      broadcasts 1492 B (40); a box on M broadcasts its own input width, 52 + n*36
+      (628 B = 16 on the S-1608, box-to-box-2026-09-13; 1204 B = 32 on the S-4000S,
+      role-m-boot-20260831-223528). With `cfea_payload.announces_box` this is how a
+      box master is told from a desk (ruling 2026-10-07): a broadcast narrower than
+      40 is a box at that width.
   is_downstream_width:
     value: num_channels == 40
 types:
@@ -764,6 +777,33 @@ types:
       - id: rest
         size-eos: true
         doc: Zero padding, last byte the block checksum.
+    instances:
+      announces_box:
+        value: total_slots < 40
+        doc: |
+          DESK OR BOX MASTER (ruling 2026-10-07). A box on M sends cfea, chanmap
+          and scene pushes like a desk, so record kinds cannot tell them apart;
+          this byte can. 0x28 on every desk announce captured (M-200 c9:cc:03, 242
+          in real-m200-s1608-coldboot-2026-07-11; M-300 c9:d8:5b, 228; M-5000
+          ca:15:4c, 180; 16 867 across the corpus). A box on M writes its own
+          input width: 0x10 on the S-1608 c4:80:3b (23 announces in box-to-box
+          enrol-main-port-slice.pcap, 17 in s1608-master-96k-vs-m200-slave).
+
+          The verdict a master draws from it, with `broadcast_width`:
+            announces_box, or broadcast_width < 40   -> a BOX master, at that width;
+            1492 B broadcast and total_slots == 0x28 -> a DESK (a captured fact);
+            1492 B broadcast, no cfea heard yet      -> UNDECIDED: wait for one.
+          Never "desk" by default.
+
+          NOT EVERY BOX ON M ANNOUNCES. The S-0808 on M sends no cfea at all
+          (s0808-as-master-20261007-122036 enp128s20f0u6.pcap: 159 773 frames
+          from 00:40:ab:c4:dc:9c, every one 340 B broadcast, type word cdea or
+          0000 only — channel map x20, scene push — and no cf ea). Its broadcast
+          width decides it: under 1492 B is a box, with no hold.
+
+          KNOWN GAP: a 40-input box on M broadcasts 1492 B and may announce 0x28,
+          or, like the S-0808, nothing. Nobody has captured one; until it is, it
+          reads as a desk if it announces 0x28 and as undecided if it does not.
   scene_chunk_payload:
     doc: |
       op 0x0100 — a CONTINUATION CHUNK of the master's scene transfer, 26 bytes
@@ -1554,14 +1594,24 @@ types:
     instances:
       declared_in_channels:
         value: >-
-          (cells[0].to_i == 2 ? 4 : 0) + (cells[1].to_i == 2 ? 4 : 0) +
-          (cells[2].to_i == 2 ? 4 : 0) + (cells[3].to_i == 2 ? 4 : 0) +
-          (cells[4].to_i == 2 ? 4 : 0) + (cells[5].to_i == 2 ? 4 : 0) +
-          (cells[6].to_i == 2 ? 4 : 0) + (cells[7].to_i == 2 ? 4 : 0) +
-          (cells[8].to_i == 2 ? 4 : 0) + (cells[9].to_i == 2 ? 4 : 0) +
-          (cells[10].to_i == 2 ? 4 : 0) + (cells[11].to_i == 2 ? 4 : 0)
-        doc: Declared INPUT width, 4 channels per analog-input cell. The third
-          placement carrier. Kaitai has no fold, hence the unrolled sum.
+          (cells[0].to_i == 2 or cells[0].to_i == 0 ? 4 : 0) +
+          (cells[1].to_i == 2 or cells[1].to_i == 0 ? 4 : 0) +
+          (cells[2].to_i == 2 or cells[2].to_i == 0 ? 4 : 0) +
+          (cells[3].to_i == 2 or cells[3].to_i == 0 ? 4 : 0) +
+          (cells[4].to_i == 2 or cells[4].to_i == 0 ? 4 : 0) +
+          (cells[5].to_i == 2 or cells[5].to_i == 0 ? 4 : 0) +
+          (cells[6].to_i == 2 or cells[6].to_i == 0 ? 4 : 0) +
+          (cells[7].to_i == 2 or cells[7].to_i == 0 ? 4 : 0) +
+          (cells[8].to_i == 2 or cells[8].to_i == 0 ? 4 : 0) +
+          (cells[9].to_i == 2 or cells[9].to_i == 0 ? 4 : 0) +
+          (cells[10].to_i == 2 or cells[10].to_i == 0 ? 4 : 0) +
+          (cells[11].to_i == 2 or cells[11].to_i == 0 ? 4 : 0)
+        doc: |
+          Declared INPUT width, 4 channels per input cell: `analog_input`
+          (0x02) and `split_input` (0x00) both count, as libreac counts them
+          (reac_ports_parse). Counting only 0x02 read the S-4000H's 8 inputs
+          (vlan13-0832.pcap) as none. The third placement carrier. Kaitai has
+          no fold, hence the unrolled sum.
       declared_out_channels:
         value: >-
           (cells[0].to_i == 1 ? 4 : 0) + (cells[1].to_i == 1 ? 4 : 0) +
@@ -1892,6 +1942,50 @@ types:
           The PATCH field, which the console prints as TWO DIGITS run together
           with the minor: 2 on both the S-1608 and the S-4000S-3208, giving the
           displayed `2.302` and `2.102`. 0 on the S-0808.
+      hw_block:
+        value: payload
+        if: is_reply and addr_lo == identity_addr::reac_version and
+          payload.size >= 8
+        doc: |
+          The 0x0600 record's eight bytes as they arrived, beside the four
+          numbers decoded from them, because the first u16 is undecoded. This
+          is what a binding publishes as the box's hw block; it is the same
+          record as the REAC version, not a second one.
+      box_family:
+        value: >-
+          (reac_version_reserved == 0 and reac_version_major == 1 and
+           reac_version_minor == 0 and reac_version_patch == 0) ? 1 :
+          (reac_version_reserved == 0 and reac_version_major == 2 and
+           reac_version_minor == 3 and reac_version_patch == 2) ? 2 :
+          (reac_version_reserved == 0 and reac_version_major == 2 and
+           reac_version_minor == 1 and reac_version_patch == 2) ? 3 : 0
+        enum: box_family
+        if: is_reply and addr_lo == identity_addr::reac_version and
+          payload.size >= 8
+        doc: |
+          THE BOX FAMILY, READ OFF THE HW BLOCK. The S-1608 and the S-4000S
+          never answer the name address (0x1000), so their model is not on the
+          wire as text; the hw block is what tells the families apart, and it
+          does so uniquely on every box the corpus holds:
+
+            hw block (0x0600)          family    boxes (MAC), declared in/out
+            00 00 00 01 00 00 00 00    S-0808    m200-BIDIR-coldboot-2026-07-11; 8/8
+            00 00 00 02 00 03 00 02    S-1608    0040abc48041, 0040abc4803b; 16/8
+            00 00 00 02 00 01 00 02    S-4000S   0040abc40680, 0040abc408bc (32/8);
+                                                 0040abc42580 (8/32,
+                                                 m200-s4000h-coldboot.pcap)
+
+          No two families share a value, and every S-4000S chassis shares one,
+          whatever widths its cards declare. So the hw block names the FAMILY
+          and the config announce's cells name the WIDTHS (see `box_model`).
+
+          THIS IS A RECOGNITION RULE, AND THE ONLY ONE. The mapping from the
+          three values to the three family names is not carried by any frame:
+          a Roland console holds it in its own firmware (an M-200i shows the
+          S-4000H at 0040abc42580 as "S-4000S, 08 in / 32 out", 2026-09-17).
+          A value outside the three is `unknown`, never the nearest family.
+          The record is the REAC protocol version, so a firmware release that
+          moves it moves the family to `unknown` until a capture adds it here.
   record_fragment:
     doc: |
       op 0x0401 and op 0x0402 — link 4 with the segment field reading FIRST and
@@ -2056,7 +2150,7 @@ types:
             'reg_page::identity': identity_data
       - id: inner_checksum
         type: u1
-        doc: Roland DT1 rule - Sum(tag .. inner_checksum) mod 256 == 0x80.
+        doc: Roland DT1 rule - Sum(tag .. inner_checksum) mod 128 == 0 (seven-bit).
       - id: sysex_end
         contents: [0xF7]
       - id: padding
@@ -2237,6 +2331,50 @@ types:
         repeat-expr: _parent._parent.num_channels / 2
         doc: One 6-byte group per channel PAIR (2k, 2k+1), holding both channels'
           three sample bytes interleaved by the braid.
+  box_model:
+    doc: |
+      THE MODEL NAME, DERIVED. Two frames carry a box's model between them:
+      the identity page's hw block gives the family (`identity_data.box_family`)
+      and the config announce's cells give the declared widths
+      (`commit_report_page.declared_in_channels` / `declared_out_channels`).
+      Nothing else goes into the name, so this type takes the three as
+      parameters and reads no bytes.
+
+      The rule: the family's stem, then `-`, then the inputs and the outputs as
+      two two-digit numbers, except when the stem already ends in exactly
+      those four digits. A stock S-1608 (16/8) is `S-1608`; a stock S-0808 is
+      `S-0808`; the S-4000S is modular, so its widths always follow:
+      `S-4000S-3208`, `S-4000S-0832`, `S-4000S-1624` (box 0040abc408bc
+      re-fitted, s4000s-1624-announce2.pcap t = 1791302090.060459) and
+      `S-4000S-4000` (40 in / 0 out). A family the hw block does not name is
+      `REAC-` and the widths: a name that claims nothing.
+
+      An S-1608 that declared anything but 16/8 would read `S-1608-<in><out>`,
+      so a name never hides a declaration that disagrees with it.
+    params:
+      - id: family
+        type: u1
+        enum: box_family
+      - id: declared_in
+        type: u1
+      - id: declared_out
+        type: u1
+    instances:
+      widths:
+        value: >-
+          (declared_in < 10 ? "0" : "") + declared_in.to_s +
+          (declared_out < 10 ? "0" : "") + declared_out.to_s
+      stem:
+        value: >-
+          family == box_family::s0808 ? "S-0808" :
+          family == box_family::s1608 ? "S-1608" :
+          family == box_family::s4000s ? "S-4000S" : "REAC"
+      stem_widths:
+        value: >-
+          family == box_family::s0808 ? "0808" :
+          family == box_family::s1608 ? "1608" : ""
+      name:
+        value: 'stem_widths == widths ? stem : stem + "-" + widths'
 enums:
   frame_type:
     0x0000: filler
@@ -2296,6 +2434,13 @@ enums:
   # Named from what each record was MEASURED to carry. `model_name_slot_b` and
   # the two `_ext` rows have never been answered by any box in the corpus and
   # are named from the console's poll alone. See type `identity_data`.
+  # box_family — what the identity page's hw block (0x0600) names. See
+  # `identity_data.box_family` for the table and the evidence behind it.
+  box_family:
+    0: unknown
+    1: s0808
+    2: s1608
+    3: s4000s
   identity_addr:
     0x0000: firmware_version
     0x0600: reac_version
