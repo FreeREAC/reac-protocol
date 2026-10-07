@@ -1220,3 +1220,6 @@ def test_a_name_never_hides_a_declaration_that_disagrees_with_it():
 def test_a_family_the_wire_does_not_name_claims_no_model():
     assert _model(F.unknown, 16, 24).name == "REAC-1624"
     assert _model(F.unknown, 40, 0).name == "REAC-4000"
+    # A Roland S-0816 (8 in / 16 out) has never been captured here, so its hw
+    # block names no family yet: it is named by its declared widths alone.
+    assert _model(F.unknown, 8, 16).name == "REAC-0816"
