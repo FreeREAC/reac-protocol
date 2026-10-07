@@ -376,6 +376,17 @@ instances:
 
       36 = 12 samples x 3 bytes, per channel, at every sample rate — so a REAC
       frame's length carries its width, and only whole channels are legal.
+  is_broadcast:
+    value: eth_dst == [0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+  broadcast_width:
+    value: 'is_broadcast ? num_channels : 0'
+    doc: |
+      The width a BROADCAST sender puts on the wire, 0 for a unicast frame. A desk
+      broadcasts 1492 B (40); a box on M broadcasts its own input width, 52 + n*36
+      (628 B = 16 on the S-1608, box-to-box-2026-09-13; 1204 B = 32 on the S-4000S,
+      role-m-boot-20260831-223528). With `cfea_payload.announces_box` this is how a
+      box master is told from a desk (ruling 2026-10-07): a broadcast narrower than
+      40 is a box at that width.
   is_downstream_width:
     value: num_channels == 40
 types:
@@ -766,6 +777,26 @@ types:
       - id: rest
         size-eos: true
         doc: Zero padding, last byte the block checksum.
+    instances:
+      announces_box:
+        value: total_slots < 40
+        doc: |
+          DESK OR BOX MASTER (ruling 2026-10-07). A box on M sends cfea, chanmap
+          and scene pushes like a desk, so record kinds cannot tell them apart;
+          this byte can. 0x28 on every desk announce captured (M-200 c9:cc:03, 242
+          in real-m200-s1608-coldboot-2026-07-11; M-300 c9:d8:5b, 228; M-5000
+          ca:15:4c, 180; 16 867 across the corpus). A box on M writes its own
+          input width: 0x10 on the S-1608 c4:80:3b (23 announces in box-to-box
+          enrol-main-port-slice.pcap, 17 in s1608-master-96k-vs-m200-slave).
+
+          The verdict a master draws from it, with `broadcast_width`:
+            announces_box, or broadcast_width < 40   -> a BOX master, at that width;
+            1492 B broadcast and total_slots == 0x28 -> a DESK (a captured fact);
+            1492 B broadcast, no cfea heard yet      -> UNDECIDED: wait for one.
+          Never "desk" by default.
+
+          KNOWN GAP: a 40-input box on M broadcasts 1492 B and may announce 0x28.
+          Nobody has captured one; until it is, it reads as a desk.
   scene_chunk_payload:
     doc: |
       op 0x0100 — a CONTINUATION CHUNK of the master's scene transfer, 26 bytes
