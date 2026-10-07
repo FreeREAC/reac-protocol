@@ -162,8 +162,10 @@ doc: |
   - OUTER, the control block: `Sum(frame[18..49]) mod 256 == 0`, the last byte of
     the block being the stamp. FILLER frames (type word 0x0000) are EXEMPT.
     `raw_block` and `block_checksum` expose the bytes for a checker to verify.
-  - INNER, a DT1 record: `Sum(TAG .. CKSUM) mod 256 == 0x80`, i.e. the Roland
-    Data Set 1 rule over the record only. `dt1_record.record_len` gives its span.
+  - INNER, a DT1 record: `Sum(TAG .. CKSUM) mod 128 == 0`, the Roland seven-bit
+    Data Set 1 rule over the record only. Every short record in the corpus also
+    sums to 0x80 mod 256; a record whose sum has an odd number of 128s sums to 0
+    and is just as valid. `dt1_record.record_len` gives its span.
 
   Both are asserted for every checked-in fixture by spec/reac_xcheck.py.
 
@@ -2110,7 +2112,7 @@ types:
             'reg_page::identity': identity_data
       - id: inner_checksum
         type: u1
-        doc: Roland DT1 rule - Sum(tag .. inner_checksum) mod 256 == 0x80.
+        doc: Roland DT1 rule - Sum(tag .. inner_checksum) mod 128 == 0 (seven-bit).
       - id: sysex_end
         contents: [0xF7]
       - id: padding
