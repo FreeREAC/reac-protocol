@@ -1228,3 +1228,50 @@ def test_a_family_the_wire_does_not_name_claims_no_model():
     # A Roland S-0816 (8 in / 16 out) has never been captured here, so its hw
     # block names no family yet: it is named by its declared widths alone.
     assert _model(F.unknown, 8, 16).name == "REAC-0816"
+
+
+# --------------------------------------------------------------------------
+# desk or box master: the cfea's total_slots and the broadcast width
+# --------------------------------------------------------------------------
+
+# frame[16:50] of a captured cfea from each kind of master.
+CFEA_S1608_ON_M = ("cfeaffff010001030d01040040abc4803b10080100010000000000000000000000"
+                   "67")   # box-to-box-2026-09-13 enrol-main-port-slice.pcap frame 3544, 628 B
+CFEA_M200 = ("cfeaffff010001030d01040040abc9cc03281000000100000000000000000000002f")
+             # real-m200-s1608-coldboot-2026-07-11 frame 754, 1492 B
+
+
+def _cfea(hexstr):
+    return parse_block(hexstr).block.payload
+
+
+def test_a_box_on_m_announces_its_own_width():
+    c = _cfea(CFEA_S1608_ON_M)
+    assert c.total_slots == 0x10
+    assert c.announces_box
+
+
+def test_a_desk_announces_forty_slots():
+    c = _cfea(CFEA_M200)
+    assert c.total_slots == 0x28
+    assert not c.announces_box
+
+
+@pytest.mark.parametrize("name", [n for n, _ in BLOCKS if n.startswith("cfea_")])
+def test_every_desk_cfea_fixture_announces_forty(name):
+    assert not _cfea(dict(BLOCKS)[name]["hex"]).announces_box
+
+
+def _frame(dst, n_ch):
+    raw = bytearray(52 + 36 * n_ch)
+    raw[0:6] = dst
+    raw[6:12] = bytes.fromhex("0040abc4803b")
+    raw[12:14] = b"\x88\x19"
+    raw[-2:] = b"\xc2\xea"
+    return R.Reac(KaitaiStream(BytesIO(bytes(raw))))
+
+
+def test_the_broadcast_width_is_the_senders():
+    assert _frame(b"\xff" * 6, 16).broadcast_width == 16      # an S-1608 on M, 628 B
+    assert _frame(b"\xff" * 6, 40).broadcast_width == 40      # a desk, 1492 B
+    assert _frame(bytes.fromhex("00145c9b282d"), 16).broadcast_width == 0   # unicast
