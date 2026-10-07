@@ -192,8 +192,10 @@ def oracle_block_cksum_ok(block32):
 
 
 def oracle_record_cksum_ok(record):
-    """reac_ctrl_record_cksum_verify(): Sum(TAG .. CKSUM) mod 256 == 0x80."""
-    return sum(record) % 256 == 0x80
+    """reac_ctrl_record_cksum_verify(): Sum(TAG .. CKSUM) mod 128 == 0, the Roland
+    seven-bit checksum (libreac 1.7.0). The corpus's short records all land on 0x80
+    mod 256; a record whose sum has an odd number of 128s lands on 0 and is valid too."""
+    return sum(record) % 128 == 0
 
 
 def oracle_braid_pos(s, ch, n_ch):
@@ -545,7 +547,10 @@ def test_dt1_inner_checksum_is_0x80(name, blk):
     raw = bytes.fromhex(blk["hex"])
     r = dt1(parse_block(blk["hex"]))
     record = raw[18:18 + r.record_len]   # TAG .. CKSUM, frame[34:34+record_len]
-    assert oracle_record_cksum_ok(record), f"{name}: record does not sum to 0x80"
+    assert oracle_record_cksum_ok(record), f"{name}: record does not sum to 0 mod 128"
+    # every captured short record also happens to sum to 0x80 mod 256 (an even
+    # number of 128s); kept as an observation of the corpus, not as the rule
+    assert sum(record) % 256 == 0x80
 
 
 def test_grant_sweep_head_amp_records_match_the_oracle_cell_table():
