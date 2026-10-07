@@ -1116,3 +1116,107 @@ def test_a_fragment_with_the_wrong_wrapper_is_REFUSED():
     # and the untouched original must still parse, so the test is not simply
     # rejecting everything
     parse_block(bytes(good).hex()).block.payload.fragment
+
+
+# --------------------------------------------------------------------------
+# the box model: family off the identity page's hw block, widths off the
+# config announce, and the name derived from the two
+# --------------------------------------------------------------------------
+
+def _cksum(block31):
+    """Close a 31-byte control block with the byte that makes all 32 sum to 0."""
+    return bytes(block31) + bytes([(-sum(block31)) % 256])
+
+
+# Config announces no stock row carries, as frame[16:50] windows.
+# CAPTURED: box 0040abc408bc, an S-4000S-3208 re-fitted to 16 in / 24 out, on
+# reac-pw as master, s4000s-1624-announce2.pcap t = 1791302090.060459.
+S4000S_1624_CONFIG = ("cdea" "0103001084000000" "020202020101010101010303"
+                      "0003000000010000000000" "50")
+# CAPTURED: box 0040abc42580 (chassis label S-4000H), alone on VLAN 13 with
+# reac-pw mastering it, vlan13-0832.pcap t = +1.4579: outputs first, inputs 0x00.
+S4000S_0832_CONFIG = ("cdea" "0103001084000000" "010101010101010100000303"
+                      "0003000000010000000000" "56")
+# SYNTHESISED per this grammar, not captured here: box 0040abc40680 re-fitted to
+# 40 in / 0 out (ten 0x02 cells, two empty) with the S-4000S tail.
+S4000S_4000_CONFIG = "cdea" + _cksum(bytes.fromhex(
+    "0103001084000000" "020202020202020202020303" "0003000000010000000000")).hex()
+
+
+def _identity(name):
+    return dt1(parse_block(dict(BLOCKS)[name]["hex"])).data
+
+
+def _model(family, n_in, n_out):
+    return R.Reac.BoxModel(family, n_in, n_out, KaitaiStream(BytesIO(b"")))
+
+
+F = R.Reac.BoxFamily
+
+
+@pytest.mark.parametrize("name,hw,family", [
+    ("s0808_cc001a", "0000000100000000", F.s0808),
+    ("s1608_cc001a", "0000000200030002", F.s1608),
+    ("s4000s_cc001a", "0000000200010002", F.s4000s),
+])
+def test_the_hw_block_names_the_family(name, hw, family):
+    ident = _identity(name)
+    assert bytes(ident.hw_block).hex() == hw
+    assert ident.box_family == family
+
+
+def test_the_hw_block_names_each_family_once():
+    hws = {bytes(_identity(n).hw_block) for n in
+           ("s0808_cc001a", "s1608_cc001a", "s4000s_cc001a")}
+    fams = {_identity(n).box_family for n in
+            ("s0808_cc001a", "s1608_cc001a", "s4000s_cc001a")}
+    assert len(hws) == 3 and len(fams) == 3 and F.unknown not in fams
+
+
+def test_a_hw_block_no_family_has_is_unknown():
+    """A REAC version the corpus never saw names no family, not the nearest."""
+    raw = bytearray(bytes.fromhex(dict(BLOCKS)["s4000s_cc001a"]["hex"]))
+    # frame[16:50]: the 0x0600 payload's patch u16 is at index 28..29
+    assert raw[28:30] == b"\x00\x02", "fixture moved"
+    raw[29] = 0x03
+    raw[30] = (raw[30] - 1) % 128            # Roland inner checksum
+    raw[33] = (-(sum(raw[2:33]))) % 256      # block checksum
+    ident = dt1(parse_block(bytes(raw).hex())).data
+    assert ident.reac_version_patch == 3
+    assert ident.box_family == F.unknown
+
+
+def test_the_firmware_is_on_the_identity_page():
+    assert _identity("s0808_cc0016").firmware_version == 1003
+    assert _identity("s1608_cc0016").firmware_version == 2200
+    assert _identity("s4000s_cc0016").firmware_version == 2500
+
+
+@pytest.mark.parametrize("config,family_from,n_in,n_out,name", [
+    (dict(BLOCKS)["s0808_config_block"]["hex"], "s0808_cc001a", 8, 8, "S-0808"),
+    (dict(BLOCKS)["s1608_config_block"]["hex"], "s1608_cc001a", 16, 8, "S-1608"),
+    (dict(BLOCKS)["s4000s_config_block"]["hex"], "s4000s_cc001a", 32, 8,
+     "S-4000S-3208"),
+    (S4000S_0832_CONFIG, "s4000s_cc001a", 8, 32, "S-4000S-0832"),
+    (S4000S_1624_CONFIG, "s4000s_cc001a", 16, 24, "S-4000S-1624"),
+    (S4000S_4000_CONFIG, "s4000s_cc001a", 40, 0, "S-4000S-4000"),
+])
+def test_the_model_is_the_family_and_the_declared_widths(config, family_from,
+                                                         n_in, n_out, name):
+    t = parse_block(config)
+    assert oracle_block_cksum_ok(t.raw_block)
+    page = t.block.payload.page
+    assert (page.declared_in_channels, page.declared_out_channels) == (n_in, n_out)
+    family = _identity(family_from).box_family
+    m = _model(family, page.declared_in_channels, page.declared_out_channels)
+    assert m.name == name
+
+
+def test_a_name_never_hides_a_declaration_that_disagrees_with_it():
+    assert _model(F.s1608, 8, 8).name == "S-1608-0808"
+    assert _model(F.s0808, 16, 8).name == "S-0808-1608"
+
+
+def test_a_family_the_wire_does_not_name_claims_no_model():
+    assert _model(F.unknown, 16, 24).name == "REAC-1624"
+    assert _model(F.unknown, 40, 0).name == "REAC-4000"
