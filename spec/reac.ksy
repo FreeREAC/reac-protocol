@@ -795,8 +795,15 @@ types:
             1492 B broadcast, no cfea heard yet      -> UNDECIDED: wait for one.
           Never "desk" by default.
 
-          KNOWN GAP: a 40-input box on M broadcasts 1492 B and may announce 0x28.
-          Nobody has captured one; until it is, it reads as a desk.
+          NOT EVERY BOX ON M ANNOUNCES. The S-0808 on M sends no cfea at all
+          (s0808-as-master-20261007-122036 enp128s20f0u6.pcap: 159 773 frames
+          from 00:40:ab:c4:dc:9c, every one 340 B broadcast, type word cdea or
+          0000 only — channel map x20, scene push — and no cf ea). Its broadcast
+          width decides it: under 1492 B is a box, with no hold.
+
+          KNOWN GAP: a 40-input box on M broadcasts 1492 B and may announce 0x28,
+          or, like the S-0808, nothing. Nobody has captured one; until it is, it
+          reads as a desk if it announces 0x28 and as undecided if it does not.
   scene_chunk_payload:
     doc: |
       op 0x0100 — a CONTINUATION CHUNK of the master's scene transfer, 26 bytes
