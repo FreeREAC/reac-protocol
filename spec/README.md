@@ -82,9 +82,13 @@ file plus the cross-parse below.
 grammar and refuses a regression against [`corpus-baseline.json`](corpus-baseline.json).
 
 ```
-make corpus-check CAPTURES=~/Devel/audio/reac-captures
-make corpus-selftest CAPTURES=~/Devel/audio/reac-captures
+make corpus-check REAC_CAPTURES=/path/to/reac-captures
+make corpus-selftest REAC_CAPTURES=/path/to/reac-captures
 ```
+
+`REAC_CAPTURES` is the corpus checkout; it defaults to the sibling `../../reac-captures` and
+is read from the environment too, so a desk sets it once. `corpus-check.py` itself reads the
+same variable when `--captures` is not given.
 
 The unit suite and the corpus are DIFFERENT EVIDENCE. The unit suite runs on the checked-in
 goldens, so it stays green while a grammar edit quietly stops parsing a capture we used to

@@ -27,7 +27,9 @@
 #                 and refuse a regression against spec/corpus-baseline.json.
 #                 The unit suite runs on the goldens; this runs on the whole
 #                 body of evidence, and they are not the same check.
-#                   make corpus-check CAPTURES=~/Devel/audio/reac-captures
+#                   make corpus-check REAC_CAPTURES=/path/to/reac-captures
+#                 (default: the sibling checkout ../../reac-captures; the
+#                 variable is also read from the environment)
 #   make corpus-selftest
 #                 corrupt every frame and require the corpus check to go RED.
 #                 A checker that cannot fail reports success over any grammar.
@@ -83,13 +85,15 @@ facts-idempotent:
 	@diff -r out/facts-idem/generated.first out/facts-idem/generated
 	@$(PYTHON) gen-facts.py --check
 
-CAPTURES ?= $(HOME)/Devel/audio/reac-captures
+# The capture corpus: a sibling checkout by default, like LIBREAC. Override
+# with REAC_CAPTURES=/path on the make line or in the environment.
+REAC_CAPTURES ?= ../../reac-captures
 
 corpus-check:
-	$(PYTHON) corpus-check.py --captures $(CAPTURES)
+	$(PYTHON) corpus-check.py --captures $(REAC_CAPTURES)
 
 corpus-selftest:
-	$(PYTHON) corpus-check.py --captures $(CAPTURES) --self-test --quiet
+	$(PYTHON) corpus-check.py --captures $(REAC_CAPTURES) --self-test --quiet
 
 check-oracle: parser
 	$(PYTHON) xcheck_c_oracle.py --libreac $(LIBREAC)
