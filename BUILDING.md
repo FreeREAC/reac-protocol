@@ -50,8 +50,8 @@ These need other checkouts and stay out of CI, which is hermetic:
 
     make -C spec check-oracle      LIBREAC=../../libreac   # the parser against the compiled libreac
     make -C spec check-ctrl-oracle LIBREAC=../../libreac   # libreac builds, the parser reads back
-    make -C spec corpus-check      CAPTURES=/path/to/reac-captures
-    make -C spec corpus-selftest   CAPTURES=/path/to/reac-captures
+    make -C spec corpus-check      REAC_CAPTURES=/path/to/reac-captures
+    make -C spec corpus-selftest   REAC_CAPTURES=/path/to/reac-captures
 
 ## Tests that need the private fixtures
 
