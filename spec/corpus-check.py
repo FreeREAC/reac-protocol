@@ -15,7 +15,7 @@ baseline. Any file that parsed before and does not now is a regression and exits
 non-zero. Files that failed before and pass now are reported too, in the other
 direction, because that is what an improvement looks like.
 
-    ./corpus-check.py --captures ~/Devel/audio/reac-captures
+    ./corpus-check.py --captures /path/to/reac-captures   # or $REAC_CAPTURES
     ./corpus-check.py --captures DIR --write-baseline corpus-baseline.json
     ./corpus-check.py --captures DIR --ksy /some/other/reac.ksy   # baseline a
                                                                  # different grammar
@@ -305,8 +305,9 @@ def scan_file(path, reac, kaitai, per_file, corrupt, moves=None):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--captures", required=True,
-                    help="directory holding the .pcap corpus (searched recursively)")
+    ap.add_argument("--captures", default=os.environ.get("REAC_CAPTURES"),
+                    help="directory holding the .pcap corpus (searched recursively); "
+                         "default: $REAC_CAPTURES")
     ap.add_argument("--ksy", default=str(DEFAULT_KSY),
                     help="grammar to test; point it at an older copy to baseline")
     # NO CAP. The cap existed because the corpus was 47.9 GB and reading all of
@@ -330,6 +331,8 @@ def main():
                          "against the current one, and require the difference "
                          "to be a PARTITION of the old buckets")
     args = ap.parse_args()
+    if not args.captures:
+        ap.error("--captures DIR is required (or set REAC_CAPTURES)")
 
     # *.pcap* and not *.pcap: tcpdump -C splits a capture into .pcap00,
     # .pcap01 ... and eleven of this corpus's files are split that way. A glob
