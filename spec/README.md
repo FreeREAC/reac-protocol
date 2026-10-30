@@ -214,6 +214,18 @@ Everything it reads is committed beside it: no network, no capture files, no rig
   48 `(CH, PARAM, VALUE)` triples, compared against the table the C grant tests pin;
 - **both checksums** — the outer 32-byte block summing to `0` and the inner Roland
   DT1 record summing to `0x80`, on every fixture;
+- **real frames, read by something that is not the grammar** — `real_xcheck.py` over
+  `fixtures/real_frames.json`: 17 whole frames and 61 control windows taken verbatim from
+  the corpus. The length law and the width, the counter as a little-endian u16, the two
+  residue bytes as the low half of the frame's own FCS, the outer checksum to zero, the
+  inner DT1 checksum to seven bits, and the head-amp triple are computed from the bytes;
+  the classification and the decoded audio are compared with libreac's decode of the same
+  bytes; and a box return must come out of the braid as a smooth signal while the same
+  bytes read plain are rough, which a permutation the grammar got wrong cannot do.
+  Sabotage-verified: a counter read big-endian, a checksum offset moved, an opcode
+  moved, a pair group resized, a sample count cut, a register-page enum moved, a
+  segment mask narrowed, an address shortened and the braid's byte order swapped each go
+  red.
 - **the placement carriers** — declared width, config selector, `unit_offset`,
   the cfea width byte and the enroll group map — *as carriers*, never as a base
   (see below).
@@ -313,15 +325,18 @@ editing the JSON by hand. Each array is `frame[16:50]`, so index *i* is frame of
 
 ## Scope — what the spec does not cover
 
-**There is no downstream fixture in this repo.** The audio layout itself is settled —
-one braid, both directions, every generation (`reac.ksy` carries the evidence, and the
+**Real downstream frames are in this repo.** The audio layout itself is settled — one
+braid, both directions, every generation (`reac.ksy` carries the evidence, and the
 per-generation "M-5000 plain LE vs the rest" idea is refuted, never having been more
 than an untested guess at a discrepancy that turned out to be a mid-byte lane shift).
-What this repo lacks is a *captured* downstream frame: every committed golden is an
-upstream return, so the downstream side of the grammar is checked only against frames
-libreac's encoder built. That exercises the envelope, the structure and agreement with
-the codec — not a console on a wire. A downstream capture would close the gap in the
-corpus; it is not needed to decide the layout.
+[`fixtures/real_frames.json`](fixtures/real_frames.json) holds console broadcasts
+(M-200i, M-300, M-5000 and a zone-A desk, 48 and 96 kHz) next to the box returns, the
+control window of every kind, and libreac's decode of each; `real_xcheck.py` reads
+them with the grammar and with plain arithmetic, and `make check-oracle` runs the same
+frames through the compiled libreac. Only the zone-A desk frame carries enough signal to
+witness the braid on the downstream side (the M-200i frames read smoother braided, 0.26
+against 0.40, which is not a margin that counts); the box returns witness it at 48 and
+96 kHz.
 
 
 **Slot placement is not in the grammar, on purpose.** Why an S-1608 is addressed at

@@ -114,9 +114,15 @@ def build(libreac: pathlib.Path, workdir: pathlib.Path) -> pathlib.Path:
     return binary
 
 
-def check_upstream(binary, R, rep):
-    """The four committed rig goldens, through both sides, field for field."""
-    fixtures = json.loads((HERE / "fixtures" / "upstream.json").read_text())["frames"]
+def check_upstream(binary, R, rep, fixtures=None):
+    """The four committed rig goldens, through both sides, field for field.
+
+    `fixtures` swaps them for another list of {name, hex}: check_real() passes the
+    real frames of fixtures/real_frames.json, 40-channel console broadcasts
+    included, which libreac's width door takes since a box may be as wide as the
+    fabric."""
+    if fixtures is None:
+        fixtures = json.loads((HERE / "fixtures" / "upstream.json").read_text())["frames"]
     hexlines = "".join(f["hex"] + "\n" for f in fixtures)
     proc = subprocess.run([str(binary), "upstream"], input=hexlines,
                           capture_output=True, text=True, check=True)
@@ -154,15 +160,21 @@ def check_upstream(binary, R, rep):
         rep.eq(f"{name}.bytes_consumed", p._io.pos(), c["clean_len"])
 
 
+def check_real(binary, R, rep):
+    """Real frames of every width, console and box, through both sides."""
+    frames = json.loads((HERE / "fixtures" / "real_frames.json").read_text())["frames"]
+    check_upstream(binary, R, rep, frames)
+    return len(frames)
+
+
 def check_downstream(binary, R, rep):
     """A 40-channel downstream frame built by libreac's own encoder.
 
     Scope, stated bluntly: this is a SYNTHETIC frame from
     `reac_downstream_build()`, not a captured console. Agreement proves the
     spec's structural description of the 1492-byte downstream envelope matches
-    what libreac emits, and nothing whatsoever about what a real desk puts on
-    the wire — that would need a downstream capture, which this repo has none
-    of. The corpus is upstream-only.
+    what libreac emits. What a real desk puts on the wire is check_real()'s,
+    over the console broadcasts in fixtures/real_frames.json.
     """
     proc = subprocess.run([str(binary), "downstream"], capture_output=True,
                           text=True, check=True)
@@ -225,10 +237,11 @@ def main(argv=None):
     binary = build(pathlib.Path(args.libreac).resolve(), HERE)
     rep = Report()
     check_upstream(binary, R, rep)
+    n_real = check_real(binary, R, rep)
     c, ksy_pcm = check_downstream(binary, R, rep)
 
     print("reac.ksy (generated parser) vs the compiled libreac oracle")
-    print(f"  frames compared : 4 upstream goldens + 1 synthesized downstream")
+    print(f"  frames compared : 4 upstream goldens + {n_real} real frames + 1 synthesized downstream")
     print(f"  field checks    : {rep.checks}")
     print(f"  PCM samples     : {rep.samples}")
     print(f"  mismatches      : {len(rep.failures)}")
