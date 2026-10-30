@@ -418,8 +418,10 @@ groups:
         value: 0xFFFF
         fmt: hex4
         ksy_name: announce
-        why: The op a cfea announce always carries.
-        evidence: EVIDENCED (corpus).
+        why: The op a cfea announce carries. Thirty cfea blocks from an M-5000
+          are all zero, op included, and are announces by their type word alone.
+        evidence: EVIDENCED (corpus) — 28 894 of 28 924 cfea blocks; the other
+          thirty are all-zero blocks (m5000-s1608-96k matrix capture, 2026-07-11).
 
   - id: control_header
     title: The control block's header, as the firmware builds it
@@ -2561,6 +2563,8 @@ groups:
       - name: MASTER_ONLY_CADENCE_FRAMES_96K
         value: 8000
         why: The master-only cadence in frames at 96 kHz.
-        evidence: INFERRED — the 48 kHz count scaled by PKT_RATE_96K /
-          PKT_RATE_48K; no 96 kHz capture measures it yet.
+        evidence: EVIDENCED (corpus) — 793 of 948 intervals between a desk's cfea
+          announces at 96 kHz are 8000 frames +-3 (M-5000 matrix captures,
+          2026-07-11); the rest straddle a restart. Also the 48 kHz count scaled
+          by PKT_RATE_96K / PKT_RATE_48K.
         derived: PKT_RATE_96K * MASTER_ONLY_CADENCE_FRAMES_48K // PKT_RATE_48K

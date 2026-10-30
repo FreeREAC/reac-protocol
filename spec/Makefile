@@ -61,7 +61,7 @@ reac.py: $(KSY)
 	$(KSC) -t python --outdir . $(KSY)
 
 check: parser facts-idempotent
-	$(PYTHON) -m pytest reac_xcheck.py facts_xcheck.py facts_fresh_xcheck.py -q
+	$(PYTHON) -m pytest reac_xcheck.py real_xcheck.py facts_xcheck.py facts_fresh_xcheck.py -q
 
 facts:
 	$(PYTHON) gen-facts.py
