@@ -299,7 +299,10 @@ instances:
   op_announce:
     value: 0xffff
     doc: |
-      The op a cfea announce always carries. [EVIDENCED (corpus).]
+      The op a cfea announce carries. Thirty cfea blocks from an M-5000 are
+      all zero, op included, and are announces by their type word alone.
+      [EVIDENCED (corpus) — 28 894 of 28 924 cfea blocks; the other thirty
+      are all-zero blocks (m5000-s1608-96k matrix capture, 2026-07-11).]
   # ---- The control block's header, as the firmware builds it ----
   hdr_link_off:
     value: 0
@@ -1648,6 +1651,7 @@ instances:
   master_only_cadence_frames_96k:
     value: 8000
     doc: |
-      The master-only cadence in frames at 96 kHz. [INFERRED — the 48 kHz
-      count scaled by PKT_RATE_96K / PKT_RATE_48K; no 96 kHz capture
-      measures it yet.]
+      The master-only cadence in frames at 96 kHz. [EVIDENCED (corpus) — 793
+      of 948 intervals between a desk's cfea announces at 96 kHz are 8000
+      frames +-3 (M-5000 matrix captures, 2026-07-11); the rest straddle a
+      restart. Also the 48 kHz count scaled by PKT_RATE_96K / PKT_RATE_48K.]

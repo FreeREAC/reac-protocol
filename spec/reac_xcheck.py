@@ -90,14 +90,16 @@ def oracle_upstream_channels(n):
 
     Takes a CLEAN length: a residue-carrying one is not 52 + n*36 and is
     refused, like any other off-law length. The strip happened in the reader.
-    Rejects an odd width (the braid packs channel pairs) and rejects the 40-ch
-    solution, which is the downstream broadcast and never a box return.
+    Rejects an odd width (the braid packs channel pairs). A box may be as wide as
+    the fabric (even 2..40), so a 1492 B return is a 40-wide box's: libreac's
+    reac_box_width_ok() says so, and the real 1492 B frames in real_frames.json
+    go through this door.
     """
     rest = n - REAC_UPSTREAM_OVERHEAD
     if rest <= 0 or rest % REAC_UPSTREAM_BYTES_PER_CH:
         return -1
     nch = rest // REAC_UPSTREAM_BYTES_PER_CH
-    if nch % 2 or nch < 2 or nch >= REAC_MAX_CHANNELS:
+    if nch % 2 or nch < 2 or nch > REAC_MAX_CHANNELS:
         return -1
     return nch
 
@@ -371,8 +373,8 @@ def test_the_readers_strip_rule_over_the_whole_frame_family():
     assert (oracle_clean_len(1204), oracle_clean_len(1206)) == (1204, 1204)
     assert (oracle_clean_len(628), oracle_clean_len(630)) == (628, 628)
     assert (oracle_clean_len(340), oracle_clean_len(342)) == (340, 340)
-    # the 40-ch solution is the downstream broadcast, never a box return
-    assert oracle_upstream_channels(1492) == -1
+    # the 40-ch solution is a legal box width (even 2..40), as in libreac
+    assert oracle_upstream_channels(1492) == 40
     # libreac's upstream width door takes a CLEAN length and refuses a residue
     # one; that is libreac's contract, not the grammar's
     for residue in (342, 630, 1206, 1494):

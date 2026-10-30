@@ -423,7 +423,9 @@ types:
             'frame_type::control': control_block
             'frame_type::announce': control_block
         doc: cd ea and cf ea share the op/rec_len/payload shape; only the op
-          differs (cf ea is always op 0xffff). FILLER has no op at all.
+          differs (cf ea carries op 0xffff on 28 894 of the 28 924 in the corpus; the
+          other thirty are all-zero blocks an M-5000 sent, op 0 and checksum 0 included,
+          and they classify as `master_announce` all the same). FILLER has no op at all.
     instances:
       raw_block:
         pos: 2
@@ -546,12 +548,16 @@ types:
   filler_block:
     doc: |
       Type word 0x0000: an audio-only frame, no control op, CHECKSUM-EXEMPT. The
-      32 bytes are 16 two-byte descriptor slot words. Downstream, a real console
-      repeats the CHECKSUM of the control frame currently in force across every
-      FILLER until the next one — during an establishment that is the scene chunk
-      in flight; upstream, a box emits a constant word (0x007a on the
-      S-0808/S-1608 returns, 0x00f4 on the S-4000S). The presence-flood a box
-      broadcasts before it links zeroes the block entirely.
+      32 bytes are 16 two-byte descriptor slot words, and on every filler in the
+      corpus all sixteen are the same word (174 743 of 174 743). That word follows
+      the checksum of the control block the sender last put on the wire, read only
+      where the frame counter ran without a gap: a stagebox's unicast return matches
+      it in 5 353 of 5 353 fillers, a real console's broadcast in 5 255 of 6 749 —
+      the rest keep the checksum of an earlier scene chunk after the final one and
+      the frames after it have gone by. So a box does not emit one constant: the
+      S-0808 and S-1608 returns read 0x007a nearly always, the S-4000S-3208 returns
+      read 0x004c most often and 0x00f4, 0x00e6, 0x0076, 0x0016 and others. The
+      presence-flood a box broadcasts before it links zeroes the block entirely.
     seq:
       - id: descriptor
         type: u2
