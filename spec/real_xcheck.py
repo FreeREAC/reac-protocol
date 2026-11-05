@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 """The grammar against real frames, read by something that is not the grammar.
 
 `fixtures/real_frames.json` holds frames taken verbatim from the capture corpus
