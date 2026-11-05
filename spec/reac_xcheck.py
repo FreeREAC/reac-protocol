@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 """Cross-validation harness: reac.ksy against the C oracle's own truth tables.
 
 Three parties, one arrangement (see README.md):
