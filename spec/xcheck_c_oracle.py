@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 """Diff the generated parser against the COMPILED libreac, not a transcription.
 
 `reac_xcheck.py` is the hermetic referee: it compares `reac.ksy` against the
