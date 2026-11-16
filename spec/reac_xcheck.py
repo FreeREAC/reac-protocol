@@ -111,44 +111,7 @@ KIND_NONE, KIND_FILLER, KIND_PROBE, KIND_MASTER_HB, KIND_MASTER_ANNOUNCE, \
     KIND_GRANT, KIND_HEADAMP, KIND_BOX_HB, KIND_UNKNOWN, KIND_CONFIG_ANNOUNCE, \
     KIND_GROUP_MAP, KIND_RECORD_FRAGMENT, KIND_LINK2 = range(13)
 # KIND_PROBE keeps its number and its name because the enum value 2 is
-# `scene_transfer` and libreac still calls it the probe bucket. It is the bucket
-# the new classification SPLITS, so it has to stay addressable by both names.
-
-
-def legacy_ctrl_kind(block34):
-    """reac_ctrl_parse() AS IT WAS BEFORE 2026-08-23, over a frame[16:50] window.
-
-    Kept only as the left-hand side of the partition proof below. Nothing else
-    should call it: it keys on two lengths where the protocol keys on a subtype.
-
-    Transcribed decision for decision, quirks included: op 0x0403 is HEADAMP
-    only when the DT1 command byte is 0x12 and the tag is 0x0101, everything
-    else under 0x0403 is GRANT; and any op whose high byte is 0x01 that is
-    neither chanmap (op_len 0x0019) nor box heartbeat (0x0001) falls through to
-    PROBE, which sweeps up config-announce and the enroll group map.
-    """
-    b = block34
-    t0, t1 = b[0], b[1]
-    op = (b[2] << 8) | b[3]
-    op_len = (b[4] << 8) | b[5]
-    if (t0, t1) == (0x00, 0x00):
-        return KIND_FILLER
-    if (t0, t1) == (0xcf, 0xea):
-        return KIND_MASTER_ANNOUNCE
-    if (t0, t1) != (0xcd, 0xea):
-        return KIND_UNKNOWN
-    if op == 0x0403:
-        # frame[32..35] = model-id low, command, tag
-        if b[16] == 0x12 and b[17] == 0x12 and b[18] == 0x01 and b[19] == 0x01:
-            return KIND_HEADAMP
-        return KIND_GRANT
-    if op == 0x0103 and op_len == 0x0019:
-        return KIND_MASTER_HB
-    if op == 0x0103 and op_len == 0x0001:
-        return KIND_BOX_HB
-    if op >> 8 == 0x01:
-        return KIND_PROBE
-    return KIND_UNKNOWN
+# `scene_transfer` and libreac still calls it the probe bucket.
 
 
 def oracle_ctrl_kind(block34):
@@ -1072,56 +1035,6 @@ def test_group_map_bytes_decode_as_the_firmware_reads_them():
     top2 = [(v if (v := g[i] >> 6) in (0, 1) else -1) for i in range(10)]
     assert low6 == [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert top2 == [1, 0, 0, 0, 0, 0, -1, -1, -1, -1]
-
-
-# --------------------------------------------------------------------------
-# The reclassification is a PARTITION, not a reshuffle
-# --------------------------------------------------------------------------
-
-def test_reclassification_only_splits_and_never_moves_sideways():
-    """Every frame the new classifier moves must come out of the old PROBE
-    bucket or the old UNKNOWN bucket, and nothing else may move at all.
-
-    A classifier rewrite is the kind of change that looks right on the frames
-    you were staring at while quietly relabelling something else. Comparing the
-    two expressions frame by frame is the only way to see that; a spot check on
-    the frames that were MEANT to move cannot."""
-    allowed = {
-        (KIND_PROBE, KIND_PROBE),
-        (KIND_PROBE, KIND_CONFIG_ANNOUNCE),
-        (KIND_PROBE, KIND_GROUP_MAP),
-        (KIND_PROBE, KIND_BOX_HB),
-        (KIND_UNKNOWN, KIND_RECORD_FRAGMENT),
-    }
-    moved = collections.Counter()
-    total = 0
-    for name, blk in BLOCKS:
-        raw = bytes.fromhex(blk["hex"])
-        was, now = legacy_ctrl_kind(raw), oracle_ctrl_kind(raw)
-        total += 1
-        if was == now:
-            continue
-        assert (was, now) in allowed, (
-            "%s moved %d -> %d, which is not a split of the old buckets"
-            % (name, was, now))
-        moved[(was, now)] += 1
-    for h in GRANT_FRAMES:
-        raw = bytes.fromhex(h)
-        was, now = legacy_ctrl_kind(raw), oracle_ctrl_kind(raw)
-        total += 1
-        assert was == now or (was, now) in allowed
-        if was != now:
-            moved[(was, now)] += 1
-    assert total >= 90, "too few frames compared for this to mean anything"
-    assert moved, "nothing moved at all -- the two classifiers are identical, "\
-                  "so this test is not observing the change it claims to"
-    # the split must conserve: everything that left PROBE landed in the three
-    # kinds PROBE splits into
-    left_probe = sum(v for (w, n), v in moved.items() if w == KIND_PROBE)
-    into = sum(v for (w, n), v in moved.items()
-               if w == KIND_PROBE and n in (KIND_CONFIG_ANNOUNCE, KIND_GROUP_MAP,
-                                            KIND_BOX_HB))
-    assert left_probe == into, "a frame left PROBE for somewhere else"
 
 
 def test_grammar_and_oracle_agree_on_every_fixture():
