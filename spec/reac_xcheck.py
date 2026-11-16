@@ -461,10 +461,10 @@ def test_op_dispatch_reads_the_op_the_oracle_reads(name, blk):
     raw = bytes.fromhex(blk["hex"])
     t = parse_block(blk["hex"])
     assert t.op_raw == (raw[2] << 8) | raw[3]
-    assert t.op_len_raw == (raw[4] << 8) | raw[5]
+    assert t.rec_len == (raw[4] << 8) | raw[5]
     if t.type_word == R.Reac.FrameType.control.value:
         assert t.block.op.value if hasattr(t.block.op, "value") else t.block.op
-        assert t.block.rec_len == t.op_len_raw
+        assert t.block.rec_len == t.rec_len
 
 
 def test_page_0103_subpage_dispatch():
@@ -577,7 +577,7 @@ def dt1(t):
 @pytest.mark.parametrize("name,blk", [(n, b) for n, b in BLOCKS if "cc00" in n])
 def test_dt1_container_shape(name, blk):
     r = dt1(parse_block(blk["hex"]))
-    assert r.len_echo == parse_block(blk["hex"]).op_len_raw - 5
+    assert r.len_echo == parse_block(blk["hex"]).rec_len - 5
     assert r.device_id == 0x0a
     assert bytes(r.model_id) == b"\x00\x00\x12"
     assert r.record_len == r.data_len + 3
@@ -710,7 +710,7 @@ def test_scene_chunks_are_slices_of_the_body(scene_body):
             continue
         t = parse_block(blk["hex"])
         assert t.op_raw == 0x0100
-        assert t.op_len_raw == 0x001a == 26, "rec_len is the CHUNK LENGTH"
+        assert t.rec_len == 0x001a == 26, "rec_len is the CHUNK LENGTH"
         p = t.block.payload
         assert p.chunk_reserved == 0
         assert bytes(p.chunk) in chunks, f"{name} is not a slice of the body"
@@ -728,7 +728,7 @@ def test_scene_header_declares_the_total_not_a_model_constant(scene_body):
     t = parse_block(next(b for n, b in BLOCKS if n == "sub01")["hex"])
     p = t.block.payload
     assert t.op_raw == 0x0101
-    assert t.op_len_raw == 0x0018 == 24, "rec_len is this chunk's length"
+    assert t.rec_len == 0x0018 == 24, "rec_len is this chunk's length"
     assert p.scene_total_len == len(scene_body) == 0x22c8
     assert bytes(p.body_head) == scene_body[:24]
     assert bytes(p.body_head)[:4] == b"1234"
@@ -737,7 +737,7 @@ def test_scene_header_declares_the_total_not_a_model_constant(scene_body):
 def test_scene_final_carries_the_tail(scene_body):
     t = parse_block(next(b for n, b in BLOCKS if n == "sub02")["hex"])
     assert t.op_raw == 0x0102
-    assert t.op_len_raw == 0x000e == 14 == (8904 - 24) % 26
+    assert t.rec_len == 0x000e == 14 == (8904 - 24) % 26
     assert bytes(t.block.payload.chunk)[:14] == scene_body[-14:]
 
 

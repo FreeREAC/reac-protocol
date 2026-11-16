@@ -164,7 +164,7 @@ def exercise(frame, reac, kaitai):
     f = reac.Reac(kaitai.KaitaiStream(kaitai.BytesIO(frame)))
     _ = f.raw_len, f.num_channels, f.len_audio
     t = f.control
-    _ = t.ctrl_kind, t.op_raw, t.op_len_raw, t.block_checksum
+    _ = t.ctrl_kind, t.op_raw, t.rec_len, t.block_checksum
     block = t.block
     for name in ("link", "seg", "seg_kind", "seg_is_first", "seg_is_last",
                  "opcode", "op", "op_len"):
@@ -200,7 +200,7 @@ def exercise_block(window, reac, kaitai):
     C goldens are stored as, so a truncated capture still exercises the whole
     control multiplex."""
     t = reac.Reac.TypedBlock(kaitai.KaitaiStream(kaitai.BytesIO(window)))
-    _ = t.ctrl_kind, t.op_raw, t.op_len_raw, t.block_checksum
+    _ = t.ctrl_kind, t.op_raw, t.rec_len, t.block_checksum
     block = t.block
     for name in ("link", "seg", "seg_kind", "seg_is_first", "seg_is_last",
                  "opcode", "op", "op_len"):
