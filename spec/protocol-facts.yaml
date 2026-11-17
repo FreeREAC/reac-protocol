@@ -454,7 +454,7 @@ groups:
         value: 2
         why: block[2:4] — the big-endian length.
         evidence: EVIDENCED (image).
-        ksy: types/typed_block/instances/op_len_raw/pos
+        ksy: types/typed_block/instances/rec_len/pos
         ksy_offset: -2
       - name: HDR_OPCODE_OFF
         value: 4

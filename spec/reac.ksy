@@ -441,16 +441,11 @@ types:
         type: u2
         doc: frame[18:20], readable whatever the type word says. Used by
           ctrl_kind so classification never depends on the switch.
-      op_len_raw:
+      rec_len:
         pos: 4
         type: u2
-        doc: |
-          frame[20:22] — the record length, big-endian. Named for libreac's
-          consumer, which `ctrl_kind` mirrors, and NOT for what the field is;
-          `control_block.rec_len` is the same bytes under their real name.
-          Keeping the old name here is deliberate: this instance exists only to
-          reproduce a consumer's decisions, including the one below that keys a
-          classification on a LENGTH.
+        doc: frame[20:22] — the record length, big-endian; the same bytes as
+          `control_block.rec_len`, readable whatever the type word says.
       link_raw:
         pos: 2
         type: u1
@@ -718,11 +713,6 @@ types:
         enum: link1_opcode
         doc: The same byte with the link-1 opcode names attached. Meaningless
           when `link` is not `control`.
-      record_class:
-        value: link.to_i
-        doc: The sister branch's name for `link` — 0x01 session, 0x04
-          parameter. One byte, one meaning; kept as an alias so a reader
-          coming from either vocabulary lands on the same field.
   cfea_payload:
     doc: |
       The cf ea master announce (op 0xffff, rec_len 0x0100). Advertises the

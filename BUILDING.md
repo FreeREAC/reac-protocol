@@ -32,7 +32,7 @@ cross-checks that hold the grammar, the declared facts and the C oracle (libreac
 `make -C spec check` regenerates the parser (it is never committed), requires the generated
 fact headers to be current and reproducible, and runs `reac_xcheck.py`, `facts_xcheck.py` and
 `facts_fresh_xcheck.py`. `tools/freereac_ops.py check` keeps the public tree public: no
-internal material, no file-name citation of a moved document, no build command on the README.
+internal material and no build command on the README.
 
 ## The declared facts
 

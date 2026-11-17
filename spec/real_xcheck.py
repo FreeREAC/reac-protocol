@@ -163,7 +163,7 @@ def test_a_real_control_block_sums_to_zero_and_says_what_the_bytes_say(fx):
     assert t.block_checksum == win[33] == t.block.block_checksum
     assert bytes(t.raw_block) == win[2:34]
     assert t.op_raw == int.from_bytes(win[2:4], "big")
-    assert t.op_len_raw == int.from_bytes(win[4:6], "big")
+    assert t.rec_len == int.from_bytes(win[4:6], "big")
     b = t.block
     assert int(b.seg_kind) == win[3] & 3
     assert (int(b.link), b.seg, b.rec_len, b.opcode) == (win[2], win[3], int.from_bytes(win[4:6], "big"), win[6])
